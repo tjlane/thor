@@ -26,9 +26,12 @@ Dependencies
 * numpy      (epd)
 * scipy      (epd)
 * pytables   (epd)
+* pyyaml     (epd)
 * matplotlib (epd)
 * OpenMM     (https://simtk.org/home/openmm)
+* periodictable   (http://www.reflectometry.org/danse/elements.html)
 * nvcc       (optional additional GPU support, https://developer.nvidia.com/cuda-downloads)
+
 
 We HIGHLY recommend using the Enthought python distribution (EPD, http://www.enthought.com/products/epd.php) which contains all of the dependincies marked above with (epd) in a single package. It's awesome and free for academics.
 
