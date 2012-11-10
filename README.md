@@ -1,6 +1,8 @@
 ODIN
 ====
 
+(this code is under active development, and nothing works... yet!)
+
 Structural ensemble determination from heterogeneous, multiple experimental sources. 
 
 ODIN takes your experimental data and predicts structures, and also structural ensembles in a rigorous way!
