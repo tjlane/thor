@@ -6,6 +6,7 @@ his MSMBuilder setup.py file.
 """
 
 import os, sys
+from os.path import join as pjoin
 from glob import glob
 
 # setuptools needs to come before numpy.distutils to get install_requires
@@ -17,7 +18,7 @@ from distutils.unixccompiler import UnixCCompiler
 from distutils.extension import Extension
 from distutils.command.build_ext import build_ext
 
-#import numpy
+import numpy
 #from numpy.distutils.core import setup, Extension
 #from numpy.distutils.misc_util import Configuration
 
@@ -41,10 +42,9 @@ metadata = {
     'author_email': 'tjlane@stanford.edu',
     'license': 'GPL v3.0',
     'url': 'https://github.com/tjlane/odin',
-    'download_url': 'https://simtk.orgc/home/msmbuilder',
-    'install_requires': ['numpy', 'scipy', 'matplotlib', 'pyyaml',
-                         'deap', 'fastcluster==1.1.6'],
-    'platforms': ["Linux", "Mac OS X"],
+    'download_url': 'https://github.com/tjlane/odin',
+    'install_requires': ['numpy', 'scipy', 'matplotlib', 'pyyaml', 'periodictable'],
+    'platforms': ['Linux'],
     'zip_safe': False,
     'description': "Code for Structure Determination",
     'long_description': """ODIN is a simulation toolpackage for producing
@@ -53,8 +53,25 @@ data."""}
 
 
 # ------------------------------------------------------------------------------
-# HELPER FUNCTIONS -- git, python version, readthedocs
+# HELPER FUNCTIONS -- path finding, git, python version, readthedocs
 # ------------------------------------------------------------------------------
+
+def find_in_path(name, path):
+    "Find a file in a search path"
+    #adapted fom http://code.activestate.com/recipes/52224-find-a-file-given-a-search-path/
+    for dir in path.split(os.pathsep):
+        binpath = pjoin(dir, name)
+        if os.path.exists(binpath):
+            return os.path.abspath(binpath)
+    return None
+    
+
+# Obtain the numpy include directory. This logic works across numpy versions.
+try:
+    numpy_include = numpy.get_include()
+except AttributeError:
+    numpy_include = numpy.get_numpy_include()
+
 
 def git_version():
     """
@@ -153,154 +170,155 @@ if not release:
     
 # ------------------------------------------------------------------------------
 # GPU FUNCTION WRAPPING -- nvcc support
-# python distutils doesn't have NVCC by default. This is a total hack.
+# python distutils doesn't have NVCC by default
 # ------------------------------------------------------------------------------
 
-subprocess.check_call('swig -python -c++ -o src/swig/swig_wrap.cpp src/swig/swig.i', shell=True)
-
-# make the clean command always run first
-#sys.argv.insert(1, 'clean')
-#sys.argv.insert(2, 'build')
-
-class MyExtension(Extension):
-    """subclass extension to add the kwarg 'glob_extra_link_args'
-    which will get evaluated by glob right before the extension gets compiled
-    and let the swig shared object get linked against the cuda kernel
+def locate_cuda():
     """
-    def __init__(self, *args, **kwargs):
-        self.glob_extra_link_args = kwargs.pop('glob_extra_link_args', [])
-        Extension.__init__(self, *args, **kwargs)
+    Locate the CUDA environment on the system
 
-class NVCC(UnixCCompiler):
-    src_extensions = ['.cu']
-    executables = {'preprocessor' : None,
-                   'compiler'     : ["nvcc"],
-                   'compiler_so'  : ["nvcc"],
-                   'compiler_cxx' : ["nvcc"],
-                   'linker_so'    : ["echo"], # TURN OFF NVCC LINKING
-                   'linker_exe'   : ["gcc"],
-                   'archiver'     : ["ar", "-cr"],
-                   'ranlib'       : None,
-               }
-    def __init__(self):
-        # Check to ensure that nvcc can be located
-        try:
-            subprocess.check_output('nvcc --help', shell=True)
-        except CalledProcessError:
-            print >> sys.stderr, 'Could not find nvcc, the nvidia cuda compiler'
-            sys.exit(1)
-        UnixCCompiler.__init__(self)
+    Returns a dict with keys 'home', 'nvcc', 'include', and 'lib64'
+    and values giving the absolute path to each directory.
 
-
-class custom_build_ext(build_ext):
+    Starts by looking for the CUDAHOME env variable. If not found, everything
+    is based on finding 'nvcc' in the PATH.
     """
-    this cusom class lets us build one extension with nvcc and one extension with 
-    regular gcc basically, it just tries to detect a .cu file ending to trigger 
-    the nvcc compiler.
+
+    # first check if the CUDAHOME env variable is in use
+    if 'CUDAHOME' in os.environ:
+        home = os.environ['CUDAHOME']
+        nvcc = pjoin(home, 'bin', 'nvcc')
+    else:
+        # otherwise, search the PATH for NVCC
+        nvcc = find_in_path('nvcc', os.environ['PATH'])
+        if nvcc is None:
+            raise EnvironmentError('The nvcc binary could not be '
+                'located in your $PATH. Either add it to your path, or set $CUDAHOME')
+        home = os.path.dirname(os.path.dirname(nvcc))
+
+    cudaconfig = {'home':home, 'nvcc':nvcc,
+                  'include': pjoin(home, 'include'),
+                  'lib64': pjoin(home, 'lib64')}
+    for k, v in cudaconfig.iteritems():
+        if not os.path.exists(v):
+            raise EnvironmentError('The CUDA %s path could not be located in %s' % (k, v))
+
+    return cudaconfig
+    
+CUDA = locate_cuda()
+
+
+def customize_compiler_for_nvcc(self):
+    """
+    Inject deep into distutils to customize how the dispatch
+    to gcc/nvcc works.
+
+    If you subclass UnixCCompiler, it's not trivial to get your subclass
+    injected in, and still have the right customizations (i.e.
+    distutils.sysconfig.customize_compiler) run on it. So instead of going
+    the OO route, I have this. Note, it's kindof like a wierd functional
+    subclassing going on.
     """
     
+    # tell the compiler it can processes .cu
+    self.src_extensions.append('.cu')
+
+    # save references to the default compiler_so and _comple methods
+    default_compiler_so = self.compiler_so
+    super = self._compile
+
+    # now redefine the _compile method. This gets executed for each
+    # object but distutils doesn't have the ability to change compilers
+    # based on source extension: we add it.
+    def _compile(obj, src, ext, cc_args, extra_postargs, pp_opts):
+        if os.path.splitext(src)[1] == '.cu':
+            # use the cuda for .cu files
+            self.set_executable('compiler_so', CUDA['nvcc'])
+            # use only a subset of the extra_postargs, which are 1-1 translated
+            # from the extra_compile_args in the Extension class
+            postargs = extra_postargs['nvcc']
+        else:
+            postargs = extra_postargs['gcc']
+
+        super(obj, src, ext, cc_args, postargs, pp_opts)
+        # reset the default compiler_so, which we might have changed for cuda
+        self.compiler_so = default_compiler_so
+
+    # inject our redefined _compile method into the class
+    self._compile = _compile
+
+
+# run the customize_compiler
+class custom_build_ext(build_ext):
     def build_extensions(self):
-        # we're going to need to switch between compilers, so lets save both
-        self.default_compiler = self.compiler
-        self.nvcc = NVCC()
+        customize_compiler_for_nvcc(self.compiler)
         build_ext.build_extensions(self)
 
-    def build_extension(self, *args, **kwargs):
-        extension = args[0]
-        # switch the compiler based on which thing we're compiling
-        # if any of the sources end with .cu, use nvcc
-        if any([e.endswith('.cu') for e in extension.sources]):
-            # note that we've DISABLED the linking (by setting the linker to be "echo")
-            # in the nvcc compiler
-            self.compiler = self.nvcc
-        else:
-            self.compiler = self.default_compiler
-
-        # evaluate the glob pattern and add it to the link line
-        # note, this suceeding with a glob pattern like build/temp*/gpurmsd/RMSD.o
-        # depends on the fact that this extension is built after the extension
-        # which creates that .o file
-        if hasattr(extension, 'glob_extra_link_args'):
-            for pattern in extension.glob_extra_link_args:
-                unglobbed = glob(pattern)
-                if len(unglobbed) == 0:
-                    raise RuntimeError("glob_extra_link_args didn't match any files")
-                self.compiler.linker_so += unglobbed
-        
-        # call superclass
-        build_ext.build_extension(self, *args, **kwargs)
+gpuscatter = Extension('_gpuscatter',
+                        sources=['src/cuda/swig_wrap.cpp', 'src/cuda/gpuscatter_mgr.cu'],
+                        library_dirs=[CUDA['lib64']],
+                        libraries=['cudart'],
+                        runtime_library_dirs=[CUDA['lib64']],
+                        # this syntax is specific to this build system
+                        # we're only going to use certain compiler args with nvcc and not with gcc
+                        # the implementation of this trick is in customize_compiler() below
+                        extra_compile_args={'gcc': [],
+                                            'nvcc': ['-use_fast_math', '-arch=sm_20', '--ptxas-options=-v', 
+                                                     '-c', '--compiler-options', "'-fPIC'"]},
+                        include_dirs = [numpy_include, CUDA['include'], 'src/cuda'])
 
 
-# this code will get compiled up to a .o file by nvcc. the final .o file(s) that
-# it makes will be just one for each input source file. Note that we turned off
-# the nvcc linker so that we don't make any .so files.
-nvcc_compiled = Extension('nvcc_object_avoider',
-                          sources=['src/cuda/gpuscatter_manager.cu'],
-                          extra_compile_args=['-arch=sm_20', '--ptxas-options=-v', 
-                                              '-c', '--compiler-options', "'-fPIC'"],
-                          # we need to include src as an input directory so that 
-                          # the header files and device_kernel.cu can be found
-                          include_dirs=['/usr/local/cuda/include', 'src'],
-                          )
+# check for swig
+if find_in_path('swig', os.environ['PATH']):
+    subprocess.check_call('swig -python -c++ -o src/cuda/swig_wrap.cpp src/cuda/gpuscatter.i', shell=True)
+else:
+    raise EnvironmentError('the swig executable was not found in your PATH')
 
-# the swig wrapper for gpuscatter.cu gets compiled, and then linked to scatter.o
-swig_wrapper = MyExtension('_scatter',
-                           sources=['src/swig/swig_wrap.cpp'],
-                           library_dirs=['/usr/local/cuda/lib64'],
-                           libraries=['cudart'],
-                           # extra bit of magic so that we link this
-                           # against the kernels -o file
-                           # this picks up the build/temp.linux/src/manager.cu
-                           glob_extra_link_args=['build/*/*/manager.o'],
-                           # make sure that at runtime we find the linked libraries
-                           runtime_library_dirs="$ORIGIN/../lib/")
-
-# inject our custom trigger
-metadata['cmdclass'] = {'build_ext': custom_build_ext}
 
 
 # -----------------------------------------------------------------------------
 # PROCEED TO STANDARD SETUP
 # -----------------------------------------------------------------------------
 
-def configuration(parent_package='',top_path=None):
-    "Configure the build"
-
-    config = Configuration('odin',
-                           package_parent=parent_package,
-                           top_path=top_path,
-                           package_path='src/python')
-    config.set_options(assume_default_configuration=True,
-                       delegate_options_to_subpackages=True,
-                       quiet=False)
-    
-    # add the scipts, so they can be called from the command line
-    config.add_scripts([e for e in glob('scripts/*.py') if not e.endswith('__.py')])
-    
-    # add scripts as a subpackage (so they can be imported from other scripts)
-    config.add_subpackage('scripts', subpackage_path=None)
-
-    # example for additional packages or extensions
-    #config.add_subpackage('package', subpackage_path='src/python/package_name')
-    #dist = Extension('msmbuilder._distance_wrap', sources=glob('src/ext/scipy_distance/*.c'))
-        
-    #for extension in [module_name]:
-        # ext.extra_compile_args = ["-O3", "-fopenmp", "-Wall"]
-        # ext.extra_link_args = ['-lgomp']
-        # ext.include_dirs = [numpy.get_include()]
-        # config.ext_modules.append(extension)
-    
-    return config
-
-
-metadata['py_modules']  = ['scatter']
-metadata['package_dir'] = {'': 'src/python',         # the 'root' package - odin
-                           'gpuscatter': 'src/cuda'  # GPU scattering code
-                           }
-metadata['ext_modules'] = [nvcc_compiled, swig_wrapper]
+# def configuration(parent_package='',top_path=None):
+#     "Configure the build"
+# 
+#     config = Configuration('odin',
+#                            package_parent=parent_package,
+#                            top_path=top_path,
+#                            package_path='src/python')
+#     config.set_options(assume_default_configuration=True,
+#                        delegate_options_to_subpackages=True,
+#                        quiet=False)
+#     
+#     # add the scipts, so they can be called from the command line
+#     config.add_scripts([e for e in glob('scripts/*.py') if not e.endswith('__.py')])
+#     
+#     # add scripts as a subpackage (so they can be imported from other scripts)
+#     config.add_subpackage('scripts', subpackage_path=None)
+# 
+#     # example for additional packages or extensions
+#     #config.add_subpackage('package', subpackage_path='src/python/package_name')
+#     #dist = Extension('msmbuilder._distance_wrap', sources=glob('src/ext/scipy_distance/*.c'))
+#         
+#     #for extension in [module_name]:
+#         # ext.extra_compile_args = ["-O3", "-fopenmp", "-Wall"]
+#         # ext.extra_link_args = ['-lgomp']
+#         # ext.include_dirs = [numpy.get_include()]
+#         # config.ext_modules.append(extension)
+#     
+#     return config
 
 
 
+# ADD PACKAGES, MODULES TO metadata
+
+metadata['py_modules']  = ['gpuscatter']
+metadata['package_dir'] = {'': 'src'}
+metadata['ext_modules'] = [gpuscatter]
+
+# inject our custom trigger
+metadata['cmdclass'] = {'build_ext': custom_build_ext},
 
 
 
