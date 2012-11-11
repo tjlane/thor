@@ -31,12 +31,13 @@ from subprocess import CalledProcessError
 # HEADER -- metadata for setup()
 # ------------------------------------------------------------------------------
 
-VERSION = "0.1b"
+VERSION = "0.1a"
 ISRELEASED = False
 __author__ = "TJ Lane"
 __version__ = VERSION
 
 metadata = {
+    'name': 'odin',
     'version': VERSION,
     'author': __author__,
     'author_email': 'tjlane@stanford.edu',
@@ -318,11 +319,11 @@ metadata['package_dir'] = {'': 'src'}
 metadata['ext_modules'] = [gpuscatter]
 
 # inject our custom trigger
-metadata['cmdclass'] = {'build_ext': custom_build_ext},
+metadata['cmdclass'] = {'build_ext': custom_build_ext}
 
 
 
 if __name__ == '__main__':
     write_version_py()
-    metadata['configuration'] = configuration
+    #metadata['configuration'] = configuration
     setup(**metadata)
