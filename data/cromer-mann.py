@@ -163,7 +163,7 @@ def print_cromer_mann_dict():
             key = str(key)
         values = str(values)
         
-        print '                      %s : %s' % (key, values)
+        print '                      %s : %s,' % (key, values)
     
     print '                      }'
     
