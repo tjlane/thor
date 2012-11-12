@@ -255,6 +255,15 @@ class custom_build_ext(build_ext):
         customize_compiler_for_nvcc(self.compiler)
         build_ext.build_extensions(self)
 
+
+# -----------------------------------------------------------------------------
+# PROCEED TO STANDARD SETUP
+# odin, gpuscatter,
+# -----------------------------------------------------------------------------
+
+
+# gpuscatter extension
+
 gpuscatter = Extension('_gpuscatter',
                         sources=['src/cuda/swig_wrap.cpp', 'src/cuda/gpuscatter_mgr.cu'],
                         library_dirs=[CUDA['lib64']],
@@ -277,45 +286,12 @@ else:
 
 
 
-# -----------------------------------------------------------------------------
-# PROCEED TO STANDARD SETUP
-# -----------------------------------------------------------------------------
-
-# def configuration(parent_package='',top_path=None):
-#     "Configure the build"
-# 
-#     config = Configuration('odin',
-#                            package_parent=parent_package,
-#                            top_path=top_path,
-#                            package_path='src/python')
-#     config.set_options(assume_default_configuration=True,
-#                        delegate_options_to_subpackages=True,
-#                        quiet=False)
-#     
-#     # add the scipts, so they can be called from the command line
-#     config.add_scripts([e for e in glob('scripts/*.py') if not e.endswith('__.py')])
-#     
-#     # add scripts as a subpackage (so they can be imported from other scripts)
-#     config.add_subpackage('scripts', subpackage_path=None)
-# 
-#     # example for additional packages or extensions
-#     #config.add_subpackage('package', subpackage_path='src/python/package_name')
-#     #dist = Extension('msmbuilder._distance_wrap', sources=glob('src/ext/scipy_distance/*.c'))
-#         
-#     #for extension in [module_name]:
-#         # ext.extra_compile_args = ["-O3", "-fopenmp", "-Wall"]
-#         # ext.extra_link_args = ['-lgomp']
-#         # ext.include_dirs = [numpy.get_include()]
-#         # config.ext_modules.append(extension)
-#     
-#     return config
-
-
 
 # ADD PACKAGES, MODULES TO metadata
 
+metadata['packages']    = ['odin']
 metadata['py_modules']  = ['gpuscatter']
-metadata['package_dir'] = {'': 'src'}
+metadata['package_dir'] = {'odin': 'src/python'}
 metadata['ext_modules'] = [gpuscatter]
 
 # inject our custom trigger
@@ -325,5 +301,4 @@ metadata['cmdclass'] = {'build_ext': custom_build_ext}
 
 if __name__ == '__main__':
     write_version_py()
-    #metadata['configuration'] = configuration
     setup(**metadata)
