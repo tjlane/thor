@@ -291,7 +291,8 @@ else:
 
 metadata['packages']    = ['odin']
 metadata['py_modules']  = ['gpuscatter']
-metadata['package_dir'] = {'odin': 'src/python'}
+metadata['package_dir'] = {'': 'src/cuda',
+                           'odin': 'src/python'}
 metadata['ext_modules'] = [gpuscatter]
 
 # inject our custom trigger
