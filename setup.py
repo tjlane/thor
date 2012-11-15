@@ -15,11 +15,11 @@ from setuptools import setup
 
 from distutils import sysconfig
 from distutils.unixccompiler import UnixCCompiler
-from distutils.extension import Extension
+#from distutils.extension import Extension
 from distutils.command.build_ext import build_ext
 
 import numpy
-#from numpy.distutils.core import setup, Extension
+from numpy.distutils.core import setup, Extension
 from numpy.distutils.misc_util import Configuration
 
 import subprocess
@@ -37,7 +37,7 @@ __author__ = "TJ Lane"
 __version__ = VERSION
 
 metadata = {
-    'name': 'odin',
+#    'name': 'odin',
     'version': VERSION,
     'author': __author__,
     'author_email': 'tjlane@stanford.edu',
@@ -286,7 +286,7 @@ def configuration(parent_package='',top_path=None):
                        quiet=False)
     
     #once all of the data is in one place, we can add it with this
-    config.add_data_dir('./test/reference')
+    config.add_data_dir('reference')
     
     # add the scipts, so they can be called from the command line
     config.add_scripts([s for s in glob('scripts/*') if not s.endswith('__.py')])
@@ -294,8 +294,13 @@ def configuration(parent_package='',top_path=None):
     # add scripts as a subpackage (so they can be imported from other scripts)
     config.add_subpackage('scripts', subpackage_path=None)
 
+    print config.todict()
+ 
+    return config
+
 
 if CUDA:
+    print "ATTEMPTING TO INSTALL GPUSCATTER"
     gpuscatter = Extension('_gpuscatter',
                             sources=['src/cuda/swig_wrap.cpp', 'src/cuda/gpuscatter_mgr.cu'],
                             library_dirs=[CUDA['lib64']],
@@ -318,14 +323,16 @@ else:
 
 # ADD PACKAGES, MODULES TO metadata
 
-metadata['packages']    = ['odin']
+#metadata['packages']    = [] # ['odin']
+
 metadata['py_modules']  = []
-metadata['package_dir'] = {'odin': 'src/python'}
+metadata['package_dir'] = {} #{'': 'src/python'}
 metadata['ext_modules'] = []
 metadata['scripts'] = [s for s in glob('scripts/*') if not s.endswith('__.py')]                 
-metadata['configuration'] = configuration()
+metadata['configuration'] = configuration
 
 # if we have a CUDA-enabled GPU...
+
 if CUDA:
     metadata['package_dir'][''] = 'src/cuda'
     metadata['py_modules'].append('gpuscatter')
@@ -333,7 +340,6 @@ if CUDA:
 
     # inject our custom trigger
     metadata['cmdclass'] = {'build_ext': custom_build_ext}
-
 
 
 if __name__ == '__main__':
