@@ -20,7 +20,7 @@ from distutils.command.build_ext import build_ext
 
 import numpy
 #from numpy.distutils.core import setup, Extension
-#from numpy.distutils.misc_util import Configuration
+from numpy.distutils.misc_util import Configuration
 
 import subprocess
 from subprocess import CalledProcessError
@@ -44,7 +44,7 @@ metadata = {
     'license': 'GPL v3.0',
     'url': 'https://github.com/tjlane/odin',
     'download_url': 'https://github.com/tjlane/odin',
-    'install_requires': ['numpy', 'scipy', 'matplotlib', 'pyyaml', 'periodictable'],
+    'install_requires': ['numpy', 'scipy', 'matplotlib', 'pyyaml', 'mdtraj'],
     'platforms': ['Linux'],
     'zip_safe': False,
     'description': "Code for Structure Determination",
@@ -274,6 +274,27 @@ if CUDA:
 # odin, gpuscatter,
 # -----------------------------------------------------------------------------
 
+def configuration(parent_package='',top_path=None):
+    "Configure the build"
+
+    config = Configuration('odin',
+                           package_parent=parent_package,
+                           top_path=top_path,
+                           package_path='src/python')
+    config.set_options(assume_default_configuration=True,
+                       delegate_options_to_subpackages=True,
+                       quiet=False)
+    
+    #once all of the data is in one place, we can add it with this
+    config.add_data_dir('./test/reference')
+    
+    # add the scipts, so they can be called from the command line
+    config.add_scripts([s for s in glob('scripts/*') if not s.endswith('__.py')])
+    
+    # add scripts as a subpackage (so they can be imported from other scripts)
+    config.add_subpackage('scripts', subpackage_path=None)
+
+
 if CUDA:
     gpuscatter = Extension('_gpuscatter',
                             sources=['src/cuda/swig_wrap.cpp', 'src/cuda/gpuscatter_mgr.cu'],
@@ -300,7 +321,9 @@ else:
 metadata['packages']    = ['odin']
 metadata['py_modules']  = []
 metadata['package_dir'] = {'odin': 'src/python'}
-metadata['ext_modules'] = []                     
+metadata['ext_modules'] = []
+metadata['scripts'] = [s for s in glob('scripts/*') if not s.endswith('__.py')]                 
+metadata['configuration'] = configuration()
 
 # if we have a CUDA-enabled GPU...
 if CUDA:
