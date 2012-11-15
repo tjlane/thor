@@ -193,8 +193,15 @@ def locate_cuda():
         # otherwise, search the PATH for NVCC
         nvcc = find_in_path('nvcc', os.environ['PATH'])
         if nvcc is None:
-            raise EnvironmentError('The nvcc binary could not be '
-                'located in your $PATH. Either add it to your path, or set $CUDAHOME')
+            print
+            print '------------------------- WARNING --------------------------'
+            print 'The nvcc binary could not be located in your $PATH. Either '
+            print 'add it to your path, or set $CUDAHOME. The installation will'
+            print 'continue witout CUDA/GPU features.'
+            print '------------------------------------------------------------'
+            print
+            return False
+            
         home = os.path.dirname(os.path.dirname(nvcc))
 
     cudaconfig = {'home':home, 'nvcc':nvcc,
@@ -202,8 +209,13 @@ def locate_cuda():
                   'lib64': pjoin(home, 'lib64')}
     for k, v in cudaconfig.iteritems():
         if not os.path.exists(v):
-            raise EnvironmentError('The CUDA %s path could not be located in %s' % (k, v))
-
+            print
+            print '------------------------- WARNING --------------------------'
+            print 'The CUDA %s path could not be located in %s' % (k, v)
+            print 'The installation will continue witout CUDA/GPU features.'
+            print '------------------------------------------------------------'
+            print
+            return False
     return cudaconfig
     
 CUDA = locate_cuda()
@@ -250,10 +262,11 @@ def customize_compiler_for_nvcc(self):
 
 
 # run the customize_compiler
-class custom_build_ext(build_ext):
-    def build_extensions(self):
-        customize_compiler_for_nvcc(self.compiler)
-        build_ext.build_extensions(self)
+if CUDA:
+    class custom_build_ext(build_ext):
+        def build_extensions(self):
+            customize_compiler_for_nvcc(self.compiler)
+            build_ext.build_extensions(self)
 
 
 # -----------------------------------------------------------------------------
@@ -261,21 +274,19 @@ class custom_build_ext(build_ext):
 # odin, gpuscatter,
 # -----------------------------------------------------------------------------
 
-
-# gpuscatter extension
-
-gpuscatter = Extension('_gpuscatter',
-                        sources=['src/cuda/swig_wrap.cpp', 'src/cuda/gpuscatter_mgr.cu'],
-                        library_dirs=[CUDA['lib64']],
-                        libraries=['cudart'],
-                        runtime_library_dirs=[CUDA['lib64']],
-                        # this syntax is specific to this build system
-                        # we're only going to use certain compiler args with nvcc and not with gcc
-                        # the implementation of this trick is in customize_compiler() below
-                        extra_compile_args={'gcc': [],
-                                            'nvcc': ['-use_fast_math', '-arch=sm_20', '--ptxas-options=-v', 
-                                                     '-c', '--compiler-options', "'-fPIC'"]},
-                        include_dirs = [numpy_include, CUDA['include'], 'src/cuda'])
+if CUDA:
+    gpuscatter = Extension('_gpuscatter',
+                            sources=['src/cuda/swig_wrap.cpp', 'src/cuda/gpuscatter_mgr.cu'],
+                            library_dirs=[CUDA['lib64']],
+                            libraries=['cudart'],
+                            runtime_library_dirs=[CUDA['lib64']],
+                            # this syntax is specific to this build system
+                            # we're only going to use certain compiler args with nvcc and not with gcc
+                            # the implementation of this trick is in customize_compiler() below
+                            extra_compile_args={'gcc': [],
+                                                'nvcc': ['-use_fast_math', '-arch=sm_20', '--ptxas-options=-v', 
+                                                         '-c', '--compiler-options', "'-fPIC'"]},
+                            include_dirs = [numpy_include, CUDA['include'], 'src/cuda'])
 
 
 # check for swig
@@ -284,19 +295,21 @@ if find_in_path('swig', os.environ['PATH']):
 else:
     raise EnvironmentError('the swig executable was not found in your PATH')
 
-
-
-
 # ADD PACKAGES, MODULES TO metadata
 
 metadata['packages']    = ['odin']
-metadata['py_modules']  = ['gpuscatter']
-metadata['package_dir'] = {'': 'src/cuda',
-                           'odin': 'src/python'}
-metadata['ext_modules'] = [gpuscatter]
+metadata['py_modules']  = []
+metadata['package_dir'] = {'odin': 'src/python'}
+metadata['ext_modules'] = []                     
 
-# inject our custom trigger
-metadata['cmdclass'] = {'build_ext': custom_build_ext}
+# if we have a CUDA-enabled GPU...
+if CUDA:
+    metadata['package_dir'][''] = 'src/cuda'
+    metadata['py_modules'].append('gpuscatter')
+    metadata['ext_modules'].append(gpuscatter)
+
+    # inject our custom trigger
+    metadata['cmdclass'] = {'build_ext': custom_build_ext}
 
 
 
