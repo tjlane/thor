@@ -3,6 +3,7 @@
 Functions that are useful in various places, but have no common theme.
 """
 
+import numpy as np
 
 def smooth(x, beta=10.0, window_size=11):
     """
@@ -25,12 +26,40 @@ def smooth(x, beta=10.0, window_size=11):
         window_size += 1
     
     # apply the smoothing function
-    s = numpy.r_[x[window_len-1:0:-1], x, x[-1:-window_len:-1]]
-    w = numpy.kaiser(window_size, beta)
-    y = numpy.convolve( w/w.sum(), s, mode='valid' )
+    s = np.r_[x[window_size-1:0:-1], x, x[-1:-window_size:-1]]
+    w = np.kaiser(window_size, beta)
+    y = np.convolve( w/w.sum(), s, mode='valid' )
     
     # remove the extra array length convolve adds
     b = (window_size-1) / 2
     smoothed = y[b:len(y)-b]
     
     return smoothed
+
+
+graphic = """
+	                                    .  
+	                                  .#   
+	           N                     .##   
+	          #.                     #  :  
+	       .# .                     .# .#  
+	       .. |       ..##.         #   #  
+	       #  l     .#.    #       #    #  
+	             .#         #.    #    #   
+	      #    #             #.  #.    #   
+	      # .#                ##      #    
+	      ##.                #7      :#       ____  _____ _____ _   _ 
+	      #                 .# .:   .#       / __ \|  __ \_   _| \ | |
+	   .:.  .   .    .      .#..   Z#       | |  | | |  | || | |  \| |
+	  .####  . . ...####     #.   #.        | |  | | |  | || | | . ` |
+	 # .##   . # . #.#   . ND .##.#         | |__| | |__| || |_| |\  |
+	 . .#N   .  .   N.   # D .=#  #          \____/|_____/_____|_| \_|
+	#   . ####     .###,  ,      ##        
+	#.## .               7#7. # N  #                       Observation
+	 .                      ##.. . #       	               Driven
+	                          .#   #                       Inference
+	                            #7 Z                   of eNsembles
+		                             .#        
+
+     ----------------------------------------------------------------------
+"""
