@@ -44,9 +44,10 @@ metadata = {
     'license': 'GPL v3.0',
     'url': 'https://github.com/tjlane/odin',
     'download_url': 'https://github.com/tjlane/odin',
-    'install_requires': ['numpy', 'scipy', 'matplotlib', 'pyyaml', 'mdtraj'],
+    'install_requires': ['numpy', 'scipy', 'matplotlib', 'pyyaml', 'mdtraj', 'nose'],
     'platforms': ['Linux'],
     'zip_safe': False,
+    'test_suite': "nose.collector",
     'description': "Code for Structure Determination",
     'long_description': """ODIN is a simulation toolpackage for producing
 models of biomolecular structures consistent with a large set of experimental

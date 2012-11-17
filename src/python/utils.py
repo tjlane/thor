@@ -36,6 +36,12 @@ def smooth(x, beta=10.0, window_size=11):
     
     return smoothed
 
+def arctan3(y, x):
+    """ like arctan2, but returns a value in [0,2pi] """
+    theta = np.arctan2(y,x)
+    theta[theta < 0.0] += 2 * np.pi
+    return theta
+
 
 graphic = """
 	                                    .  
