@@ -31,9 +31,9 @@ Installation should be very easy. Hopefully, you can pretty much copy and paste 
 
 1. Install the Enthought Python distribution (alternative: install all the below dependencies marked 'epd'). Should be as easy as running their install script.
 
-
+	<pre><code>
 	./sh install.sh
-
+	</code></pre>
 
 2. Clone & install MDTraj (https://github.com/rmcgibbo/mdtraj/)
 
@@ -41,14 +41,15 @@ Installation should be very easy. Hopefully, you can pretty much copy and paste 
 	git clone https://github.com/rmcgibbo/mdtraj.git
 	cd mdtraj
 	python setup.py install
-	<pre></code>
+	</code></pre>
 
 3. Clone & install ODIN
 
+	<pre><code>
 	git clone https://github.com/tjlane/odin.git
 	cd odin
 	python setup.py install
-
+	</code></pre>
 
 4. Enjoy!
 
