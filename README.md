@@ -37,10 +37,11 @@ Installation should be very easy. Hopefully, you can pretty much copy and paste 
 
 2. Clone & install MDTraj (https://github.com/rmcgibbo/mdtraj/)
 
+	<code>
 	git clone https://github.com/rmcgibbo/mdtraj.git
 	cd mdtraj
 	python setup.py install
-	
+	</code>
 
 3. Clone & install ODIN
 
