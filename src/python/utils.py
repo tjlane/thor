@@ -4,7 +4,7 @@ Functions that are useful in various places, but have no common theme.
 """
 
 from argparse import ArgumentParser
-import pprint
+from pprint import pprint
 import numpy as np
 
 
@@ -15,7 +15,7 @@ class odinparser(ArgumentParser):
     def parse_args(self):
         print graphic
         args = super(odinparser, self).parse_args()
-        print args.__dict__
+        pprint(args.__dict__)
         return args
 
 
