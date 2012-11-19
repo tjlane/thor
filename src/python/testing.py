@@ -19,6 +19,23 @@ def skip(rason):
         return inner
     return wrap
     
+# decorator to skip GPU tests
+def gputest(rason):
+    def wrap(test):
+        @functools.wraps(test)
+        def inner(*args, **kwargs):
+            if 'GPU' not in globals().keys():
+                try:
+                    import gpuscatter
+                    GPU = True
+                except ImportError as e:
+                    GPU = False
+            if not GPU: 
+                raise SkipTest
+            print "After f(*args)"
+        return inner
+    return wrap
+    
     
 def ref_file(filename):
     """
