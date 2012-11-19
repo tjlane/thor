@@ -301,7 +301,7 @@ def configuration(parent_package='',top_path=None):
 
 
 if CUDA:
-    print "ATTEMPTING TO INSTALL GPUSCATTER"
+    print "Attempting to install gpuscatter module..."
     gpuscatter = Extension('_gpuscatter',
                             sources=['src/cuda/swig_wrap.cpp', 'src/cuda/gpuscatter_mgr.cu'],
                             library_dirs=[CUDA['lib64']],
