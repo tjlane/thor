@@ -7,6 +7,10 @@ from argparse import ArgumentParser
 from pprint import pprint
 import numpy as np
 
+import logging
+logging.basicConfig()
+logger = logging.getLogger(__name__)
+
 
 class odinparser(ArgumentParser):
     """
@@ -50,6 +54,7 @@ def smooth(x, beta=10.0, window_size=11):
     
     return smoothed
 
+
 def arctan3(y, x):
     """ like arctan2, but returns a value in [0,2pi] """
     theta = np.arctan2(y,x)
@@ -89,27 +94,59 @@ def write_sample_input(filename='sample.odin'):
     temps:   [1, 0.5, 0.1, 0.01]     # temps in units of beta, <= nodes*gpn
     
     '''
+    f = open(filename, 'w')
+    f.write(txt)
+    f.close()
+    logger.info("Wrote: %s" % filename)
+    return
     
 
+def plot_polar_intensities(shot, output_file=None):
+    """
+    Plot an intensity map in polar coordinates.
+    
+    Parameters
+    ----------
+    shot : odin.xray.Shot
+        A shot to plot.
+    output_file : str
+        The filename to write. If `None`, will display the image on screen and
+        not save.
+    """
+
+    pi = shot.polar_intensities
+
+    colors = pi[:,2] # color by intensity
+    ax = plt.subplot(111, polar=True)
+    c = plt.scatter(pi[:,1], pi[:,0], c=colors, cmap=cm.hsv)
+    c.set_alpha(0.75)
+
+    if output_file:
+        plt.savefig(output_file)
+        logger.info("Saved: %s" % output_file)
+    else:
+        plt.show()
+
+    return
 
 
 graphic = """
 	                                    .  
 	                                  .#   
-	           N                     .##   
+	           .                     .##   
 	          #.                     #  :  
 	       .# .                     .# .#  
-	       .. |       ..##.         #   #  
+	       .. .       ..##.         #   #  
 	       #  .     .#.    #       #    #  
 	             .#         #.    #    #   
 	      #    #             #.  #.    #   
 	      # .#                ##      #    
 	      ##.                #.      :#       ____  _____ _____ _   _ 
 	      #                 .# .:   .#       / __ \|  __ \_   _| \ | |
-	   .:.  .   .    .      .#..   .#       | |  | | |  | || | |  \| |
+	   .:.      .    .      .#..   .#       | |  | | |  | || | |  \| |
 	  .####  . . ...####     #.   #.        | |  | | |  | || | | . ` |
 	 # .##   . # . #.#   . =# .##.#         | |__| | |__| || |_| |\  |
-	 . .##   .  .   ..   # = .=#  #          \____/|_____/_____|_| \_|
+	 . .##   .  #   ..   # = .=#  #          \____/|_____/_____|_| \_|
 	#   . ####     .###,  ,      ##        
 	#.## .               '#.. #    #                       Observation
 	 .                      ##.. . #       	               Driven
