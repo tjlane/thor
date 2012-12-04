@@ -45,7 +45,7 @@ metadata = {
     'url': 'https://github.com/tjlane/odin',
     'download_url': 'https://github.com/tjlane/odin',
     'install_requires': ['numpy', 'scipy', 'matplotlib', 'pyyaml', 'mdtraj', 
-                         'nose',],
+                         'nose'],
     'platforms': ['Linux'],
     'zip_safe': False,
     'test_suite': "nose.collector",
