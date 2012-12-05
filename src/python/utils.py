@@ -114,9 +114,9 @@ def plot_polar_intensities(shot, output_file=None):
         not save.
     """
 
-    pi = shot.polar_intensities
+    pi = shot.polar_grid
 
-    colors = pi[:,2] # color by intensity
+    colors = shot.polar_intensities # color by intensity
     ax = plt.subplot(111, polar=True)
     c = plt.scatter(pi[:,1], pi[:,0], c=colors, cmap=cm.hsv)
     c.set_alpha(0.75)
