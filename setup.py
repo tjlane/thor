@@ -1,8 +1,5 @@
 u"""
 setup.py: Install ODIN
-
-Many thanks to Robert McGibbon (rmcgibbo) -- this file is largely stolen from
-his MSMBuilder setup.py file.
 """
 
 import os, sys
