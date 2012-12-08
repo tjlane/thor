@@ -3,6 +3,9 @@
 Functions that are useful in various places, but have no common theme.
 """
 
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+
 from argparse import ArgumentParser
 from pprint import pprint
 import numpy as np
