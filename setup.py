@@ -211,7 +211,7 @@ def locate_cuda():
             print
             print '------------------------- WARNING --------------------------'
             print 'The CUDA %s path could not be located in %s' % (k, v)
-            print 'The installation will continue witout CUDA/GPU features.'
+            print 'The installation will continue without CUDA/GPU features.'
             print '------------------------------------------------------------'
             print
             return False
@@ -316,8 +316,8 @@ if CUDA:
 
 cpuscatter = Extension('odin._cpuscatter',
                         sources=['src/cpuscatter/swig_wrap.cpp', 'src/cpuscatter/cpuscatter.cpp'],
-                        extra_compile_args=['-O3', '-fPIC',
-                                            "-msse2","-msse3","-fopenmp", '-Wall'],
+                        extra_compile_args={'gcc': ['-O3', '-fPIC', "-fopenmp", '-Wall'],
+                                            'g++': ['-O3', '-fPIC', "-fopenmp", '-Wall']},
                         extra_link_args = ['-lgomp'],
                         include_dirs = [numpy_include, 'src/cpuscatter'])
 
@@ -330,6 +330,7 @@ else:
 
 # this could be a bad idea, but try putting the SWIG python files into the python source tree
 subprocess.check_call('cp src/cpuscatter/cpuscatter.py src/python/cpuscatter.py', shell=True)
+subprocess.check_call('cp src/cuda/gpuscatter.py src/python/gpuscatter.py', shell=True)
 
 metadata['py_modules']  = []
 metadata['package_dir'] = {'' : 'src'}
@@ -345,8 +346,8 @@ if CUDA:
     metadata['ext_modules'].append(gpuscatter)
     # metadata['py_modules'].append('gpuscatter')
 
-    # inject our custom trigger
-    metadata['cmdclass'] = {'build_ext': custom_build_ext}
+# inject our custom trigger
+metadata['cmdclass'] = {'build_ext': custom_build_ext}
 
 
 if __name__ == '__main__':
