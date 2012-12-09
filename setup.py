@@ -317,7 +317,7 @@ if CUDA:
 cpuscatter = Extension('odin._cpuscatter',
                         sources=['src/cpuscatter/swig_wrap.cpp', 'src/cpuscatter/cpuscatter.cpp'],
                         extra_compile_args=['-O3', '-fPIC',
-                                            "-msse2","-msse3","-fopenmp", '-Wall'],
+                                            "-fopenmp", '-Wall'],
                         extra_link_args = ['-lgomp'],
                         include_dirs = [numpy_include, 'src/cpuscatter'])
 
