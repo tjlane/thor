@@ -299,7 +299,7 @@ def configuration(parent_package='',top_path=None):
 if CUDA:
     print "Attempting to install gpuscatter module..."
     gpuscatter = Extension('odin._gpuscatter',
-                            sources=['src/cuda/swig_wrap.cpp', 'src/cuda/gpuscatter_mgr.cu'],
+                            sources=['src/gpuscatter/swig_wrap.cpp', 'src/gpuscatter/gpuscatter_mgr.cu'],
                             library_dirs=[CUDA['lib64']],
                             libraries=['cudart'],
                             runtime_library_dirs=[CUDA['lib64']],
@@ -323,27 +323,26 @@ cpuscatter = Extension('odin._cpuscatter',
 # check for swig
 if find_in_path('swig', os.environ['PATH']):
     subprocess.check_call('swig -python -c++ -o src/cpuscatter/swig_wrap.cpp src/cpuscatter/cpuscatter.i', shell=True)
-    subprocess.check_call('swig -python -c++ -o src/cuda/swig_wrap.cpp src/cuda/gpuscatter.i', shell=True)
+    subprocess.check_call('swig -python -c++ -o src/gpuscatter/swig_wrap.cpp src/gpuscatter/gpuscatter.i', shell=True)
+    
+    # this could be a bad idea, but try putting the SWIG python files into the python source tree
+    subprocess.check_call('cp src/cpuscatter/cpuscatter.py src/python/cpuscatter.py', shell=True)
+    subprocess.check_call('cp src/gpuscatter/gpuscatter.py src/python/gpuscatter.py', shell=True)
+    
 else:
     raise EnvironmentError('the swig executable was not found in your PATH')
-
-# this could be a bad idea, but try putting the SWIG python files into the python source tree
-subprocess.check_call('cp src/cpuscatter/cpuscatter.py src/python/cpuscatter.py', shell=True)
-subprocess.check_call('cp src/cuda/gpuscatter.py src/python/gpuscatter.py', shell=True)
 
 metadata['py_modules']  = []
 metadata['package_dir'] = {'' : 'src'}
 metadata['ext_modules'] = [cpuscatter]
-#metadata['py_modules'] = ['cpuscatter/cpuscatter']
+#metadata['py_modules'] = []
 metadata['scripts'] = [s for s in glob('scripts/*') if not s.endswith('__.py')]                 
 metadata['configuration'] = configuration
 
 # if we have a CUDA-enabled GPU...
 
 if CUDA:
-    #metadata['package_dir'][''] = 'src/cuda'
     metadata['ext_modules'].append(gpuscatter)
-    # metadata['py_modules'].append('gpuscatter')
 
 # inject our custom trigger
 metadata['cmdclass'] = {'build_ext': custom_build_ext}
