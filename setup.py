@@ -314,10 +314,10 @@ if CUDA:
 
 cpuscatter = Extension('odin._cpuscatter',
                         sources=['src/cpuscatter/swig_wrap.cpp', 'src/cpuscatter/cpuscatter.cpp'],
-
                         extra_compile_args={'gcc': ['-O3', '-fPIC', "-fopenmp", '-Wall'],
                                             'g++': ['-O3', '-fPIC', "-fopenmp", '-Wall']},
-                        extra_link_args = ['-lgomp', '-lm'],
+                        runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
+                        extra_link_args = ['-lc++', '-lstdc++', '-lgomp', '-lm'],
                         include_dirs = [numpy_include, 'src/cpuscatter'])
 
 # check for swig
