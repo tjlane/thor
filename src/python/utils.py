@@ -3,16 +3,19 @@
 Functions that are useful in various places, but have no common theme.
 """
 
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
+import logging
+logging.basicConfig()
+logger = logging.getLogger(__name__)
+
+try:
+    import matplotlib.pyplot as plt
+    import matplotlib.cm as cm
+except:
+    logger.warning('could not load matplotlib -- plotting disabled')
 
 from argparse import ArgumentParser
 from pprint import pprint
 import numpy as np
-
-import logging
-logging.basicConfig()
-logger = logging.getLogger(__name__)
 
 
 class odinparser(ArgumentParser):
