@@ -6,18 +6,12 @@ import os, sys
 from os.path import join as pjoin
 from glob import glob
 
-# setuptools needs to come before numpy.distutils to get install_requires
-import setuptools 
-from setuptools import setup
-
-from distutils import sysconfig
+from setuptools import setup, Extension
 from distutils.unixccompiler import UnixCCompiler
-#from distutils.extension import Extension
-from distutils.command.build_ext import build_ext
+from Cython.Distutils import build_ext
+#from distutils.command.build_ext import build_ext
 
 import numpy
-from numpy.distutils.core import setup, Extension
-from numpy.distutils.misc_util import Configuration
 
 import subprocess
 from subprocess import CalledProcessError
@@ -34,7 +28,7 @@ __author__ = "TJ Lane"
 __version__ = VERSION
 
 metadata = {
-#    'name': 'odin',
+    'name': 'odin',
     'version': VERSION,
     'author': __author__,
     'author_email': 'tjlane@stanford.edu',
@@ -136,36 +130,6 @@ if not release:
     finally:
         a.close()
 
-# TJL commented out -- readthedocs not set up yet anyways
-#
-# if os.environ.get('READTHEDOCS', None) == 'True' and __name__ == '__main__':
-#     # On READTHEDOCS, the service that hosts our documentation, the build
-#     # environment does not have numpy and cannot build C extension modules,
-#     # so if we detect this environment variable, we're going to bail out
-#     # and run a minimal setup. This only installs the python packages, which
-#     # is not enough to RUN anything, but should be enough to introspect the
-#     # docstrings, which is what's needed for the documentation
-#     from distutils.core import setup
-#     import tempfile, shutil
-#     write_version_py()
-#     
-#     metadata['name'] = 'odin'
-#     metadata['packages'] = ['odin', 'odin.scripts'] # odin.module, ...
-#     metadata['scripts'] = [e for e in glob('scripts/*.py') if not e.endswith('__.py')]
-# 
-#     # dirty, dirty trick to install "mock" packages
-#     mockdir = tempfile.mkdtemp()
-#     open(os.path.join(mockdir, '__init__.py'), 'w').close()
-#     extensions = ['odin._image_wrap'] # c-extensions to the python code here
-#     metadata['package_dir'] = {'odin': 'src/python', 'odin.scripts': 'scripts'}
-#     metadata['packages'].extend(extensions)
-#     for ex in extensions:
-#         metadata['package_dir'][ex] = mockdir
-#     # end dirty trick :)
-# 
-#     setup(**metadata)
-#     shutil.rmtree(mockdir) #clean up dirty trick
-#     sys.exit(1)
     
     
 # ------------------------------------------------------------------------------
@@ -271,30 +235,6 @@ class custom_build_ext(build_ext):
 # odin, gpuscatter,
 # -----------------------------------------------------------------------------
 
-def configuration(parent_package='',top_path=None):
-    "Configure the build"
-
-    config = Configuration('odin',
-                           package_parent=parent_package,
-                           top_path=top_path,
-                           package_path='src/python')
-    config.set_options(assume_default_configuration=True,
-                       delegate_options_to_subpackages=True,
-                       quiet=False)
-    
-    #once all of the data is in one place, we can add it with this
-    config.add_data_dir('reference')
-    
-    # add the scipts, so they can be called from the command line
-    config.add_scripts([s for s in glob('scripts/*') if not s.endswith('__.py')])
-    
-    # add scripts as a subpackage (so they can be imported from other scripts)
-    config.add_subpackage('scripts', subpackage_path=None)
-
-    print config.todict()
- 
-    return config
-
 
 if CUDA:
     print "Attempting to install gpuscatter module..."
@@ -311,41 +251,60 @@ if CUDA:
                                                          '-c', '--compiler-options', "'-fPIC'"]},
                             include_dirs = [numpy_include, CUDA['include'], 'src/gpuscatter'])
 
+# bcinterp    = Extension('odin._bcinterp',
+#                         sources=['src/interp/swig_wrap.cpp', 'src/interp/bcinterp.cpp'],
+#                         extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall'],
+#                                             'g++': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall']},
+#                         runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
+#                         extra_link_args = ['-lstdc++', '-lgomp', '-lm'],
+#                         include_dirs = [numpy_include, 'src/interp'])
+
+
+# cython version -- test                        
+bcinterp    = Extension('odin.bcinterp',
+                        sources=['src/interp/cyinterp.pyx', 'src/interp/bcinterp.cpp'],
+                        extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall'],
+                                            'g++': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall']},
+                        runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
+                        extra_link_args = ['-lstdc++', '-lgomp', '-lm'],
+                        include_dirs = [numpy_include, 'src/interp'],
+                        language='c++')
 
 cpuscatter = Extension('odin._cpuscatter',
                         sources=['src/cpuscatter/swig_wrap.cpp', 'src/cpuscatter/cpuscatter.cpp'],
-                        extra_compile_args={'gcc': ['-O3', '-fPIC', "-fopenmp", '-Wall'],
-                                            'g++': ['-O3', '-fPIC', "-fopenmp", '-Wall']},
+                        extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall'],
+                                            'g++': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall']},
                         runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
                         extra_link_args = ['-lstdc++', '-lgomp', '-lm'],
                         include_dirs = [numpy_include, 'src/cpuscatter'])
 
 # check for swig
 if find_in_path('swig', os.environ['PATH']):
-    subprocess.check_call('swig -python -c++ -o src/cpuscatter/swig_wrap.cpp src/cpuscatter/cpuscatter.i', shell=True)
-    subprocess.check_call('swig -python -c++ -o src/gpuscatter/swig_wrap.cpp src/gpuscatter/gpuscatter.i', shell=True)
+    #subprocess.check_call('swig -Wall -python -c++ -o src/interp/swig_wrap.cpp src/interp/bcinterp.i', shell=True)
+    subprocess.check_call('swig -Wall -python -c++ -o src/cpuscatter/swig_wrap.cpp src/cpuscatter/cpuscatter.i', shell=True)
+    subprocess.check_call('swig -Wall -python -c++ -o src/gpuscatter/swig_wrap.cpp src/gpuscatter/gpuscatter.i', shell=True)
+    
     
     # this could be a bad idea, but try putting the SWIG python files into the python source tree
+    #subprocess.check_call('cp src/interp/bcinterp.py src/python/bcinterp.py', shell=True)
     subprocess.check_call('cp src/cpuscatter/cpuscatter.py src/python/cpuscatter.py', shell=True)
     subprocess.check_call('cp src/gpuscatter/gpuscatter.py src/python/gpuscatter.py', shell=True)
     
 else:
     raise EnvironmentError('the swig executable was not found in your PATH')
 
-metadata['py_modules']  = []
-metadata['package_dir'] = {'' : 'src'}
-metadata['ext_modules'] = [cpuscatter]
-#metadata['py_modules'] = []
-metadata['scripts'] = [s for s in glob('scripts/*') if not s.endswith('__.py')]                 
-metadata['configuration'] = configuration
+metadata['packages']     = ['odin', 'odin.scripts']
+metadata['package_dir']  = {'odin' : 'src/python', 'odin.scripts' : 'scripts'}
+metadata['ext_modules']  = [bcinterp, cpuscatter]
+metadata['scripts']      = [s for s in glob('scripts/*') if not s.endswith('__.py')]
+metadata['data_files']   = [('reference', glob('./reference/*'))]
+metadata['cmdclass']     = {'build_ext': custom_build_ext}
+metadata['zip_safe']     = False
+
 
 # if we have a CUDA-enabled GPU...
-
 if CUDA:
     metadata['ext_modules'].append(gpuscatter)
-
-# inject our custom trigger
-metadata['cmdclass'] = {'build_ext': custom_build_ext}
 
 
 if __name__ == '__main__':

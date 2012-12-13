@@ -41,7 +41,7 @@ def ref_file(filename):
     """
     Returns the egg-ed path to the reference data `filename`.
     """
-    fn = resource_filename('odin', os.path.join('reference', filename))
+    fn = resource_filename('odin', os.path.join('../reference', filename))
     return fn
     
     
