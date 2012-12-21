@@ -36,7 +36,7 @@ develop-eggs
 # Installer logs
 pip-log.txt
 
-# Unit test / coverage reports
+# Unit test / coverage reports / continuous integration
 .coverage
 .tox
 

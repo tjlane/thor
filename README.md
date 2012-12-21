@@ -67,6 +67,8 @@ Dependencies
 * pytables   (epd)
 * pyyaml     (epd)
 * matplotlib (epd)
+* Cython     (epd)
+* CBFlib     (http://www.bernstein-plus-sons.com/software/CBF/)
 * OpenMM     (https://simtk.org/home/openmm)
 * nvcc       (optional additional GPU support, https://developer.nvidia.com/cuda-downloads)
 
