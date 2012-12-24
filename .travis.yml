@@ -12,6 +12,7 @@ before_install:
   - pip install tables --use-mirrors -qq
   - sudo apt-get install -qq python-numpy python-scipy
   - sudo apt-get install -qq swig
+  - pip install git+git://github.com/rmcgibbo/mdtraj.git
 install:
   - python setup.py -q install
 script:
