@@ -10,7 +10,6 @@ from setuptools import setup, Extension
 from distutils.unixccompiler import UnixCCompiler
 from distutils.command.install import install as DistutilsInstall
 from Cython.Distutils import build_ext
-#from distutils.command.build_ext import build_ext
 
 import numpy
 
@@ -184,7 +183,10 @@ def locate_cuda():
     return cudaconfig
     
 CUDA = locate_cuda()
-
+if CUDA == False:
+    CUDA_SUCCESS = False
+else:
+    CUDA_SUCCESS = True
 
 def customize_compiler_for_nvcc(self):
     """
@@ -239,6 +241,8 @@ class custom_build_ext(build_ext):
 #
 #
 
+PYCBF_SUCCESS = True # will get toggeled to False if it fails
+
 class custom_install(DistutilsInstall):
     """
     A custom install class that allows us to specifically call external build/
@@ -250,10 +254,14 @@ class custom_install(DistutilsInstall):
         try:
             import pycbf
         except ImportError as e:
-            curdir = os.path.abspath(os.curdir)
-            os.chdir('./depend/cbflib')
-            subprocess.check_call('sh install_cbflib.sh', shell=True)
-            os.chdir(curdir)
+            try:
+                curdir = os.path.abspath(os.curdir)
+                os.chdir('./depend/cbflib')
+                subprocess.check_call('sh install_cbflib.sh', shell=True)
+                os.chdir(curdir)
+                import pycbf
+            except:
+                PYCBF_SUCCESS = False
         
         # build python modules, per usual
         DistutilsInstall.run(self)
@@ -302,13 +310,10 @@ bcinterp    = Extension('odin.bcinterp',
 
 # check for swig
 if find_in_path('swig', os.environ['PATH']):
-    #subprocess.check_call('swig -Wall -python -c++ -o src/interp/swig_wrap.cpp src/interp/bcinterp.i', shell=True)
     subprocess.check_call('swig -Wall -python -c++ -o src/cpuscatter/swig_wrap.cpp src/cpuscatter/cpuscatter.i', shell=True)
     subprocess.check_call('swig -Wall -python -c++ -o src/gpuscatter/swig_wrap.cpp src/gpuscatter/gpuscatter.i', shell=True)
     
-    
     # this could be a bad idea, but try putting the SWIG python files into the python source tree
-    #subprocess.check_call('cp src/interp/bcinterp.py src/python/bcinterp.py', shell=True)
     subprocess.check_call('cp src/cpuscatter/cpuscatter.py src/python/cpuscatter.py', shell=True)
     subprocess.check_call('cp src/gpuscatter/gpuscatter.py src/python/gpuscatter.py', shell=True)
     
@@ -323,12 +328,44 @@ metadata['data_files']   = [('reference', glob('./reference/*'))]
 metadata['cmdclass']     = {'build_ext': custom_build_ext, 'install': custom_install}
 metadata['zip_safe']     = False
 
-
 # if we have a CUDA-enabled GPU...
 if CUDA:
     metadata['ext_modules'].append(gpuscatter)
 
 
+# ------------------------------------------------------------------------------
+#
+# Finally, print a warning at the *end* of the build if something fails
+#
+
+def print_warnings():
+
+    if not PYCBF_SUCCESS:
+        print 
+        print '*'*80
+        print '* WARNING : PYCBF'
+        print '* ---------------'
+        print '* Could not install cbflib/pycbf successfully. If you wish to'
+        print '* load/employ cbf (crystallographic binary files), please install'
+        print '* cbflib and pycbf manually. Until then, ODIN will function as'
+        print '* usual without cbf-reading functionality.'
+        print '*'*80
+        
+    if not CUDA_SUCCESS:
+        print 
+        print '*'*80
+        print '* WARNING : CUDA/GPU SUPPORT'
+        print '* --------------------------'
+        print '* Could not install one or more CUDA functionalities. Look for'
+        print '* warnings in the setup.py output (above) for more details. ODIN'
+        print '* will function without any GPU-accelerated functionality. Note'
+        print '* that for successful installation of GPU support, you must have.'
+        print '* an nVidia Fermi-class GPU and the CUDA toolkit installed. See'
+        print '* the nVidia website for more details.'
+        print '*'*80
+
+
 if __name__ == '__main__':
     write_version_py()
     setup(**metadata)
+    print_warnings()
