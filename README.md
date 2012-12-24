@@ -1,6 +1,9 @@
 ODIN
 ====
 
+[![Build Status](https://travis-ci.org/tjlane/odin.png)](https://travis-ci.org/tjlane/odin)
+
+
 Current Functionality
 ---------------------
 
