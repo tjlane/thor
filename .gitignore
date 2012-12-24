@@ -36,7 +36,7 @@ develop-eggs
 # Installer logs
 pip-log.txt
 
-# Unit test / coverage reports
+# Unit test / coverage reports / continuous integration
 .coverage
 .tox
 
@@ -45,3 +45,43 @@ pip-log.txt
 
 #Mr Developer
 .mr.developer.cfg
+
+# cbflib build/install junk
+depend/cbflib/CBFlib.tar.gz
+depend/cbflib/Makefile
+depend/cbflib/index.html
+depend/cbflib/lgpl.txt
+depend/cbflib/lib/cbf.o
+depend/cbflib/lib/cbf_alloc.o
+depend/cbflib/lib/cbf_ascii.o
+depend/cbflib/lib/cbf_binary.o
+depend/cbflib/lib/cbf_byte_offset.o
+depend/cbflib/lib/cbf_canonical.o
+depend/cbflib/lib/cbf_codes.o
+depend/cbflib/lib/cbf_compress.o
+depend/cbflib/lib/cbf_context.o
+depend/cbflib/lib/cbf_copy.o
+depend/cbflib/lib/cbf_file.o
+depend/cbflib/lib/cbf_getopt.o
+depend/cbflib/lib/cbf_lex.o
+depend/cbflib/lib/cbf_packed.o
+depend/cbflib/lib/cbf_predictor.o
+depend/cbflib/lib/cbf_read_binary.o
+depend/cbflib/lib/cbf_read_mime.o
+depend/cbflib/lib/cbf_simple.o
+depend/cbflib/lib/cbf_string.o
+depend/cbflib/lib/cbf_stx.o
+depend/cbflib/lib/cbf_tree.o
+depend/cbflib/lib/cbf_uncompressed.o
+depend/cbflib/lib/cbf_write.o
+depend/cbflib/lib/cbf_write_binary.o
+depend/cbflib/lib/cbf_ws.o
+depend/cbflib/lib/libcbf.a
+depend/cbflib/lib/libimg.a
+depend/cbflib/lib/md5c.o
+depend/cbflib/symlinksdone
+depend/cbflib/template_adscquantum315_3072x3072.cbf
+depend/cbflib/template_adscquantum4_2304x2304.cbf
+depend/cbflib/template_mar345_2300x2300.cbf
+depend/cbflib/template_pilatus6m_2463x2527.cbf
+

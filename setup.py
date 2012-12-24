@@ -8,6 +8,7 @@ from glob import glob
 
 from setuptools import setup, Extension
 from distutils.unixccompiler import UnixCCompiler
+from distutils.command.install import install as DistutilsInstall
 from Cython.Distutils import build_ext
 #from distutils.command.build_ext import build_ext
 
@@ -36,7 +37,8 @@ metadata = {
     'url': 'https://github.com/tjlane/odin',
     'download_url': 'https://github.com/tjlane/odin',
     'install_requires': ['numpy', 'scipy', 'matplotlib', 'pyyaml', 'mdtraj', 
-                         'nose'],
+                         'nose', 'pycbf'],
+    'dependency_links' : ['https://github.com/rmcgibbo/mdtraj/tarball/master#egg=mdtraj-0.0.0'],
     'platforms': ['Linux'],
     'zip_safe': False,
     'test_suite': "nose.collector",
@@ -229,6 +231,34 @@ class custom_build_ext(build_ext):
         customize_compiler_for_nvcc(self.compiler)
         build_ext.build_extensions(self)
 
+# ------------------------------------------------------------------------------
+# Custom installer, that will allow us to use automake to install the c packages
+# in ./depend/, specifically:
+#
+# -- cbflib & pycbf
+#
+#
+
+class custom_install(DistutilsInstall):
+    """
+    A custom install class that allows us to specifically call external build/
+    install mechanisms sequentially around the python build/install process.
+    """
+    def run(self):
+        
+        # install cbflib & pycbf
+        try:
+            import pycbf
+        except ImportError as e:
+            curdir = os.path.abspath(os.curdir)
+            os.chdir('./depend/cbflib')
+            subprocess.check_call('sh install.sh', shell=True)
+            os.chdir(curdir)
+        
+        # build python modules, per usual
+        DistutilsInstall.run(self)
+
+
 
 # -----------------------------------------------------------------------------
 # PROCEED TO STANDARD SETUP
@@ -250,25 +280,7 @@ if CUDA:
                                                 'nvcc': ['-use_fast_math', '-arch=sm_20', '--ptxas-options=-v', 
                                                          '-c', '--compiler-options', "'-fPIC'"]},
                             include_dirs = [numpy_include, CUDA['include'], 'src/gpuscatter'])
-
-# bcinterp    = Extension('odin._bcinterp',
-#                         sources=['src/interp/swig_wrap.cpp', 'src/interp/bcinterp.cpp'],
-#                         extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall'],
-#                                             'g++': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall']},
-#                         runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
-#                         extra_link_args = ['-lstdc++', '-lgomp', '-lm'],
-#                         include_dirs = [numpy_include, 'src/interp'])
-
-
-# cython version -- test                        
-bcinterp    = Extension('odin.bcinterp',
-                        sources=['src/interp/cyinterp.pyx', 'src/interp/bcinterp.cpp'],
-                        extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall'],
-                                            'g++': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall']},
-                        runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
-                        extra_link_args = ['-lstdc++', '-lgomp', '-lm'],
-                        include_dirs = [numpy_include, 'src/interp'],
-                        language='c++')
+                    
 
 cpuscatter = Extension('odin._cpuscatter',
                         sources=['src/cpuscatter/swig_wrap.cpp', 'src/cpuscatter/cpuscatter.cpp'],
@@ -277,6 +289,16 @@ cpuscatter = Extension('odin._cpuscatter',
                         runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
                         extra_link_args = ['-lstdc++', '-lgomp', '-lm'],
                         include_dirs = [numpy_include, 'src/cpuscatter'])
+                        
+                        
+bcinterp    = Extension('odin.bcinterp',
+                        sources=['src/interp/cyinterp.pyx', 'src/interp/bcinterp.cpp'],
+                        extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall'],
+                                            'g++': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall']},
+                        runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
+                        extra_link_args = ['-lstdc++', '-lgomp', '-lm'],
+                        include_dirs = [numpy_include, 'src/interp'],
+                        language='c++')
 
 # check for swig
 if find_in_path('swig', os.environ['PATH']):
@@ -298,7 +320,7 @@ metadata['package_dir']  = {'odin' : 'src/python', 'odin.scripts' : 'scripts'}
 metadata['ext_modules']  = [bcinterp, cpuscatter]
 metadata['scripts']      = [s for s in glob('scripts/*') if not s.endswith('__.py')]
 metadata['data_files']   = [('reference', glob('./reference/*'))]
-metadata['cmdclass']     = {'build_ext': custom_build_ext}
+metadata['cmdclass']     = {'build_ext': custom_build_ext, 'install': custom_install}
 metadata['zip_safe']     = False
 
 
