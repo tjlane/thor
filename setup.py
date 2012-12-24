@@ -247,10 +247,13 @@ class custom_install(DistutilsInstall):
     def run(self):
         
         # install cbflib & pycbf
-        curdir = os.path.abspath(os.curdir)
-        os.chdir('./depend/cbflib')
-        subprocess.check_call('sh install.sh', shell=True)
-        os.chdir(curdir)
+        try:
+            import pycbf
+        except ImportError as e:
+            curdir = os.path.abspath(os.curdir)
+            os.chdir('./depend/cbflib')
+            subprocess.check_call('sh install.sh', shell=True)
+            os.chdir(curdir)
         
         # build python modules, per usual
         DistutilsInstall.run(self)
