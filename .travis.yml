@@ -7,10 +7,11 @@ virtualenv:
 before_install:
   - pip install nose --use-mirrors  -qq
   - sudo apt-get install -qq libhdf5-serial-dev
-  - pip install numexpr --use-mirrors -qq
+  #- pip install numexpr --use-mirrors -qq
   - pip install cython --use-mirrors -qq
   - pip install tables --use-mirrors -qq
   - sudo apt-get install -qq python-numpy python-scipy
+  - sudo apt-get install -qq swig
 install:
   - python setup.py -q install
 script:
