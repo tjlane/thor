@@ -2,14 +2,15 @@ language: python
 python:
   - 2.6
   - 2.7
+virtualenv:
+  system_site_packages: true
 before_install:
-  - pip install numpy --use-mirrors -qq
   - pip install nose --use-mirrors  -qq
   - sudo apt-get install -qq libhdf5-serial-dev
   - pip install numexpr --use-mirrors -qq
   - pip install cython --use-mirrors -qq
   - pip install tables --use-mirrors -qq
-  - pip install scipy --use-mirrors -qq
+  - sudo apt-get install -qq python-numpy python-scipy
 install:
   - python setup.py -q install
 script:
