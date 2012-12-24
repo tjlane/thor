@@ -252,7 +252,7 @@ class custom_install(DistutilsInstall):
         except ImportError as e:
             curdir = os.path.abspath(os.curdir)
             os.chdir('./depend/cbflib')
-            subprocess.check_call('sh install.sh', shell=True)
+            subprocess.check_call('sh install_cbflib.sh', shell=True)
             os.chdir(curdir)
         
         # build python modules, per usual
