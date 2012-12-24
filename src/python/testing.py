@@ -42,6 +42,18 @@ def ref_file(filename):
     Returns the egg-ed path to the reference data `filename`.
     """
     fn = resource_filename('odin', os.path.join('../reference', filename))
+    
+    # if that doesn't work, try to find the refdata in the git repo
+    # this is mostly for Travis CI
+    if not os.path.exists(fn):
+        
+        # check if we're in the base odin dir of the repo
+        if os.path.exists('reference'):
+            fn = os.path.join(os.path.abspath(os.curdir), 'reference', filename)
+        else:
+            logger.info('%s' % os.path.abspath(os.curdir))
+            raise RuntimeError('Could not locate reference file: %s' % filename)
+        
     return fn
     
     
