@@ -19,6 +19,18 @@ def skip(rason):
         return inner
     return wrap
     
+# decorator to mark tests as expected failure
+def expected_failure(test):
+    @functools.wraps(test)
+    def inner(*args, **kwargs):
+        try:
+            test(*args, **kwargs)
+        except BaseException:
+            raise SkipTest
+        else:
+            raise AssertionError('Failure expected')
+    return inner
+    
 # decorator to skip GPU tests
 def gputest(rason):
     def wrap(test):
