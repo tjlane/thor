@@ -16,7 +16,16 @@ import numpy
 import subprocess
 from subprocess import CalledProcessError
 
+# ------------------------------------------------------------------------------
+# COLORS
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
 
 # ------------------------------------------------------------------------------
 # HEADER -- metadata for setup()
@@ -36,7 +45,7 @@ metadata = {
     'url': 'https://github.com/tjlane/odin',
     'download_url': 'https://github.com/tjlane/odin',
     'install_requires': ['numpy', 'scipy', 'matplotlib', 'pyyaml', 'mdtraj', 
-                         'nose', 'pycbf'],
+                         'nose'],
     'dependency_links' : ['https://github.com/rmcgibbo/mdtraj/tarball/master#egg=mdtraj-0.0.0'],
     'platforms': ['Linux'],
     'zip_safe': False,
@@ -157,13 +166,7 @@ def locate_cuda():
         # otherwise, search the PATH for NVCC
         nvcc = find_in_path('nvcc', os.environ['PATH'])
         if nvcc is None:
-            print
-            print '------------------------- WARNING --------------------------'
-            print 'The nvcc binary could not be located in your $PATH. Either '
-            print 'add it to your path, or set $CUDAHOME. The installation will'
-            print 'continue witout CUDA/GPU features.'
-            print '------------------------------------------------------------'
-            print
+            print bcolors.WARNING + 'The nvcc binary could not be located in your $PATH. add it to your path, or set $CUDAHOME.' + bcolors.ENDC
             return False
             
         home = os.path.dirname(os.path.dirname(nvcc))
@@ -173,12 +176,8 @@ def locate_cuda():
                   'lib64': pjoin(home, 'lib64')}
     for k, v in cudaconfig.iteritems():
         if not os.path.exists(v):
-            print
-            print '------------------------- WARNING --------------------------'
-            print 'The CUDA %s path could not be located in %s' % (k, v)
-            print 'The installation will continue without CUDA/GPU features.'
-            print '------------------------------------------------------------'
-            print
+            s = 'The CUDA %s path could not be located in %s' % (k, v)
+            print bcolors.WARNING + s + bcolors.ENDC
             return False
     return cudaconfig
     
@@ -243,29 +242,18 @@ class custom_build_ext(build_ext):
 
 PYCBF_SUCCESS = True # will get toggeled to False if it fails
 
-class custom_install(DistutilsInstall):
-    """
-    A custom install class that allows us to specifically call external build/
-    install mechanisms sequentially around the python build/install process.
-    """
-    def run(self):
-        
-        # install cbflib & pycbf
-        try:
-            import pycbf
-        except ImportError as e:
-            try:
-                curdir = os.path.abspath(os.curdir)
-                os.chdir('./depend/cbflib')
-                subprocess.check_call('sh install_cbflib.sh', shell=True)
-                os.chdir(curdir)
-                import pycbf
-            except:
-                PYCBF_SUCCESS = False
-        
-        # build python modules, per usual
-        DistutilsInstall.run(self)
-
+# install cbflib & pycbf
+try:
+    import pycbf
+except ImportError as e:
+    try:
+        curdir = os.path.abspath(os.curdir)
+        os.chdir('./depend/cbflib')
+        subprocess.check_call('sh install_cbflib.sh', shell=True)
+        os.chdir(curdir)
+        import pycbf
+    except:
+        PYCBF_SUCCESS = False
 
 
 # -----------------------------------------------------------------------------
@@ -325,7 +313,7 @@ metadata['package_dir']  = {'odin' : 'src/python', 'odin.scripts' : 'scripts'}
 metadata['ext_modules']  = [bcinterp, cpuscatter]
 metadata['scripts']      = [s for s in glob('scripts/*') if not s.endswith('__.py')]
 metadata['data_files']   = [('reference', glob('./reference/*'))]
-metadata['cmdclass']     = {'build_ext': custom_build_ext, 'install': custom_install}
+metadata['cmdclass']     = {'build_ext': custom_build_ext} #, 'install': custom_install}
 metadata['zip_safe']     = False
 
 # if we have a CUDA-enabled GPU...
@@ -342,18 +330,18 @@ def print_warnings():
 
     if not PYCBF_SUCCESS:
         print 
-        print '*'*80
+        print '*'*65
         print '* WARNING : PYCBF'
         print '* ---------------'
         print '* Could not install cbflib/pycbf successfully. If you wish to'
         print '* load/employ cbf (crystallographic binary files), please install'
         print '* cbflib and pycbf manually. Until then, ODIN will function as'
         print '* usual without cbf-reading functionality.'
-        print '*'*80
+        print '*'*65
         
     if not CUDA_SUCCESS:
         print 
-        print '*'*80
+        print '*'*65
         print '* WARNING : CUDA/GPU SUPPORT'
         print '* --------------------------'
         print '* Could not install one or more CUDA functionalities. Look for'
@@ -362,7 +350,7 @@ def print_warnings():
         print '* that for successful installation of GPU support, you must have.'
         print '* an nVidia Fermi-class GPU and the CUDA toolkit installed. See'
         print '* the nVidia website for more details.'
-        print '*'*80
+        print '*'*65
 
 
 if __name__ == '__main__':
