@@ -248,13 +248,20 @@ try:
 except ImportError as e:
     try:
         curdir = os.path.abspath(os.curdir)
+        print "moving: ./depend/cbflib"
         os.chdir('./depend/cbflib')
+        print "calling sh install_cbflib.sh"
         subprocess.check_call('sh install_cbflib.sh', shell=True)
+        print "moving: %s" % curdir
         os.chdir(curdir)
-        import pycbf
     except:
         PYCBF_SUCCESS = False
+        print bcolors.WARNING + 'Error during cbflib/pycbf installation' + bcolors.ENDC
 
+try:
+    import pycbf
+except ImportError as e:
+    print bcolors.WARNING + 'Error during cbflib/pycbf installation' + bcolors.ENDC
 
 # -----------------------------------------------------------------------------
 # PROCEED TO STANDARD SETUP
