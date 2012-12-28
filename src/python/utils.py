@@ -40,25 +40,47 @@ class odinparser(ArgumentParser):
         return args
 
 
-def spawn(f):
-    """
-    Helper function for parmap()
-    """
-    def fun(pipe,x):
-        pipe.send(f(x))
-        pipe.close()
-    return fun
-        
 
-def parmap(f,X):
+        
+        
+def parmap(f, jobs, procs=12):
     """
-    Equivalent to multiprocessing.map(), but can be called from within a class.
+    Similar to multiprocessing.map(), but can be called from within a class.    
     """
+    
+    # split the `jobs` into a list of size 
+    X = [ jobs[i::procs] for i in range(procs) ]
+    
+    # now make a function that iterates over all those sub-lists
+    def g(list_of_items):
+        """ version of `f` that iterates over a list """
+        return map(f, list_of_items)
+        
+    # distribute all the jobs
+    def spawn(f):
+        """
+        Helper function for parmap()
+        """
+        def fun(pipe,x):
+            pipe.send(f(x))
+            pipe.close()
+        return fun
+    
+    # send em off to some kiddies
     pipe=[Pipe() for x in X]
-    proc=[Process(target=spawn(f),args=(c,x)) for x,(p,c) in izip(X,pipe)]
+    proc=[Process(target=spawn(g),args=(c,x)) for x,(p,c) in izip(X,pipe)]
+    
+    # wait for kids to finish playing
     [p.start() for p in proc]
     [p.join() for p in proc]
-    return [p.recv() for (p,c) in pipe]        
+    
+    # take toys away from kids
+    output = [p.recv() for (p,c) in pipe]
+    
+    # flatten output
+    flat_output = [item for sublist in output for item in sublist]
+    
+    return flat_output
         
 
 def write_sample_input(filename='sample.odin'):
