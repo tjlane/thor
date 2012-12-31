@@ -154,19 +154,19 @@ def locate_cuda():
     Returns a dict with keys 'home', 'nvcc', 'include', and 'lib64'
     and values giving the absolute path to each directory.
 
-    Starts by looking for the CUDAHOME env variable. If not found, everything
+    Starts by looking for the CUDA_HOME env variable. If not found, everything
     is based on finding 'nvcc' in the PATH.
     """
 
-    # first check if the CUDAHOME env variable is in use
-    if 'CUDAHOME' in os.environ:
-        home = os.environ['CUDAHOME']
+    # first check if the CUDA_HOME env variable is in use
+    if 'CUDA_HOME' in os.environ:
+        home = os.environ['CUDA_HOME']
         nvcc = pjoin(home, 'bin', 'nvcc')
     else:
         # otherwise, search the PATH for NVCC
         nvcc = find_in_path('nvcc', os.environ['PATH'])
         if nvcc is None:
-            print bcolors.WARNING + 'The nvcc binary could not be located in your $PATH. add it to your path, or set $CUDAHOME.' + bcolors.ENDC
+            print bcolors.WARNING + 'The nvcc binary could not be located in your $PATH. add it to your path, or set $CUDA_HOME.' + bcolors.ENDC
             return False
             
         home = os.path.dirname(os.path.dirname(nvcc))
@@ -174,6 +174,7 @@ def locate_cuda():
     cudaconfig = {'home':home, 'nvcc':nvcc,
                   'include': pjoin(home, 'include'),
                   'lib64': pjoin(home, 'lib64')}
+    print "CUDA config:", cudaconfig
     for k, v in cudaconfig.iteritems():
         if not os.path.exists(v):
             s = 'The CUDA %s path could not be located in %s' % (k, v)
