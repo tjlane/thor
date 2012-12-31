@@ -1,31 +1,31 @@
 u"""
 setup.py: Install ODIN
-
-Many thanks to Robert McGibbon (rmcgibbo) -- this file is largely stolen from
-his MSMBuilder setup.py file.
 """
 
 import os, sys
 from os.path import join as pjoin
 from glob import glob
 
-# setuptools needs to come before numpy.distutils to get install_requires
-import setuptools 
-from setuptools import setup
-
-from distutils import sysconfig
+from setuptools import setup, Extension
 from distutils.unixccompiler import UnixCCompiler
-#from distutils.extension import Extension
-from distutils.command.build_ext import build_ext
+from distutils.command.install import install as DistutilsInstall
+from Cython.Distutils import build_ext
 
 import numpy
-from numpy.distutils.core import setup, Extension
-from numpy.distutils.misc_util import Configuration
 
 import subprocess
 from subprocess import CalledProcessError
 
+# ------------------------------------------------------------------------------
+# COLORS
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
 
 # ------------------------------------------------------------------------------
 # HEADER -- metadata for setup()
@@ -37,7 +37,7 @@ __author__ = "TJ Lane"
 __version__ = VERSION
 
 metadata = {
-#    'name': 'odin',
+    'name': 'odin',
     'version': VERSION,
     'author': __author__,
     'author_email': 'tjlane@stanford.edu',
@@ -46,6 +46,7 @@ metadata = {
     'download_url': 'https://github.com/tjlane/odin',
     'install_requires': ['numpy', 'scipy', 'matplotlib', 'pyyaml', 'mdtraj', 
                          'nose'],
+    'dependency_links' : ['https://github.com/rmcgibbo/mdtraj/tarball/master#egg=mdtraj-0.0.0'],
     'platforms': ['Linux'],
     'zip_safe': False,
     'test_suite': "nose.collector",
@@ -139,36 +140,6 @@ if not release:
     finally:
         a.close()
 
-# TJL commented out -- readthedocs not set up yet anyways
-#
-# if os.environ.get('READTHEDOCS', None) == 'True' and __name__ == '__main__':
-#     # On READTHEDOCS, the service that hosts our documentation, the build
-#     # environment does not have numpy and cannot build C extension modules,
-#     # so if we detect this environment variable, we're going to bail out
-#     # and run a minimal setup. This only installs the python packages, which
-#     # is not enough to RUN anything, but should be enough to introspect the
-#     # docstrings, which is what's needed for the documentation
-#     from distutils.core import setup
-#     import tempfile, shutil
-#     write_version_py()
-#     
-#     metadata['name'] = 'odin'
-#     metadata['packages'] = ['odin', 'odin.scripts'] # odin.module, ...
-#     metadata['scripts'] = [e for e in glob('scripts/*.py') if not e.endswith('__.py')]
-# 
-#     # dirty, dirty trick to install "mock" packages
-#     mockdir = tempfile.mkdtemp()
-#     open(os.path.join(mockdir, '__init__.py'), 'w').close()
-#     extensions = ['odin._image_wrap'] # c-extensions to the python code here
-#     metadata['package_dir'] = {'odin': 'src/python', 'odin.scripts': 'scripts'}
-#     metadata['packages'].extend(extensions)
-#     for ex in extensions:
-#         metadata['package_dir'][ex] = mockdir
-#     # end dirty trick :)
-# 
-#     setup(**metadata)
-#     shutil.rmtree(mockdir) #clean up dirty trick
-#     sys.exit(1)
     
     
 # ------------------------------------------------------------------------------
@@ -195,13 +166,7 @@ def locate_cuda():
         # otherwise, search the PATH for NVCC
         nvcc = find_in_path('nvcc', os.environ['PATH'])
         if nvcc is None:
-            print
-            print '------------------------- WARNING --------------------------'
-            print 'The nvcc binary could not be located in your $PATH. Either '
-            print 'add it to your path, or set $CUDAHOME. The installation will'
-            print 'continue witout CUDA/GPU features.'
-            print '------------------------------------------------------------'
-            print
+            print bcolors.WARNING + 'The nvcc binary could not be located in your $PATH. add it to your path, or set $CUDAHOME.' + bcolors.ENDC
             return False
             
         home = os.path.dirname(os.path.dirname(nvcc))
@@ -211,17 +176,16 @@ def locate_cuda():
                   'lib64': pjoin(home, 'lib64')}
     for k, v in cudaconfig.iteritems():
         if not os.path.exists(v):
-            print
-            print '------------------------- WARNING --------------------------'
-            print 'The CUDA %s path could not be located in %s' % (k, v)
-            print 'The installation will continue witout CUDA/GPU features.'
-            print '------------------------------------------------------------'
-            print
+            s = 'The CUDA %s path could not be located in %s' % (k, v)
+            print bcolors.WARNING + s + bcolors.ENDC
             return False
     return cudaconfig
     
 CUDA = locate_cuda()
-
+if CUDA == False:
+    CUDA_SUCCESS = False
+else:
+    CUDA_SUCCESS = True
 
 def customize_compiler_for_nvcc(self):
     """
@@ -263,48 +227,53 @@ def customize_compiler_for_nvcc(self):
     self._compile = _compile
 
 
-# run the customize_compiler
-if CUDA:
-    class custom_build_ext(build_ext):
-        def build_extensions(self):
-            customize_compiler_for_nvcc(self.compiler)
-            build_ext.build_extensions(self)
+class custom_build_ext(build_ext):
+    def build_extensions(self):
+        customize_compiler_for_nvcc(self.compiler)
+        build_ext.build_extensions(self)
 
+# ------------------------------------------------------------------------------
+# Custom installer, that will allow us to use automake to install the c packages
+# in ./depend/, specifically:
+#
+# -- cbflib & pycbf
+#
+#
+
+PYCBF_SUCCESS = True # will get toggeled to False if it fails
+curdir = os.path.abspath(os.curdir)
+
+# install cbflib & pycbf
+try:
+    import pycbf
+except ImportError as e:
+    try:
+        print "moving: ./depend/cbflib"
+        os.chdir('./depend/cbflib')
+        print "calling sh install_cbflib.sh"
+        subprocess.check_call('sh install_cbflib.sh', shell=True)
+    except:
+        PYCBF_SUCCESS = False
+        print bcolors.WARNING + 'Error during cbflib/pycbf installation' + bcolors.ENDC
+
+try:
+    import pycbf
+except ImportError as e:
+    print bcolors.WARNING + 'Error during cbflib/pycbf installation' + bcolors.ENDC
+
+print "moving: %s" % curdir
+os.chdir(curdir)
 
 # -----------------------------------------------------------------------------
 # PROCEED TO STANDARD SETUP
 # odin, gpuscatter,
 # -----------------------------------------------------------------------------
 
-def configuration(parent_package='',top_path=None):
-    "Configure the build"
-
-    config = Configuration('odin',
-                           package_parent=parent_package,
-                           top_path=top_path,
-                           package_path='src/python')
-    config.set_options(assume_default_configuration=True,
-                       delegate_options_to_subpackages=True,
-                       quiet=False)
-    
-    #once all of the data is in one place, we can add it with this
-    config.add_data_dir('reference')
-    
-    # add the scipts, so they can be called from the command line
-    config.add_scripts([s for s in glob('scripts/*') if not s.endswith('__.py')])
-    
-    # add scripts as a subpackage (so they can be imported from other scripts)
-    config.add_subpackage('scripts', subpackage_path=None)
-
-    print config.todict()
- 
-    return config
-
 
 if CUDA:
     print "Attempting to install gpuscatter module..."
-    gpuscatter = Extension('_gpuscatter',
-                            sources=['src/cuda/swig_wrap.cpp', 'src/cuda/gpuscatter_mgr.cu'],
+    gpuscatter = Extension('odin._gpuscatter',
+                            sources=['src/gpuscatter/swig_wrap.cpp', 'src/gpuscatter/gpuscatter_mgr.cu'],
                             library_dirs=[CUDA['lib64']],
                             libraries=['cudart'],
                             runtime_library_dirs=[CUDA['lib64']],
@@ -314,36 +283,85 @@ if CUDA:
                             extra_compile_args={'gcc': [],
                                                 'nvcc': ['-use_fast_math', '-arch=sm_20', '--ptxas-options=-v', 
                                                          '-c', '--compiler-options', "'-fPIC'"]},
-                            include_dirs = [numpy_include, CUDA['include'], 'src/cuda'])
+                            include_dirs = [numpy_include, CUDA['include'], 'src/gpuscatter'])
+                    
 
+cpuscatter = Extension('odin._cpuscatter',
+                        sources=['src/cpuscatter/swig_wrap.cpp', 'src/cpuscatter/cpuscatter.cpp'],
+                        extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall'],
+                                            'g++': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall']},
+                        runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
+                        extra_link_args = ['-lstdc++', '-lgomp', '-lm'],
+                        include_dirs = [numpy_include, 'src/cpuscatter'])
+                        
+                        
+bcinterp    = Extension('odin.bcinterp',
+                        sources=['src/interp/cyinterp.pyx', 'src/interp/bcinterp.cpp'],
+                        extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall'],
+                                            'g++': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall']},
+                        runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
+                        extra_link_args = ['-lstdc++', '-lgomp', '-lm'],
+                        include_dirs = [numpy_include, 'src/interp'],
+                        language='c++')
 
 # check for swig
 if find_in_path('swig', os.environ['PATH']):
-    subprocess.check_call('swig -python -c++ -o src/cuda/swig_wrap.cpp src/cuda/gpuscatter.i', shell=True)
+    subprocess.check_call('swig -Wall -python -c++ -o src/cpuscatter/swig_wrap.cpp src/cpuscatter/cpuscatter.i', shell=True)
+    subprocess.check_call('swig -Wall -python -c++ -o src/gpuscatter/swig_wrap.cpp src/gpuscatter/gpuscatter.i', shell=True)
+    
+    # this could be a bad idea, but try putting the SWIG python files into the python source tree
+    subprocess.check_call('cp src/cpuscatter/cpuscatter.py src/python/cpuscatter.py', shell=True)
+    subprocess.check_call('cp src/gpuscatter/gpuscatter.py src/python/gpuscatter.py', shell=True)
+    
 else:
     raise EnvironmentError('the swig executable was not found in your PATH')
 
-# ADD PACKAGES, MODULES TO metadata
-
-#metadata['packages']    = [] # ['odin']
-
-metadata['py_modules']  = []
-metadata['package_dir'] = {} #{'': 'src/python'}
-metadata['ext_modules'] = []
-metadata['scripts'] = [s for s in glob('scripts/*') if not s.endswith('__.py')]                 
-metadata['configuration'] = configuration
+metadata['packages']     = ['odin', 'odin.scripts']
+metadata['package_dir']  = {'odin' : 'src/python', 'odin.scripts' : 'scripts'}
+metadata['ext_modules']  = [bcinterp, cpuscatter]
+metadata['scripts']      = [s for s in glob('scripts/*') if not s.endswith('__.py')]
+metadata['data_files']   = [('reference', glob('./reference/*'))]
+metadata['cmdclass']     = {'build_ext': custom_build_ext} #, 'install': custom_install}
+metadata['zip_safe']     = False
 
 # if we have a CUDA-enabled GPU...
-
 if CUDA:
-    metadata['package_dir'][''] = 'src/cuda'
-    metadata['py_modules'].append('gpuscatter')
     metadata['ext_modules'].append(gpuscatter)
 
-    # inject our custom trigger
-    metadata['cmdclass'] = {'build_ext': custom_build_ext}
+
+# ------------------------------------------------------------------------------
+#
+# Finally, print a warning at the *end* of the build if something fails
+#
+
+def print_warnings():
+
+    if not PYCBF_SUCCESS:
+        print 
+        print '*'*65
+        print '* WARNING : PYCBF'
+        print '* ---------------'
+        print '* Could not install cbflib/pycbf successfully. If you wish to'
+        print '* load/employ cbf (crystallographic binary files), please install'
+        print '* cbflib and pycbf manually. Until then, ODIN will function as'
+        print '* usual without cbf-reading functionality.'
+        print '*'*65
+        
+    if not CUDA_SUCCESS:
+        print 
+        print '*'*65
+        print '* WARNING : CUDA/GPU SUPPORT'
+        print '* --------------------------'
+        print '* Could not install one or more CUDA functionalities. Look for'
+        print '* warnings in the setup.py output (above) for more details. ODIN'
+        print '* will function without any GPU-accelerated functionality. Note'
+        print '* that for successful installation of GPU support, you must have.'
+        print '* an nVidia Fermi-class GPU and the CUDA toolkit installed. See'
+        print '* the nVidia website for more details.'
+        print '*'*65
 
 
 if __name__ == '__main__':
     write_version_py()
     setup(**metadata)
+    print_warnings()
