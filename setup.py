@@ -343,8 +343,9 @@ def print_warnings():
         print '* ---------------'
         print '* Could not install cbflib/pycbf successfully. If you wish to'
         print '* load/employ cbf (crystallographic binary files), please install'
-        print '* cbflib and pycbf manually. Until then, ODIN will function as'
-        print '* usual without cbf-reading functionality.'
+        print '* cbflib and pycbf manually. Use the script "install_cbflib.sh in'
+        print '* odin/depend/cbflib as a template.  Until then, ODIN will'
+        print '* function as usual without cbf-reading capailities.'
         print '*'*65
         
     if not CUDA_SUCCESS:
