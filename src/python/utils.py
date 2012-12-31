@@ -38,11 +38,8 @@ class odinparser(ArgumentParser):
         args = super(odinparser, self).parse_args()
         pprint(args.__dict__)
         return args
-
-
-
         
-        
+
 def parmap(f, jobs, procs=12):
     """
     Similar to multiprocessing.map(), but can be called from within a class.    
