@@ -242,19 +242,17 @@ class custom_build_ext(build_ext):
 #
 
 PYCBF_SUCCESS = True # will get toggeled to False if it fails
+curdir = os.path.abspath(os.curdir)
 
 # install cbflib & pycbf
 try:
     import pycbf
 except ImportError as e:
     try:
-        curdir = os.path.abspath(os.curdir)
         print "moving: ./depend/cbflib"
         os.chdir('./depend/cbflib')
         print "calling sh install_cbflib.sh"
         subprocess.check_call('sh install_cbflib.sh', shell=True)
-        print "moving: %s" % curdir
-        os.chdir(curdir)
     except:
         PYCBF_SUCCESS = False
         print bcolors.WARNING + 'Error during cbflib/pycbf installation' + bcolors.ENDC
@@ -263,6 +261,9 @@ try:
     import pycbf
 except ImportError as e:
     print bcolors.WARNING + 'Error during cbflib/pycbf installation' + bcolors.ENDC
+
+print "moving: %s" % curdir
+os.chdir(curdir)
 
 # -----------------------------------------------------------------------------
 # PROCEED TO STANDARD SETUP
@@ -343,8 +344,9 @@ def print_warnings():
         print '* ---------------'
         print '* Could not install cbflib/pycbf successfully. If you wish to'
         print '* load/employ cbf (crystallographic binary files), please install'
-        print '* cbflib and pycbf manually. Until then, ODIN will function as'
-        print '* usual without cbf-reading functionality.'
+        print '* cbflib and pycbf manually. Use the script "install_cbflib.sh in'
+        print '* odin/depend/cbflib as a template.  Until then, ODIN will'
+        print '* function as usual without cbf-reading capailities.'
         print '*'*65
         
     if not CUDA_SUCCESS:
