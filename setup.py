@@ -354,11 +354,11 @@ def print_warnings():
         print '*'*65
         print '* WARNING : CUDA/GPU SUPPORT'
         print '* --------------------------'
-        print '* Could not install one or more CUDA functionalities. Look for'
+        print '* Could not install one or more CUDA/GPU features. Look for'
         print '* warnings in the setup.py output (above) for more details. ODIN'
-        print '* will function without any GPU-accelerated functionality. Note'
-        print '* that for successful installation of GPU support, you must have.'
-        print '* an nVidia Fermi-class GPU and the CUDA toolkit installed. See'
+        print '* will function without any GPU-acceleration. Note that for  '
+        print '* successful installation of GPU support, you must have an nVidia'
+        print '* Fermi-class GPU (or better) and the CUDA toolkit installed. See'
         print '* the nVidia website for more details.'
         print '*'*65
 
