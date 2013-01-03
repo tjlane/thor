@@ -13,6 +13,6 @@ before_install:
   - sudo apt-get install -qq swig
   - pip install git+git://github.com/rmcgibbo/mdtraj.git
 install:
-  - python setup.py -q install
+  - python setup.py install --no-openmp
 script:
   - nosetests
