@@ -266,11 +266,31 @@ print "moving: %s" % curdir
 os.chdir(curdir)
 
 # -----------------------------------------------------------------------------
-# PROCEED TO STANDARD SETUP
-# odin, gpuscatter,
+# INSTALL C/C++ EXTENSIONS
+# gpuscatter, cpuscatter, bcinterp
 # -----------------------------------------------------------------------------
 
 
+# set up OMP flags -- if NO_OPENMP=1, turn off open mp
+if 'NO_OPENMP' in os.environ.keys():
+    if (os.environ['NO_OPENMP'] == '1'):
+        omp_compile = ['-DNO_OMP']
+        omp_link    = []
+        print bcolors.WARNING + '$NO_OMP=1, disabling OPENMP support' + bcolors.ENDC
+    else:
+        omp_compile = ['-fopenmp']
+        omp_link    = ['-lgomp']
+elif '--no-openmp' in sys.argv[2:]:
+    sys.argv.remove('--no-openmp')
+    omp_compile = ['-DNO_OMP']
+    omp_link    = []
+    print bcolors.WARNING + 'set --no-openmp, disabling OPENMP support' + bcolors.ENDC
+else:
+    omp_compile = ['-fopenmp']
+    omp_link    = ['-lgomp']
+
+
+# install the extensions
 if CUDA:
     print "Attempting to install gpuscatter module..."
     gpuscatter = Extension('odin._gpuscatter',
@@ -289,19 +309,19 @@ if CUDA:
 
 cpuscatter = Extension('odin._cpuscatter',
                         sources=['src/cpuscatter/swig_wrap.cpp', 'src/cpuscatter/cpuscatter.cpp'],
-                        extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall'],
-                                            'g++': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall']},
+                        extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile,
+                                            'g++': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile},
                         runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
-                        extra_link_args = ['-lstdc++', '-lgomp', '-lm'],
+                        extra_link_args = ['-lstdc++', '-lm'] + omp_link,
                         include_dirs = [numpy_include, 'src/cpuscatter'])
                         
                         
 bcinterp    = Extension('odin.bcinterp',
                         sources=['src/interp/cyinterp.pyx', 'src/interp/bcinterp.cpp'],
-                        extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall'],
-                                            'g++': ['--fast-math', '-O3', '-fPIC', "-fopenmp", '-Wall']},
+                        extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile,
+                                            'g++': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile},
                         runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
-                        extra_link_args = ['-lstdc++', '-lgomp', '-lm'],
+                        extra_link_args = ['-lstdc++', '-lm'] + omp_link,
                         include_dirs = [numpy_include, 'src/interp'],
                         language='c++')
 
