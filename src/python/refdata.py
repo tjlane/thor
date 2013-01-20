@@ -1,9 +1,29 @@
 
+"""
+refdata.py -- reference data and tables used in computations
+"""
 
 import numpy as np
 
 # SPHERICAL QUADRATURE PARAMETERS
-# provided by Seb Doniach Jan 2013
+#
+# Spherical numerical quadrature approximates integrals over the unit
+# sphere with a weighted finite sum
+#
+# integral ~ Sum[ w_i * f(points) ]
+#            {points}  
+#
+# The first three columns are the x,y,z components of vectors at which to
+# evaluate points on a sphere. The last column is the weight to assign
+# to the function evaluation at that point.
+#
+# These vectors and weights were obtained Jan 2013 from
+#
+# http://www.personal.soton.ac.uk/jf1w07/nodes/nodes.html 
+#
+# [1] Fliege and Maier (1999) The distribution of points on the sphere and 
+# corresponding cubature formulae. IMA J. Numer. Analysis 19, 317-334.
+#
 
 sph_quad_900 = np.array([[  0.00000000e+00,   0.00000000e+00,   1.00000000e+00,
           1.04739940e-02],
