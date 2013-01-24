@@ -342,7 +342,7 @@ metadata['package_dir']  = {'odin' : 'src/python', 'odin.scripts' : 'scripts'}
 metadata['ext_modules']  = [bcinterp, cpuscatter]
 metadata['scripts']      = [s for s in glob('scripts/*') if not s.endswith('__.py')]
 metadata['data_files']   = [('reference', glob('./reference/*'))]
-metadata['cmdclass']     = {'build_ext': custom_build_ext} #, 'install': custom_install}
+metadata['cmdclass']     = {'build_ext': custom_build_ext}
 metadata['zip_safe']     = False
 
 # if we have a CUDA-enabled GPU...
