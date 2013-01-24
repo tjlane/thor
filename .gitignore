@@ -1,4 +1,5 @@
 *.py[co]
+install.sh
 
 # swig generated files
 gpuscatter.py
@@ -9,6 +10,7 @@ swig_wrap.cpp
 src/python/version.py
 src/python/cpuscatter.py
 src/python/cpuscatter.py
+src/interp/cyinterp.cpp
 
 # ignore mac metadata files
 ._*
