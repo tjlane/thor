@@ -1,13 +1,8 @@
 *.py[co]
 install.sh
 
-# swig generated files
-gpuscatter.py
-cpuscatter.py
-swig_wrap.cpp
-
 # ignore distutils files
-src/python/version.py
+src/python/installed.py
 src/python/cpuscatter.py
 src/python/cpuscatter.py
 src/interp/cyinterp.cpp
