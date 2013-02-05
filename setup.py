@@ -34,7 +34,7 @@ metadata = {
     'url': 'https://github.com/tjlane/odin',
     'download_url': 'https://github.com/tjlane/odin',
     'install_requires': ['numpy', 'scipy', 'matplotlib', 'pyyaml', 'mdtraj', 
-                         'nose'],
+                         'nose', 'cython==0.16'],
     'dependency_links' : ['https://github.com/rmcgibbo/mdtraj/tarball/master#egg=mdtraj-0.0.0'],
     'platforms': ['Linux', 'OSX'],
     'zip_safe': False,
@@ -249,8 +249,8 @@ else:
 
 if CUDA:
     print "Attempting to install GPU functionality"
-    xraysim = Extension('odin.xraysim',
-                        sources=['src/scatter/xraysim.pyx', 'src/scatter/cpuscatter.cpp', 'src/scatter/gpuscatter.cpp'],
+    gpuscatter = Extension('odin.gpuscatter',
+                        sources=['src/scatter/gpuscatter_wrap.pyx', 'src/scatter/gpuscatter.cpp'],
                         extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile,
                                             'g++': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile,
                                             'nvcc': ['-use_fast_math', '-arch=sm_20', '--ptxas-options=-v', 
@@ -262,14 +262,16 @@ if CUDA:
                         include_dirs = [numpy_include, 'src/scatter', CUDA['include']],
                         language='c++')
 else:
-    xraysim = Extension('odin.xraysim',
-                        sources=['src/scatter/xraysim.pyx', 'src/scatter/cpuscatter.cpp'],
-                        extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile,
-                                            'g++': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile},
-                        runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
-                        extra_link_args = ['-lstdc++', '-lm'] + omp_link,
-                        include_dirs = [numpy_include, 'src/scatter'],
-                        language='c++')
+    gpuscatter = None
+
+cpuscatter = Extension('odin.cpuscatter',
+                    sources=['src/scatter/cpuscatter_wrap.pyx', 'src/scatter/cpuscatter.cpp'],
+                    extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile,
+                                        'g++': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile},
+                    runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
+                    extra_link_args = ['-lstdc++', '-lm'] + omp_link,
+                    include_dirs = [numpy_include, 'src/scatter'],
+                    language='c++')
                         
                         
 bcinterp = Extension('odin.interp',
@@ -284,7 +286,8 @@ bcinterp = Extension('odin.interp',
 
 metadata['packages']     = ['odin', 'odin.scripts']
 metadata['package_dir']  = {'odin' : 'src/python', 'odin.scripts' : 'scripts'}
-metadata['ext_modules']  = [bcinterp, xraysim]
+metadata['ext_modules']  = [bcinterp, cpuscatter]
+if gpuscatter: metadata['ext_modules'].append(gpuscatter)
 metadata['scripts']      = [s for s in glob('scripts/*') if not s.endswith('__.py')]
 metadata['data_files']   = [('reference', glob('./reference/*'))]
 metadata['cmdclass']     = {'build_ext': custom_build_ext}
