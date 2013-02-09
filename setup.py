@@ -250,7 +250,7 @@ else:
 if CUDA:
     print "Attempting to install GPU functionality"
     gpuscatter = Extension('odin.gpuscatter',
-                        sources=['src/scatter/gpuscatter_wrap.pyx', 'src/scatter/gpuscatter.cpp'],
+                        sources=['src/scatter/gpuscatter_wrap.pyx', 'src/scatter/gpuscatter.cu'],
                         extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile,
                                             'g++': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile,
                                             'nvcc': ['-use_fast_math', '-arch=sm_20', '--ptxas-options=-v', 

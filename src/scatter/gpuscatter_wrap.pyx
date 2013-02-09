@@ -134,13 +134,13 @@ def simulate(n_molecules, qxyz, rxyz, atomic_numbers, poisson_parameter=0.0,
     
     
     # call the actual C++ code
-    cpu_scatter_obj = new C_CPUScatter(qxyz.shape[0],
+    gpu_scatter_obj = new C_GPUScatter(device_id, bpg, qxyz.shape[0],
                                &c_qxyz[0,0], &c_qxyz[1,0], &c_qxyz[2,0],
                                rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
                                &c_aid[0], len(c_cromermann), &c_cromermann[0],
                                n_molecules, &c_rfloats[0,0], &c_rfloats[1,0], &c_rfloats[2,0],
                                &h_outQ[0])
-    del cpu_scatter_obj
+    del gpu_scatter_obj
                                    
     # deal with the output
     output_sanity_check(h_outQ)

@@ -3,9 +3,9 @@ install.sh
 
 # ignore distutils files
 src/python/installed.py
-src/python/cpuscatter.py
-src/python/cpuscatter.py
 src/interp/cyinterp.cpp
+src/scatter/gpuscatter_wrap.cpp
+src/scatter/cpuscatter_wrap.cpp
 
 # ignore mac metadata files
 ._*
