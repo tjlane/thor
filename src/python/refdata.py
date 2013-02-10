@@ -5,6 +5,68 @@ refdata.py -- reference data and tables used in computations
 
 import numpy as np
 
+# ------------------------------------------------------------------------------
+# Helper functions for accessing REFERENCE TABLES
+# ------------------------------------------------------------------------------
+
+
+def get_cromermann_parameters(atomic_numbers, max_num_atom_types=None):
+    """
+    Get cromer-mann parameters for each atom type and renumber the atom 
+    types to 0, 1, 2, ... to point to their CM params.
+    
+    Parameters
+    ----------
+    atomic_numbers : ndarray, int
+        A numpy array of the atomic numbers of each atom in the system.
+        
+    max_num_atom_types : int
+        The maximium number of atom types allowable
+    
+    Returns
+    -------
+    cromermann : c-array, float
+        The Cromer-Mann parameters for the system. Positions [(0-8) * aid] are
+        reserved for each atom type in the system (see `aid` below).
+        
+    aid : c-array, int
+        The indicies of the atomic id's of each atom in the system. This is an
+        arbitrary compressed index for use within the scattering code. Really
+        this is just a renumbering so that each atom type recieves an index
+        0, 1, 2, ... corresponding to the position of that atom's type in
+        the `cromermann` array.  
+    """
+
+    atom_types = np.unique(atomic_numbers)
+    num_atom_types = len(atom_types)
+
+    if max_num_atom_types:
+        if num_atom_types > max_num_atom_types:
+            raise Exception('Fatal Error. Your molecule has too many unique atom  '
+                            'types -- the scattering code cannot handle more due'
+                            ' to code requirements. You can recompile the kernel'
+                            ' to fix this -- see file odin/src/scatter. Email '
+                            'tjlane@stanford.edu complaining about shitty code'
+                            'if you get confused.')
+
+    cromermann = np.zeros( 9*num_atom_types, dtype=np.float32 )
+    aid = np.zeros( len(atomic_numbers), dtype=np.int32 )
+
+    for i,a in enumerate(atom_types):
+        ind = i * 9
+        try:
+            cromermann[ind:ind+9] = np.array(cromer_mann_params[(a,0)], dtype=np.float32)
+        except KeyError as e:
+            print 'Element number %d not in Cromer-Mann form factor parameter database' % a
+            raise RuntimeError('Could not get critical parameters for computation')
+        aid[ atomic_numbers == a ] = np.int32(i)
+
+    return cromermann, aid
+    
+# ------------------------------------------------------------------------------
+# REFERENCE TABLES
+# ------------------------------------------------------------------------------
+
 # SPHERICAL QUADRATURE PARAMETERS
 #
 # Spherical numerical quadrature approximates integrals over the unit

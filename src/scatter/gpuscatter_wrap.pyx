@@ -13,6 +13,22 @@ from odin import installed
 if not installed.gpuscatter:
     raise RuntimeError("GPU scatter code called but not installed!")
 
+    
+def output_sanity_check(intensities):
+    """
+    Perform a basic sanity check on the intensity array we're about to return.
+    """
+
+    # check for NaNs in output
+    if np.isnan(np.sum(intensities)):
+        raise RuntimeError('Fatal error, NaNs detected in scattering output!')
+
+    # check for negative values in output
+    if len(intensities[intensities < 0.0]) != 0:
+        raise RuntimeError('Fatal error, negative intensities detected in scattering output!')
+
+    return
+
 
 cdef extern from "gpuscatter.hh":
     cdef cppclass C_GPUScatter "GPUScatter":

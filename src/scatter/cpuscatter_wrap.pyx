@@ -5,8 +5,24 @@ Cython wrapper for CPU scattering.
 
 import numpy as np
 cimport numpy as np
-from odin.scatter import get_cromermann_parameters, output_sanity_check
 
+from odin.refdata import get_cromermann_parameters
+
+def output_sanity_check(intensities):
+    """
+    Perform a basic sanity check on the intensity array we're about to return.
+    """
+    
+    # check for NaNs in output
+    if np.isnan(np.sum(intensities)):
+        raise RuntimeError('Fatal error, NaNs detected in scattering output!')
+        
+    # check for negative values in output
+    if len(intensities[intensities < 0.0]) != 0:
+        raise RuntimeError('Fatal error, negative intensities detected in scattering output!')
+        
+    return
+    
                     
 cdef extern from "cpuscatter.hh":
     cdef cppclass C_CPUScatter "CPUScatter":
