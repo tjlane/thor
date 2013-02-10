@@ -2,17 +2,16 @@ language: python
 python:
   - 2.7
 virtualenv:
-  system_site_packages: true
+  system_site_packages: false
 before_install:
-  - pip install nose --use-mirrors  -qq
-  - sudo apt-get install -qq libhdf5-serial-dev
-  - pip install numexpr --use-mirrors -qq
-  - pip install cython --use-mirrors -qq
-  - pip install tables --use-mirrors -qq
   - sudo apt-get install -qq python-numpy python-scipy python-matplotlib
   - sudo apt-get install -qq swig
+  - sudo apt-get install -qq libhdf5-serial-dev
+  - pip install --use-mirrors -qq nose
+  - pip install --use-mirrors -qq cython
+  - pip install --use-mirrors -qq tables
   - pip install git+git://github.com/rmcgibbo/mdtraj.git
 install:
-  - python setup.py install --no-openmp
+  - python setup.py install
 script:
   - nosetests
