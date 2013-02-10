@@ -100,12 +100,10 @@ def simulate(n_molecules, np.ndarray qxyz, np.ndarray rxyz, np.ndarray atomic_nu
     # generate random numbers
     cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_rfloats
     if rfloats == None:
-        c_rfloats = np.ascontiguousarray( np.random.rand(size=(3, n_molecules)), dtype=np.float32)
+        c_rfloats = np.ascontiguousarray( np.random.rand(3, n_molecules), dtype=np.float32)
     else:
         c_rfloats = np.ascontiguousarray(rfloats.T, dtype=np.float32)
         print "WARNING: employing fed random numbers -- this should be a test"
-    assert rfloats.shape == (n_molecules, 3)
-    
 
     # see if we're going to use finite photon statistics
     if poisson_parameter == 0.0:

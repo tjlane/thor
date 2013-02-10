@@ -6,7 +6,7 @@ Cython wrapper for GPU scattering.
 import numpy as np
 cimport numpy as np
 
-from odin.scatter import get_cromermann_parameters, output_sanity_check
+from odin.refdata import get_cromermann_parameters
 from odin import installed
 
 
@@ -118,12 +118,10 @@ def simulate(n_molecules, qxyz, rxyz, atomic_numbers, poisson_parameter=0.0,
     # generate random numbers
     cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_rfloats
     if rfloats == None:
-        c_rfloats = np.ascontiguousarray( np.random.rand(size=(3, n_molecules)), dtype=np.float32)
+        c_rfloats = np.ascontiguousarray( np.random.rand(3, n_molecules), dtype=np.float32)
     else:
         c_rfloats = np.ascontiguousarray(rfloats.T, dtype=np.float32)
         print "WARNING: employing fed random numbers -- this should be a test"
-    assert rfloats.shape == (n_molecules, 3)
-    
 
     # see if we're going to use finite photon statistics
     if poisson_parameter == 0.0:
