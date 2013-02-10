@@ -259,7 +259,7 @@ if CUDA:
                         libraries=['cudart'],
                         runtime_library_dirs=['/usr/lib', '/usr/local/lib', CUDA['lib64']],
                         extra_link_args = ['-lstdc++', '-lm'] + omp_link,
-                        include_dirs = ['src/scatter', CUDA['include']],
+                        include_dirs = [numpy_include, 'src/scatter', CUDA['include']],
                         language='c++')
 else:
     gpuscatter = None
