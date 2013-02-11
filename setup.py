@@ -267,7 +267,7 @@ else:
 cpuscatter = Extension('odin.cpuscatter',
                     sources=['src/scatter/cpuscatter_wrap.pyx', 'src/scatter/cpuscatter.cpp'],
                     extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile,
-                                        'g++': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile},
+                                        'g++': ['--fast-math', '-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] + omp_compile},
                     runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
                     extra_link_args = ['-lstdc++', '-lm'] + omp_link,
                     include_dirs = [numpy_include, 'src/scatter'],
