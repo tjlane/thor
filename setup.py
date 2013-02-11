@@ -379,7 +379,7 @@ gpuscatter = %(GPUSCATTER_SUCCESS)s
 
 
 if __name__ == '__main__':
-    setup(**metadata)
     write_install_py({'GPUSCATTER_SUCCESS' : CUDA_SUCCESS,
                       'PYCBF_SUCCESS'      : PYCBF_SUCCESS})
+    setup(**metadata)
     print_warnings()
