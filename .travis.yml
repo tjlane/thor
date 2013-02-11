@@ -5,12 +5,15 @@ python:
 virtualenv:
   system_site_packages: true
 before_install:
-  - sudo apt-get install -qq python-numpy python-scipy python-matplotlib
+  - pip install --use-mirrors -qq numexpr
+  - sudo apt-get update
+  - sudo apt-get install -qq python-numpy 
+  - sudo apt-get install -qq python-scipy
+  - sudo apt-get install -qq python-matplotlib
   - sudo apt-get install -qq swig
   - sudo apt-get install -qq libhdf5-serial-dev
   - pip install --use-mirrors -qq nose
   - pip install --use-mirrors -qq cython
-  - pip install --use-mirrors -qq numexpr
   - pip install --use-mirrors -qq tables
   - pip install git+git://github.com/rmcgibbo/mdtraj.git
 install:
