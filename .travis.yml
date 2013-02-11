@@ -13,6 +13,6 @@ before_install:
   - pip install --use-mirrors -qq tables
   - pip install git+git://github.com/rmcgibbo/mdtraj.git
 install:
-  - python setup.py install
+  - python setup.py install --no-openmp
 script:
   - nosetests -v
