@@ -34,7 +34,7 @@ metadata = {
     'url': 'https://github.com/tjlane/odin',
     'download_url': 'https://github.com/tjlane/odin',
     'install_requires': ['numpy', 'scipy', 'matplotlib', 'pyyaml', 'mdtraj', 
-                         'nose', 'cython==0.16'],
+                         'nose', 'cython>=0.16'],
     'dependency_links' : ['https://github.com/rmcgibbo/mdtraj/tarball/master#egg=mdtraj-0.0.0'],
     'platforms': ['Linux', 'OSX'],
     'zip_safe': False,
