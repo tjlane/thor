@@ -34,8 +34,9 @@ metadata = {
     'url': 'https://github.com/tjlane/odin',
     'download_url': 'https://github.com/tjlane/odin',
     'install_requires': ['numpy', 'scipy', 'matplotlib', 'pyyaml', 'mdtraj', 
-                         'nose', 'cython>=0.16'],
-    'dependency_links' : ['https://github.com/rmcgibbo/mdtraj/tarball/master#egg=mdtraj-0.0.0'],
+                         'nose', 'cython>=0.16', 'fabio'],
+    'dependency_links' : ['https://github.com/rmcgibbo/mdtraj/tarball/master#egg=mdtraj-0.0.0', 
+                          'https://fable.svn.sourceforge.net/svnroot/fable/fabio/branches/v0.1.0#egg=fabio-0.1.0'],
     'platforms': ['Linux', 'OSX'],
     'zip_safe': False,
     'test_suite': "nose.collector",
@@ -199,38 +200,6 @@ class custom_build_ext(build_ext):
         customize_compiler_for_nvcc(self.compiler)
         build_ext.build_extensions(self)
 
-# ------------------------------------------------------------------------------
-# Custom installer, that will allow us to use automake to install the c packages
-# in ./depend/, specifically:
-#
-# -- cbflib & pycbf
-#
-#
-
-PYCBF_SUCCESS = True # will get toggeled to False if it fails
-curdir = os.path.abspath(os.curdir)
-
-# install cbflib & pycbf
-try:
-    import pycbf
-except ImportError as e:
-    try:
-        print "moving: ./depend/cbflib"
-        os.chdir('./depend/cbflib')
-        print "calling sh install_cbflib.sh"
-        subprocess.check_call('sh install_cbflib.sh', shell=True)
-    except:
-        PYCBF_SUCCESS = False
-        print_warning('Error during cbflib/pycbf installation')
-
-try:
-    import pycbf
-except ImportError as e:
-    print_warning('Error during cbflib/pycbf installation')
-
-print "moving: %s" % curdir
-os.chdir(curdir)
-
 # -----------------------------------------------------------------------------
 # INSTALL C/C++ EXTENSIONS
 # gpuscatter, cpuscatter, bcinterp
@@ -299,18 +268,6 @@ metadata['cmdclass']     = {'build_ext': custom_build_ext}
 #
 
 def print_warnings():
-
-    if not PYCBF_SUCCESS:
-        print 
-        print '*'*65
-        print '* WARNING : PYCBF'
-        print '* ---------------'
-        print '* Could not install cbflib/pycbf successfully. If you wish to'
-        print '* load/employ cbf (crystallographic binary files), please install'
-        print '* cbflib and pycbf manually. Use the script "install_cbflib.sh in'
-        print '* odin/depend/cbflib as a template.  Until then, ODIN will'
-        print '* function as usual without cbf-reading capailities.'
-        print '*'*65
         
     if not CUDA_SUCCESS:
         print 
@@ -348,7 +305,6 @@ if not release:
     version = full_version
 
 # installed module information
-pycbf = %(PYCBF_SUCCESS)s
 gpuscatter = %(GPUSCATTER_SUCCESS)s
 """
 
@@ -379,7 +335,6 @@ gpuscatter = %(GPUSCATTER_SUCCESS)s
 
 
 if __name__ == '__main__':
-    write_install_py({'GPUSCATTER_SUCCESS' : CUDA_SUCCESS,
-                      'PYCBF_SUCCESS'      : PYCBF_SUCCESS})
+    write_install_py({'GPUSCATTER_SUCCESS' : CUDA_SUCCESS})
     setup(**metadata)
     print_warnings()
