@@ -1,6 +1,5 @@
 language: python
 python:
-  - 2.6
   - 2.7
 virtualenv:
   system_site_packages: true
@@ -17,6 +16,7 @@ before_install:
   - pip install --use-mirrors -qq cython
   - pip install --use-mirrors -qq tables
   - pip install git+git://github.com/rmcgibbo/mdtraj.git
+  - svn co https://fable.svn.sourceforge.net/svnroot/fable/fabio/branches/v0.1.0 fabio; cd fabio; python setup.py install; cd ..
 install:
   - python setup.py install --no-openmp
 script:
