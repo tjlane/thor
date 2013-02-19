@@ -252,14 +252,27 @@ bcinterp = Extension('odin.interp',
                      include_dirs = [numpy_include, 'src/interp'],
                      language='c++')
 
+ringscatter = Extension('odin.ringscatter',
+  sources              = ['ext/ring_scatter.pyx','ext/ring.cpp'],
+  #extra_compile_args   = ['--fast-math','-O3','-c','-Wl,-rpath=/home/dermen/hdf5/lib'],
+  extra_compile_args   = {'gcc':['--fast-math','-O3','-fPIC','-Wall'],
+                          'g++':['--fast-math','-O3','-fPIC','-Wall'] },
+  runtime_library_dirs = ['/home/dermen/hdf5/lib','usr/lib','/usr/local/lib'],
+  library_dirs         = ['/home/dermen/hdf5/lib'],
+  include_dirs         = ['/home/dermen/hdf5/include','ext'],
+  libraries            = ['hdf5'],
+  extra_link_args      = ['-lhdf5'],
+  language             =  'c++')
+
 
 metadata['packages']     = ['odin', 'odin.scripts']
 metadata['package_dir']  = {'odin' : 'src/python', 'odin.scripts' : 'scripts'}
-metadata['ext_modules']  = [bcinterp, cpuscatter]
+metadata['ext_modules']  = [bcinterp, cpuscatter,ringscatter]
 if gpuscatter: metadata['ext_modules'].append(gpuscatter)
 metadata['scripts']      = [s for s in glob('scripts/*') if not s.endswith('__.py')]
 metadata['data_files']   = [('reference', glob('./reference/*'))]
 metadata['cmdclass']     = {'build_ext': custom_build_ext}
+
 
 
 # ------------------------------------------------------------------------------
@@ -336,5 +349,5 @@ gpuscatter = %(GPUSCATTER_SUCCESS)s
 
 if __name__ == '__main__':
     write_install_py({'GPUSCATTER_SUCCESS' : CUDA_SUCCESS})
-    setup(**metadata)
+    setup(**metadata) # ** will unpack dictionary 'metadata' providing the values as arguments
     print_warnings()
