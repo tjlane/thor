@@ -265,7 +265,7 @@ def scrape_eargs():
     """ Locate settings in environment vars """
     settings = {}
 
-    hdf5 = os.environ.get("HDF5_DIR", '')
+    hdf5 = os.environ.get("HDF5_DIR", "")
     if hdf5 != '':
         settings['hdf5'] = hdf5
 
@@ -273,17 +273,16 @@ def scrape_eargs():
 
 def scrape_cargs():
     """ Locate settings in command line """
-    settings = {}
+    settings_ = {}
     for arg in sys.argv[:]:
-        print arg
         if arg.find('--hdf5=') == 0:
             hdf5 = arg.split('=')[-1]
             if hdf5.lower() == 'default':
-                settings.pop('hdf5', None)
+                settings_.pop('hdf5', None)
             else:
-                settings['hdf5'] = hdf5
+                settings_['hdf5'] = hdf5
             sys.argv.remove(arg)
-    return settings
+    return settings_
 
 # automatically locates HDF5 install dir if using Enthought python distribution
 if re.search('EPD',sys.version):
@@ -339,7 +338,19 @@ def print_warnings():
         print '* Fermi-class GPU (or better) and the CUDA toolkit installed. See'
         print '* the nVidia website for more details.'
         print '*'*65
-        
+     
+    print "\n"
+
+    if HDF5 is None:    
+        wrn_str = "*"*65 + "\n"
+        wrn_str+= "*  WARNING: COULD NOT FIND THE HDF5 INSTALL DIRECTORY.\n"
+        wrn_str+= '*  ---------------------------------------------------\n'
+        wrn_str+= "*   Please export the environment variable HDF5_DIR\n*   or pass the cmd line option --hdf5=/path/to/hdf5\n"
+        wrn_str+= "*   to setup.py, where HDF5_DIR or /path/to/hdf5 is\n*   the directory containing both the include and lib\n" 
+        wrn_str+= "*   directories of your hdf5 build. Careful with env-\n*   variables when using sudo...\n"
+        wrn_str+= "*   Otherwise proceeding without ringscatter support...\n"
+        wrn_str+= "*"*65
+        print wrn_str
     return
         
         
