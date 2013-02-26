@@ -6,10 +6,10 @@ import os, sys,re
 from os.path import join as pjoin
 from glob import glob
 
-from setuptools import setup, Extension
+#from setuptools import setup, Extension
 
-#from distutils.extension import Extension
-#from distutils.core import setup
+from distutils.extension import Extension
+from distutils.core import setup
 
 from distutils.unixccompiler import UnixCCompiler
 from distutils.command.install import install as DistutilsInstall
@@ -39,8 +39,8 @@ metadata = {
     'download_url': 'https://github.com/tjlane/odin',
     'install_requires': ['numpy', 'scipy', 'matplotlib', 'pyyaml', 'mdtraj', 
                          'nose', 'cython>=0.16', 'fabio'],
-    'dependency_links' : ['https://github.com/rmcgibbo/mdtraj/tarball/master#egg=mdtraj-0.0.0', 
-                          'https://fable.svn.sourceforge.net/svnroot/fable/fabio/branches/v0.1.0#egg=fabio-0.1.0'],
+    'dependency_links' : ['https://github.com/rmcgibbo/mdtraj/tarball/master#egg=mdtraj-0.0.0'], 
+                         # 'https://fable.svn.sourceforge.net/svnroot/fable/fabio/branches/v0.1.0#egg=fabio-0.1.0'],
     'platforms': ['Linux', 'OSX'],
     'zip_safe': False,
     'test_suite': "nose.collector",
