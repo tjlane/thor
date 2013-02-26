@@ -6,10 +6,10 @@ import os, sys,re
 from os.path import join as pjoin
 from glob import glob
 
-#from setuptools import setup, Extension
+from setuptools import setup, Extension
 
-from distutils.extension import Extension
-from distutils.core import setup
+#from distutils.extension import Extension
+#from distutils.core import setup
 
 from distutils.unixccompiler import UnixCCompiler
 from distutils.command.install import install as DistutilsInstall
