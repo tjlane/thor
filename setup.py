@@ -6,7 +6,12 @@ import os, sys,re
 from os.path import join as pjoin
 from glob import glob
 
-#from setuptools import setup, Extension
+from setuptools import setup, Extension
+
+#from distutils.extension import Extension
+#from distutils.core import setup
+
+>>>>>>> d75dd1a72f214f4dd95675a87043410ac33e10e1
 from distutils.unixccompiler import UnixCCompiler
 from distutils.command.install import install as DistutilsInstall
 from Cython.Distutils import build_ext
@@ -253,6 +258,15 @@ bcinterp = Extension('odin.interp',
                      include_dirs = [numpy_include, 'src/interp'],
                      language='c++')
 
+data = Extension('odin.data',
+                     sources=['src/popi/polar_pilatus.pyx', 'src/popi/popi.cpp'],
+                     extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'],
+                                         'g++': ['--fast-math', '-O3', '-fPIC', '-Wall']},
+                     runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
+                     extra_link_args = ['-lstdc++', '-lm'],
+                     include_dirs = [numpy_include, 'src/popi'],
+                     language='c++')
+
 #########################################
 #
 #            FIND HDF5 DIR
@@ -294,10 +308,10 @@ else:
 
 if HDF5 is not None:
   ringscatter = Extension('odin.ringscatter',
-    sources              = ['ext/ring_scatter.pyx','ext/ring.cpp'],
+    sources              = ['src/ring/ring_scatter.pyx','src/ring/ring.cpp'],
     extra_compile_args   = {'gcc':['--fast-math','-O3','-fPIC','-Wall'],
                             'g++':['--fast-math','-O3','-fPIC','-Wall'] },
-    include_dirs         = [os.path.join(HDF5, 'include'),'ext'],
+    include_dirs         = [os.path.join(HDF5, 'include'),'src/ring'],
     library_dirs         = [os.path.join(HDF5, 'lib')],
     runtime_library_dirs = [os.path.join(HDF5, 'lib'),'usr/lib','/usr/local/lib'],
     libraries            = ['hdf5','hdf5_hl'],
@@ -312,8 +326,8 @@ else:
 
 metadata['packages']     = ['odin', 'odin.scripts']
 metadata['package_dir']  = {'odin' : 'src/python', 'odin.scripts' : 'scripts'}
-metadata['ext_modules']  = [bcinterp, cpuscatter]
-if gpuscatter:  metadata['ext_modules'].append(gpuscatter)
+metadata['ext_modules']  = [bcinterp, cpuscatter,data]
+if gpuscatter:       metadata['ext_modules'].append(gpuscatter)
 if HDF5 is not None: metadata['ext_modules'].append(ringscatter)
 metadata['scripts']      = [s for s in glob('scripts/*') if not s.endswith('__.py')]
 metadata['data_files']   = [('reference', glob('./reference/*'))]
