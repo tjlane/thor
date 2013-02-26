@@ -6,7 +6,7 @@ import os, sys,re
 from os.path import join as pjoin
 from glob import glob
 
-from setuptools import setup, Extension
+#from setuptools import setup, Extension
 from distutils.unixccompiler import UnixCCompiler
 from distutils.command.install import install as DistutilsInstall
 from Cython.Distutils import build_ext
