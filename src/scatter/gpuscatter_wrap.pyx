@@ -121,7 +121,7 @@ def simulate(n_molecules, qxyz, rxyz, atomic_numbers, poisson_parameter=0.0,
     # generate random numbers
     cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_rfloats
     if rfloats == None:
-        np.random.seed( int(time() + os.getpid()) )
+        np.random.seed( int(time() + os.getpid()) + 1 )
         c_rfloats = np.ascontiguousarray( np.random.rand(3, n_molecules), dtype=np.float32)
     else:
         c_rfloats = np.ascontiguousarray(rfloats.T, dtype=np.float32)
