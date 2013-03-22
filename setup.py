@@ -314,7 +314,7 @@ if HDF5 is not None:
     library_dirs         = [os.path.join(HDF5, 'lib')],
     runtime_library_dirs = [os.path.join(HDF5, 'lib'),'usr/lib','/usr/local/lib'],
     libraries            = ['hdf5','hdf5_hl'],
-    extra_link_args      = ['-lhdf5'],
+    extra_link_args      = ['-lstdc++','-lhdf5'],
     language             =  'c++')
 else:
   print "\n  COULD NOT FIND THE HDF5 INSTALL DIRECTORY.\n"
