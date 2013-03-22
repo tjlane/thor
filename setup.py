@@ -330,7 +330,8 @@ metadata['ext_modules']  = [bcinterp, cpuscatter, data]
 if gpuscatter:
     metadata['ext_modules'].append(gpuscatter)
     
-#if HDF5 is not None: metadata['ext_modules'].append(ringscatter)
+if HDF5 is not None:
+    metadata['ext_modules'].append(ringscatter)
 
 metadata['scripts']      = [s for s in glob('scripts/*') if not s.endswith('__.py')]
 metadata['data_files']   = [('reference', glob('./reference/*'))]
