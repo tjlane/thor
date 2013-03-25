@@ -134,8 +134,7 @@ def simulate(n_molecules, qxyz, rxyz, atomic_numbers, poisson_parameter=0.0,
     else:
         finite_photons = 1
         pois = np.random.poisson(poisson_parameter, size=n_molecules).astype(np.int32)
-    cdef np.ndarray[ndim=1, dtype=np.int32_t] n_photons
-    n_photons = np.ascontiguousarray(pois, dtype=np.int32)
+    cdef int[::1] n_photons = np.ascontiguousarray(pois, dtype=np.int32)
 
     # get the Cromer-Mann parameters
     py_cromermann, py_aid = get_cromermann_parameters(atomic_numbers)

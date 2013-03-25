@@ -118,8 +118,7 @@ def simulate(n_molecules, np.ndarray qxyz, np.ndarray rxyz, np.ndarray atomic_nu
     else:
         finite_photons = 1
         pois = np.random.poisson(poisson_parameter, size=n_molecules).astype(np.int32)
-    cdef np.ndarray[ndim=1, dtype=np.int32_t] n_photons
-    n_photons = np.ascontiguousarray(pois, dtype=np.int32)
+    cdef int[::1] n_photons = np.ascontiguousarray(pois, dtype=np.int32)
     
 
     # get the Cromer-Mann parameters
@@ -147,7 +146,7 @@ def simulate(n_molecules, np.ndarray qxyz, np.ndarray rxyz, np.ndarray atomic_nu
                                rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
                                &c_aid[0], len(c_cromermann), &c_cromermann[0],
                                n_molecules, &c_rfloats[0,0], &c_rfloats[1,0], &c_rfloats[2,0],
-                               finite_photons, &n_photons,
+                               finite_photons, &n_photons[0],
                                &h_outQ[0])
     del cpu_scatter_obj
                                    
