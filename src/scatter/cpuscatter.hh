@@ -59,5 +59,5 @@ public:
                 // output
                 float* h_outQ_ );
            
-  ~CPUScatter();                           // destructor
+    ~CPUScatter();                           // destructor
 };
