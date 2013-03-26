@@ -266,6 +266,15 @@ data = Extension('odin.data',
                      include_dirs = [numpy_include, 'src/popi'],
                      language='c++')
 
+corr = Extension('odin.corr',
+                     sources=['src/corr/correlate.pyx', 'src/corr/corr.cpp'],
+                     extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'],
+                                         'g++': ['--fast-math', '-O3', '-fPIC', '-Wall']},
+                     runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
+                     extra_link_args = ['-lstdc++', '-lm'],
+                     include_dirs = [numpy_include, 'src/corr'],
+                     language='c++')
+
 #########################################
 #
 #            FIND HDF5 DIR
@@ -325,8 +334,8 @@ else:
 
 metadata['packages']     = ['odin', 'odin.scripts']
 metadata['package_dir']  = {'odin' : 'src/python', 'odin.scripts' : 'scripts'}
-metadata['ext_modules']  = [bcinterp, cpuscatter, data]
 
+metadata['ext_modules']  = [bcinterp, cpuscatter, data,corr]
 if gpuscatter:
     metadata['ext_modules'].append(gpuscatter)
     
