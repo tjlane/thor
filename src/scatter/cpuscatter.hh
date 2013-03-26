@@ -23,6 +23,9 @@ class CPUScatter {
     float* h_rand2; // size: nRotations
     float* h_rand3; // size: nRotations
 
+    int    finite_photons;
+    int*   n_photons; // size: nRotations
+
     float* h_outQ;  // size: nQ (OUTPUT)
 
 
@@ -48,9 +51,13 @@ public:
                 float* h_rand1_,
                 float* h_rand2_,
                 float* h_rand3_,
+                
+                // finite photon parameters
+                int    finite_photons_,
+                int*   n_photons_,
 
                 // output
                 float* h_outQ_ );
            
-  ~CPUScatter();                           // destructor
+    ~CPUScatter();                           // destructor
 };

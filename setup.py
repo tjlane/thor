@@ -323,7 +323,7 @@ if HDF5 is not None:
     library_dirs         = [os.path.join(HDF5, 'lib')],
     runtime_library_dirs = [os.path.join(HDF5, 'lib'),'usr/lib','/usr/local/lib'],
     libraries            = ['hdf5','hdf5_hl'],
-    extra_link_args      = ['-lhdf5'],
+    extra_link_args      = ['-lstdc++','-lhdf5'],
     language             =  'c++')
 else:
   print "\n  COULD NOT FIND THE HDF5 INSTALL DIRECTORY.\n"
@@ -334,9 +334,14 @@ else:
 
 metadata['packages']     = ['odin', 'odin.scripts']
 metadata['package_dir']  = {'odin' : 'src/python', 'odin.scripts' : 'scripts'}
-metadata['ext_modules']  = [bcinterp, cpuscatter, data, corr]
-if gpuscatter:       metadata['ext_modules'].append(gpuscatter)
-if HDF5 is not None: metadata['ext_modules'].append(ringscatter)
+
+metadata['ext_modules']  = [bcinterp, cpuscatter, data,corr]
+if gpuscatter:
+    metadata['ext_modules'].append(gpuscatter)
+    
+if HDF5 is not None:
+    metadata['ext_modules'].append(ringscatter)
+
 metadata['scripts']      = [s for s in glob('scripts/*') if not s.endswith('__.py')]
 metadata['data_files']   = [('reference', glob('./reference/*'))]
 metadata['cmdclass']     = {'build_ext': custom_build_ext}

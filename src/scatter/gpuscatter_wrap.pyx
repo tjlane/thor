@@ -52,6 +52,8 @@ cdef extern from "gpuscatter.hh":
                      float* h_rand1_,
                      float* h_rand2_,
                      float* h_rand3_,
+                     int    finite_photons_,
+                     int*   h_n_photons_,
                      float* h_outQ_ ) except +
 
 
@@ -131,11 +133,13 @@ def simulate(n_molecules, qxyz, rxyz, atomic_numbers, poisson_parameter=0.0,
     if poisson_parameter == 0.0:
         finite_photons = 0
         pois = np.zeros(n_molecules, dtype=np.int32)
+    elif rfloats != None: # unit test
+        finite_photons = 1
+        pois = np.ones(n_molecules, dtype=np.int32) * 100
     else:
         finite_photons = 1
         pois = np.random.poisson(poisson_parameter, size=n_molecules).astype(np.int32)
-    cdef np.ndarray[ndim=1, dtype=np.int32_t] n_photons
-    n_photons = np.ascontiguousarray(pois, dtype=np.int32)
+    cdef int[::1] n_photons = np.ascontiguousarray(pois, dtype=np.int32)
 
     # get the Cromer-Mann parameters
     py_cromermann, py_aid = get_cromermann_parameters(atomic_numbers)
@@ -160,6 +164,7 @@ def simulate(n_molecules, qxyz, rxyz, atomic_numbers, poisson_parameter=0.0,
                                rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
                                &c_aid[0], len(c_cromermann), &c_cromermann[0],
                                n_molecules, &c_rfloats[0,0], &c_rfloats[1,0], &c_rfloats[2,0],
+                               finite_photons, &n_photons[0],
                                &h_outQ[0])
     del gpu_scatter_obj
                                    
