@@ -29,6 +29,7 @@ class GPUScatter {
     
     int    finite_photons;
     int*   h_n_photons; // size: nRotations
+    int*   h_photon_rands;
 
     float* h_outQ;  // size: nQ (OUTPUT)
 
@@ -48,6 +49,7 @@ class GPUScatter {
     float* d_rand3; // size: nRotations
     
     int*   d_n_photons; // size: nRotations
+    float* d_photon_rands;
 
     float* d_outQ;  // size: nQ (OUTPUT)
 
@@ -82,6 +84,7 @@ public:
                 // finite photon parameters
                 int    finite_photons_,
                 int*   h_n_photons_,
+                float* h_photon_rands,
 
                 // output
                 float* h_outQ_ 

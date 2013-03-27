@@ -54,6 +54,7 @@ cdef extern from "gpuscatter.hh":
                      float* h_rand3_,
                      int    finite_photons_,
                      int*   h_n_photons_,
+                     float* h_photon_rands,
                      float* h_outQ_ ) except +
 
 
@@ -101,12 +102,14 @@ def simulate(n_molecules, qxyz, rxyz, atomic_numbers, poisson_parameter=0.0,
         to a scattering vector from `qxyz`.
     """
     
+    
     if not type(device_id) == int:
         raise TypeError('`device_id` must be type int')
         
     if not n_molecules % 512 == 0:
         raise ValueError('`n_rotations` must be a multiple of 512')
     bpg = 512 / n_molecules # blocks-per-grid
+    
     
     # A NOTE ABOUT ARRAY ORDERING
     # In what follows, for multi-dimensional arrays I often take the transpose
@@ -128,23 +131,37 @@ def simulate(n_molecules, qxyz, rxyz, atomic_numbers, poisson_parameter=0.0,
     else:
         c_rfloats = np.ascontiguousarray(rfloats.T, dtype=np.float32)
         print "WARNING: employing fed random numbers -- this should be a test"
+        
 
     # see if we're going to use finite photon statistics
+    
+    # this value is static, if you change it also change it
+    n_photon_rands = int(1e6)
+    
     if poisson_parameter == 0.0:
         finite_photons = 0
         pois = np.zeros(n_molecules, dtype=np.int32)
+        photon_rands = np.zeros(n_photon_rands, dtype=np.float32)
+        
     elif rfloats != None: # unit test
         finite_photons = 1
         pois = np.ones(n_molecules, dtype=np.int32) * 100
+        photon_rands = np.ones(n_photon_rands, dtype=np.float32) * 0.5
+        
     else:
         finite_photons = 1
         pois = np.random.poisson(poisson_parameter, size=n_molecules).astype(np.int32)
-    cdef int[::1] n_photons = np.ascontiguousarray(pois, dtype=np.int32)
+        pois.sort() # sort the rands to sync warps on the GPU
+        photon_rands = np.random.rand(n_photon_rands, dtype=np.float32)
+        
+    cdef int[::1]   n_photons    = np.ascontiguousarray(pois, dtype=np.int32)
+    cdef float[::1] photon_rands = np.ascontiguousarray(photon_rands, dtype=np.float32)
+    
 
     # get the Cromer-Mann parameters
     py_cromermann, py_aid = get_cromermann_parameters(atomic_numbers)
     cdef np.ndarray[ndim=1, dtype=np.float32_t] c_cromermann
-    c_cromermann =  np.ascontiguousarray(py_cromermann, dtype=np.float32)
+    c_cromermann = np.ascontiguousarray(py_cromermann, dtype=np.float32)
     
     # NOTE ON int TYPES : For some reason the numpy int types don't seem to be
     # as robust as floats/doubles. Not sure why. The below "memoryview" method
@@ -164,7 +181,7 @@ def simulate(n_molecules, qxyz, rxyz, atomic_numbers, poisson_parameter=0.0,
                                rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
                                &c_aid[0], len(c_cromermann), &c_cromermann[0],
                                n_molecules, &c_rfloats[0,0], &c_rfloats[1,0], &c_rfloats[2,0],
-                               finite_photons, &n_photons[0],
+                               finite_photons, &n_photons[0], &photon_rands[0],
                                &h_outQ[0])
     del gpu_scatter_obj
                                    
