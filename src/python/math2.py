@@ -16,7 +16,7 @@ from utils import parmap
 import numpy as np
 from random import randrange, seed
 
-from scipy import ndimage
+from scipy import ndimage, stats
 from scipy.ndimage import filters
 from scipy.signal import fftconvolve
 
@@ -535,5 +535,29 @@ def fft_acf(data):
     acf = result / result[0]
     return acf
 
+
+def freedman_diaconis(data):
+    """
+    Estimate an optimal number of histogram bins using the Freedman-Diaconis
+    rule of thumb.
     
+    Parameters
+    ----------
+    data : ndarray
+        The data to histogram.
+        
+    Returns
+    -------
+    n_bins : int
+        The number of bins to use.
+    """
     
+    data = data.flatten()
+    
+    q3 = stats.scoreatpercentile(data, 75.0)
+    q1 = stats.scoreatpercentile(data, 25.0)
+    
+    h  = 2.0 * (q3 - q1) * np.power(len(data), -1.0/3.0)
+    n_bins = int( ( np.max(data) - np.min(data) ) / h )
+    
+    return n_bins
