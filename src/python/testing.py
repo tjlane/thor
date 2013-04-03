@@ -6,6 +6,7 @@ from pkg_resources import resource_filename
 
 from nose import SkipTest
 
+import numpy as np
 from numpy.testing import assert_array_almost_equal, assert_array_equal
 
 
@@ -109,3 +110,49 @@ def assert_spase_matrix_equal(m1, m2, decimal=6):
     # even though its called assert_array_almost_equal, it will
     # work for scalars
     assert_array_almost_equal((m1 - m2).sum(), 0, decimal=decimal)
+    
+    
+def brute_force_masked_correlation(x, mask):
+    """
+    Performes a masked correlation in a brute-force manner. Used in 
+    test/test_xray.py to test methods in xray.py.
+    
+    Parameters
+    ----------
+    x : np.ndarray
+        The array to (auto) correlate.
+        
+    mask : np.ndarray
+        The mask to use. True is keep, false discard.
+        
+    Returns
+    -------
+    ref_corr : np.ndarray
+        The correlation function, where ref_corr[i] is the correlation between
+        x and itself circlularly permuted by i indices.
+    """
+    
+    x = x - np.mean( x[mask] )
+    
+    n_x = len(x)
+    ref_corr = np.zeros(n_x)
+
+    for delta in range(n_x):
+        n_delta = 0.0
+
+        for i in range(n_x):    
+            j = (i + delta) % n_x
+
+            if np.logical_and(mask[i], mask[j]):
+                ref_corr[delta] += x[i] * x[j]
+                n_delta += 1.0
+
+        if n_delta > 0.0:
+            ref_corr[delta] /= n_delta
+        else:
+            ref_corr[delta] = 0.0
+            
+    ref_corr /= (np.std( x[mask] ) ** 2.0)
+            
+    return ref_corr
+
