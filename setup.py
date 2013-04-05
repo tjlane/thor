@@ -257,7 +257,7 @@ bcinterp = Extension('odin.interp',
                      include_dirs = [numpy_include, 'src/interp'],
                      language='c++')
 
-data = Extension('odin.data',
+popi = Extension('odin.popi',
                      sources=['src/popi/polar_pilatus.pyx', 'src/popi/popi.cpp'],
                      extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'],
                                          'g++': ['--fast-math', '-O3', '-fPIC', '-Wall']},
@@ -335,7 +335,7 @@ else:
 metadata['packages']     = ['odin', 'odin.scripts']
 metadata['package_dir']  = {'odin' : 'src/python', 'odin.scripts' : 'scripts'}
 
-metadata['ext_modules']  = [bcinterp, cpuscatter, data,corr]
+metadata['ext_modules']  = [bcinterp, cpuscatter, popi, corr]
 if gpuscatter:
     metadata['ext_modules'].append(gpuscatter)
     
