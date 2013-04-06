@@ -16,7 +16,7 @@ from utils import parmap
 import numpy as np
 from random import randrange, seed
 
-from scipy import ndimage, stats
+from scipy import ndimage, stats, optimize
 from scipy.ndimage import filters
 from scipy.signal import fftconvolve
 
@@ -447,6 +447,46 @@ class CircularHough(object):
         r_convl[start_x:end_x,start_y:end_y] = convl
         
         return r_convl
+    
+        
+def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1):
+    """
+    Locates the center of a circular image.
+    """
+    
+    logger.info('Finding the center of the strongest ring...')
+    
+    x_size = image2d.shape[0]
+    y_size = image2d.shape[1]
+    
+    if mask != None:
+        image2d *= mask.astype(np.bool)
+    
+    if initial_guess == None:
+        initial_guess = np.array(image2d.shape) / 2.0
+        
+    bins = 100
+        
+    def objective(center):
+        """
+        Returns the peak height in radial space.
+        """
+        
+        xy = np.mgrid[0:x_size-1:x_size*1j,0:y_size-1:y_size*1j]
+        r2 = np.power(xy[0,:,:] - center[0], 2) + np.power(xy[1,:,:] - center[1], 2)
+
+        #bins = np.arange(0.0, r2.max(), pix_res)
+        hist, bin_edges = np.histogram(r2.flatten(), weights=image2d.flatten(), bins=bins)
+        bin_centers = bin_edges[1:] - np.abs(bin_edges[1]-bin_edges[0])
+
+        m = bin_centers[ np.argmax(hist) ]
+        print m
+        return -1.0 * m
+    
+    print "opt.."
+    center = optimize.fmin_powell(objective, initial_guess, xtol=pix_res)
+    
+    return center
         
 
 def smooth(x, beta=10.0, window_size=11):
