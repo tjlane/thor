@@ -16,9 +16,11 @@ from utils import parmap
 import numpy as np
 from random import randrange, seed
 
-from scipy import ndimage, stats, optimize
+from scipy import ndimage, stats, optimize, spatial
 from scipy.ndimage import filters
 from scipy.signal import fftconvolve
+ 
+from matplotlib import nxutils
 
 
 class CircularHough(object):
@@ -601,3 +603,51 @@ def freedman_diaconis(data):
     n_bins = int( ( np.max(data) - np.min(data) ) / h )
     
     return n_bins
+
+    
+def find_overlap(area_points, test_points):
+    """
+    Find the intersection of two sets of points. Here, `area_points` defines
+    a polygon, and this function finds which of `test_points` are in that 
+    polygon.
+    
+    Parameters
+    ----------
+    area_points : np.ndarray, float
+        An N x M array, with N the number of points and M the dimension of the 
+        space. The convex hull these points define an `area` against which
+        the `test_points` are tested for inclusion.
+        
+    test_points : np.ndarray, float
+        An N' x M array, with the same M (dimension) as `area_points`.
+    
+    Returns
+    -------
+    in_area : np.ndarray, bool
+        An len N' array of booleans, True if the corresponding index of
+        `test_points` is in the test area, and False otherwise.
+    """
+    
+    if not area_points.shape[1] == test_points.shape[1]:
+        raise ValueError('area_points and test_points must be two dimensional, '
+                         'and their second dimension must be the same size')
+    
+    # http://stackoverflow.com/questions/11629064/finding-a-partial-or-complete-
+    # inclusion-of-a-set-of-points-in-convex-hull-of-oth
+    
+    triangulation = spatial.Delaunay(area_points)
+    
+    # order points for matplotlib fxn
+    unordered = list(triangulation.convex_hull)
+    ordered = list(unordered.pop(0))
+    
+    while len(unordered) > 0:
+        next = (i for i, seg in enumerate(unordered) if ordered[-1] in seg).next()
+        ordered += [point for point in unordered.pop(next) if point != ordered[-1]]
+    
+    ordered_pts = area_points[ordered]
+    in_area = nxutils.points_inside_poly(test_points, ordered_pts)
+    
+    assert len(in_area) == test_points.shape[0]
+    
+    return in_area
