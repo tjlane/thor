@@ -81,8 +81,18 @@ def parmap(f, jobs, procs=12):
 
     
 def unique_rows(a):
+    """
+    For a two-dim array, returns unique rows.
+    """
     unique_a = np.unique(a.view([('', a.dtype)]*a.shape[1]))
     return unique_a.view(a.dtype).reshape((unique_a.shape[0], a.shape[1]))
+    
+    
+def maxima(a):
+    """
+    Returns the indices where `a` is at a local max.
+    """
+    return np.where(np.r_[True, a[1:] > a[:-1]] & np.r_[a[:-1] > a[1:], True] == True)[0]
         
     
 def write_sample_input(filename='sample.odin'):
