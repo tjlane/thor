@@ -16,9 +16,11 @@ from utils import parmap
 import numpy as np
 from random import randrange, seed
 
-from scipy import ndimage, stats
+from scipy import ndimage, stats, optimize, spatial
 from scipy.ndimage import filters
 from scipy.signal import fftconvolve
+ 
+from matplotlib import nxutils
 
 
 class CircularHough(object):
@@ -447,6 +449,46 @@ class CircularHough(object):
         r_convl[start_x:end_x,start_y:end_y] = convl
         
         return r_convl
+    
+        
+def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1):
+    """
+    Locates the center of a circular image.
+    """
+    
+    logger.info('Finding the center of the strongest ring...')
+    
+    x_size = image2d.shape[0]
+    y_size = image2d.shape[1]
+    
+    if mask != None:
+        image2d *= mask.astype(np.bool)
+    
+    if initial_guess == None:
+        initial_guess = np.array(image2d.shape) / 2.0
+        
+    bins = 100
+        
+    def objective(center):
+        """
+        Returns the peak height in radial space.
+        """
+        
+        xy = np.mgrid[0:x_size-1:x_size*1j,0:y_size-1:y_size*1j]
+        r2 = np.power(xy[0,:,:] - center[0], 2) + np.power(xy[1,:,:] - center[1], 2)
+
+        #bins = np.arange(0.0, r2.max(), pix_res)
+        hist, bin_edges = np.histogram(r2.flatten(), weights=image2d.flatten(), bins=bins)
+        bin_centers = bin_edges[1:] - np.abs(bin_edges[1]-bin_edges[0])
+
+        m = bin_centers[ np.argmax(hist) ]
+        print m
+        return -1.0 * m
+    
+    print "opt.."
+    center = optimize.fmin_powell(objective, initial_guess, xtol=pix_res)
+    
+    return center
         
 
 def smooth(x, beta=10.0, window_size=11):
@@ -561,3 +603,51 @@ def freedman_diaconis(data):
     n_bins = int( ( np.max(data) - np.min(data) ) / h )
     
     return n_bins
+
+    
+def find_overlap(area_points, test_points):
+    """
+    Find the intersection of two sets of points. Here, `area_points` defines
+    a polygon, and this function finds which of `test_points` are in that 
+    polygon.
+    
+    Parameters
+    ----------
+    area_points : np.ndarray, float
+        An N x M array, with N the number of points and M the dimension of the 
+        space. The convex hull these points define an `area` against which
+        the `test_points` are tested for inclusion.
+        
+    test_points : np.ndarray, float
+        An N' x M array, with the same M (dimension) as `area_points`.
+    
+    Returns
+    -------
+    in_area : np.ndarray, bool
+        An len N' array of booleans, True if the corresponding index of
+        `test_points` is in the test area, and False otherwise.
+    """
+    
+    if not area_points.shape[1] == test_points.shape[1]:
+        raise ValueError('area_points and test_points must be two dimensional, '
+                         'and their second dimension must be the same size')
+    
+    # http://stackoverflow.com/questions/11629064/finding-a-partial-or-complete-
+    # inclusion-of-a-set-of-points-in-convex-hull-of-oth
+    
+    triangulation = spatial.Delaunay(area_points)
+    
+    # order points for matplotlib fxn
+    unordered = list(triangulation.convex_hull)
+    ordered = list(unordered.pop(0))
+    
+    while len(unordered) > 0:
+        next = (i for i, seg in enumerate(unordered) if ordered[-1] in seg).next()
+        ordered += [point for point in unordered.pop(next) if point != ordered[-1]]
+    
+    ordered_pts = area_points[ordered]
+    in_area = nxutils.points_inside_poly(test_points, ordered_pts)
+    
+    assert len(in_area) == test_points.shape[0]
+    
+    return in_area

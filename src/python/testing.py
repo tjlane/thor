@@ -152,7 +152,6 @@ def brute_force_masked_correlation(x, mask):
         else:
             ref_corr[delta] = 0.0
             
-    ref_corr /= (np.std( x[mask] ) ** 2.0)
+    ref_corr /= (np.mean( x[mask] ) ** 2.0)
             
     return ref_corr
-
