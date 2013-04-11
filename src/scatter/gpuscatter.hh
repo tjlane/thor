@@ -7,7 +7,7 @@ class GPUScatter {
     // in CPU memory
     int device_id;
     int bpg;      // <-- defines the number of rotations
-    static const int tpb; // always set in cu file
+    static const int tpb = 512;      // always = 512
     unsigned int nQ_size;
 
     int nQ;
@@ -26,10 +26,6 @@ class GPUScatter {
     float* h_rand1; // size: nRotations
     float* h_rand2; // size: nRotations
     float* h_rand3; // size: nRotations
-    
-    int    finite_photons;
-    int*   h_n_photons; // size: nRotations
-    int*   h_photon_rands;
 
     float* h_outQ;  // size: nQ (OUTPUT)
 
@@ -47,9 +43,6 @@ class GPUScatter {
     float* d_rand1; // size: nRotations
     float* d_rand2; // size: nRotations
     float* d_rand3; // size: nRotations
-    
-    int*   d_n_photons; // size: nRotations
-    float* d_photon_rands;
 
     float* d_outQ;  // size: nQ (OUTPUT)
 
@@ -80,11 +73,6 @@ public:
                 float* h_rand1_,
                 float* h_rand2_,
                 float* h_rand3_,
-                
-                // finite photon parameters
-                int    finite_photons_,
-                int*   h_n_photons_,
-                float* h_photon_rands,
 
                 // output
                 float* h_outQ_ 
