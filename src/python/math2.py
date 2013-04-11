@@ -21,6 +21,9 @@ from scipy.ndimage import filters
 from scipy.signal import fftconvolve
  
 from matplotlib import nxutils
+from matplotlib import pyplot as plt
+
+from odin.interp import Bcinterp
 
 
 class CircularHough(object):
@@ -467,26 +470,32 @@ def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1):
     if initial_guess == None:
         initial_guess = np.array(image2d.shape) / 2.0
         
-    bins = 100
+    # generate a radial grid
+    num_phi = 360
+    phi = np.linspace(0.0, 2.0 * np.pi * (float(num_phi-1)/num_phi), num=num_phi)
+    r   = np.arange(pix_res, np.min([x_size/3., y_size/3.]), pix_res)
+    num_r = len(r)
+    
+    rx = np.repeat(r, num_phi) * np.cos(np.tile(phi, num_r))
+    ry = np.repeat(r, num_phi) * np.sin(np.tile(phi, num_r))
         
+    # interpolate the image
+    interp = Bcinterp(image2d.T.flatten(), 1.0, 1.0, x_size, y_size, 0.0, 0.0)
+    
     def objective(center):
         """
         Returns the peak height in radial space.
         """
         
-        xy = np.mgrid[0:x_size-1:x_size*1j,0:y_size-1:y_size*1j]
-        r2 = np.power(xy[0,:,:] - center[0], 2) + np.power(xy[1,:,:] - center[1], 2)
+        ri = interp.evaluate(rx + center[0], ry + center[1])
+        a = np.mean( ri.reshape(num_r, num_phi), axis=1 )
+        m = np.max(a)
 
-        #bins = np.arange(0.0, r2.max(), pix_res)
-        hist, bin_edges = np.histogram(r2.flatten(), weights=image2d.flatten(), bins=bins)
-        bin_centers = bin_edges[1:] - np.abs(bin_edges[1]-bin_edges[0])
-
-        m = bin_centers[ np.argmax(hist) ]
-        print m
         return -1.0 * m
     
-    print "opt.."
-    center = optimize.fmin_powell(objective, initial_guess, xtol=pix_res)
+    logger.debug('optimizing center position')
+    center = optimize.fmin_powell(objective, initial_guess, xtol=pix_res, disp=0)
+    logger.debug('Optimal center: %s (Delta: %s)' % (center, initial_guess-center))
     
     return center
         
