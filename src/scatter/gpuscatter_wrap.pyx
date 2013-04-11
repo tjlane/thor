@@ -127,7 +127,8 @@ def simulate(n_molecules, qxyz, rxyz, atomic_numbers, poisson_parameter=0.0,
     # get the Cromer-Mann parameters
     py_cromermann, py_aid = get_cromermann_parameters(atomic_numbers)
     cdef np.ndarray[ndim=1, dtype=np.float32_t] c_cromermann
-    cdef np.ndarray[ndim=1, dtype=np.int32_t] c_aid
+    c_cromermann = np.ascontiguousarray(py_cromermann, dtype=np.float32)
+    
     cdef int[::1] c_aid = np.ascontiguousarray(py_aid, dtype=np.int32) # memory-view contiguous "C" array
     
     
