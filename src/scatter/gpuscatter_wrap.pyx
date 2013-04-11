@@ -42,7 +42,7 @@ cdef extern from "gpuscatter.hh":
                      float* h_rx_,
                      float* h_ry_,
                      float* h_rz_,
-                     np.int32_t*   h_id_,
+                     int*   h_id_,
                      int    nCM_,
                      float* h_cm_,
                      int    nRot_,
@@ -128,9 +128,7 @@ def simulate(n_molecules, qxyz, rxyz, atomic_numbers, poisson_parameter=0.0,
     py_cromermann, py_aid = get_cromermann_parameters(atomic_numbers)
     cdef np.ndarray[ndim=1, dtype=np.float32_t] c_cromermann
     cdef np.ndarray[ndim=1, dtype=np.int32_t] c_aid
-    c_cromermann =  np.ascontiguousarray(py_cromermann, dtype=np.float32)
-    c_aid =  np.ascontiguousarray(py_aid, dtype=np.int32)
-    assert c_aid.shape[0] == rxyz.shape[0]
+    cdef int[::1] c_aid = np.ascontiguousarray(py_aid, dtype=np.int32) # memory-view contiguous "C" array
     
     
     # initialize output array
