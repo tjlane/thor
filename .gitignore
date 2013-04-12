@@ -6,7 +6,7 @@ src/python/installed.py
 src/interp/cyinterp.cpp
 src/scatter/gpuscatter_wrap.cpp
 src/scatter/cpuscatter_wrap.cpp
-src/popi/polar_pilatus.cpp
+src/ring/ring_scatter.cpp
 src/corr/correlate.cpp
 
 # ignore mac metadata files
