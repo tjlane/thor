@@ -109,11 +109,11 @@ def random_pairs(total_elements, num_pairs, extra=10):
     not_done = True
     
     while not_done:
-        
+            
         n_to_draw = total_elements + extra
         p = np.random.randint(0, n_to_draw, size=(num_pairs, 2))
         p.sort(axis=1)
-        p = utils.unique_rows(p)
+        p = unique_rows(p)
         p = p[ p[:,0] == p[:,1] ] # slice out i == j
         
         if p.shape[0] == num_pairs:
