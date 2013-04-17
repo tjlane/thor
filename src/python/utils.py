@@ -106,17 +106,21 @@ def random_pairs(total_elements, num_pairs, extra=10):
         An `num_pairs` x 2 array of the random pairs.
     """
     
+    if num_pairs > (total_elements * (total_elements-1)) / 2:
+        raise ValueError('Cannot request more than N(N-1)/2 unique pairs')
+    
     not_done = True
     
     while not_done:
-            
-        n_to_draw = total_elements + extra
-        p = np.random.randint(0, n_to_draw, size=(num_pairs, 2))
+        
+        n_to_draw = num_pairs + extra
+        p = np.random.randint(0, total_elements, size=(num_pairs, 2))
         p.sort(axis=1)
         p = unique_rows(p)
-        p = p[ p[:,0] == p[:,1] ] # slice out i == j
+        p = p[ p[:,0] != p[:,1] ] # slice out i == j
         
-        if p.shape[0] == num_pairs:
+        if p.shape[0] >= num_pairs:
+            p[:num_pairs]
             not_done = False
         else:
             extra += 10
