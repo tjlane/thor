@@ -87,6 +87,40 @@ def unique_rows(a):
     unique_a = np.unique(a.view([('', a.dtype)]*a.shape[1]))
     return unique_a.view(a.dtype).reshape((unique_a.shape[0], a.shape[1]))
     
+
+def random_pairs(total_elements, num_pairs, extra=10):
+    """
+    Sample `num_pairs` random pairs (i,j) from i,j in [0:total_elements) without
+    replacement.
+    
+    Parameters
+    ----------
+    total_elements : int
+        The total number of elements.
+    num_pairs : int
+        The number of unique pairs to sample
+    
+    Returns
+    -------
+    pairs : np.ndarray, int
+        An `num_pairs` x 2 array of the random pairs.
+    """
+    
+    not_done = True
+    
+    while not_done:
+        
+        p = np.random.randint(0, total_elements, size=(num_pairs + extra, 2))
+        p.sort(axis=1)
+        p = unique_rows(p)
+        p = p[ p[:,0] != p[:,1] ] # slice out i == j
+        if p.shape[0] >= num_pairs:
+            not_done = False
+        else:
+            extra += 10
+    
+    return p[0:num_pairs]
+
     
 def maxima(a):
     """
