@@ -88,7 +88,7 @@ def unique_rows(a):
     return unique_a.view(a.dtype).reshape((unique_a.shape[0], a.shape[1]))
     
 
-def random_pairs(total_elements, num_pairs, extra=10):
+def random_pairs(total_elements, num_pairs): #, extra=10):
     """
     Sample `num_pairs` random pairs (i,j) from i,j in [0:total_elements) without
     replacement.
@@ -104,22 +104,38 @@ def random_pairs(total_elements, num_pairs, extra=10):
     -------
     pairs : np.ndarray, int
         An `num_pairs` x 2 array of the random pairs.
-    """
+    
+    if num_pairs > (total_elements * (total_elements-1)) / 2:
+        raise ValueError('Cannot request more than N(N-1)/2 unique pairs')
     
     not_done = True
     
     while not_done:
-        
-        p = np.random.randint(0, total_elements, size=(num_pairs + extra, 2))
+        n_to_draw = num_pairs + extra
+        p = np.random.randint(0, total_elements, size=(num_pairs, 2))
         p.sort(axis=1)
         p = unique_rows(p)
         p = p[ p[:,0] != p[:,1] ] # slice out i == j
+        
         if p.shape[0] >= num_pairs:
+            p[:num_pairs]
             not_done = False
         else:
             extra += 10
     
     return p[0:num_pairs]
+    """
+
+    np.random.seed()
+    inter_pairs  = []
+    factor = 2
+    while len(inter_pairs) < num_pairs:
+        rand_pairs   = np.random.randint( 0, total_elements, (num_pairs*factor,2) )
+        unique_pairs = list( set( tuple(pair) for pair in rand_pairs ) )
+        inter_pairs  = filter( lambda x:x[0] != x[1], unique_pairs)
+        factor += 1
+
+    return np.array ( inter_pairs[0:num_pairs] )
 
     
 def maxima(a):

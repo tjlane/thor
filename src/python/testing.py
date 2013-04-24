@@ -120,7 +120,7 @@ def brute_force_masked_correlation(x, mask):
     Parameters
     ----------
     x : np.ndarray
-        The array to (auto) correlate.
+        The array to (auto) correlate. Should be one-D
         
     mask : np.ndarray
         The mask to use. True is keep, false discard.
@@ -132,11 +132,13 @@ def brute_force_masked_correlation(x, mask):
         x and itself circlularly permuted by i indices.
     """
     
-    x = x - np.mean( x[mask] )
+    mask = mask.astype(np.bool)
+    x = x * mask.astype(np.float)
+    x_bar = np.sum(x) / float(np.sum(mask))
     
     n_x = len(x)
     ref_corr = np.zeros(n_x)
-
+    
     for delta in range(n_x):
         n_delta = 0.0
 
@@ -144,14 +146,12 @@ def brute_force_masked_correlation(x, mask):
             j = (i + delta) % n_x
 
             if np.logical_and(mask[i], mask[j]):
-                ref_corr[delta] += x[i] * x[j]
+                ref_corr[delta] += (x[i] - x_bar) * (x[j] - x_bar)
                 n_delta += 1.0
 
         if n_delta > 0.0:
-            ref_corr[delta] /= n_delta
+            ref_corr[delta] /= ( n_delta * (x_bar ** 2) )
         else:
             ref_corr[delta] = 0.0
-            
-    ref_corr /= (np.mean( x[mask] ) ** 2.0)
             
     return ref_corr
