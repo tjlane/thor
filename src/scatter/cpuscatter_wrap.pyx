@@ -6,6 +6,9 @@ Cython wrapper for CPU scattering.
 import numpy as np
 cimport numpy as np
 
+from time import time
+import os
+
 from odin.refdata import get_cromermann_parameters
 
 def output_sanity_check(intensities):
@@ -100,6 +103,7 @@ def simulate(n_molecules, np.ndarray qxyz, np.ndarray rxyz, np.ndarray atomic_nu
     # generate random numbers
     cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_rfloats
     if rfloats == None:
+        np.random.seed( int(time() + os.getpid()) )
         c_rfloats = np.ascontiguousarray( np.random.rand(3, n_molecules), dtype=np.float32)
     else:
         c_rfloats = np.ascontiguousarray(rfloats.T, dtype=np.float32)
