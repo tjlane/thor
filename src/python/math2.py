@@ -234,4 +234,37 @@ def find_overlap(area_points, test_points):
     
     return in_area
 
-        
+
+def ER_rotation_matrix(axis, theta):
+    """
+    Compute the rotation matrix defining a rotation in 3D of angle `theta` 
+    around `axis` using the Euler-Rodrigues formula.
+    
+    Parameters
+    ----------
+    axis : np.ndarray, float
+        A 3-vector defining the axis of rotation.
+
+    theta : float
+        The rotation angle, in radians.
+
+    Returns
+    -------
+    R : np.ndarray, float
+        A 3x3 array defining a rotation matrix.
+
+    Citation
+    --------
+    ..[1] https://en.wikipedia.org/wiki/Euler%E2%80%93Rodrigues_parameters
+    """
+
+    # note: the a,b,c,d parameters here don't correspond with their equivalents
+    # elsewhere in the code
+
+    axis = axis/np.sqrt(np.dot(axis,axis))
+    a = np.cos(theta/2)
+    b, c, d = -axis*np.sin(theta/2)
+    R = np.array([[a*a+b*b-c*c-d*d, 2*(b*c-a*d), 2*(b*d+a*c)],
+                  [2*(b*c+a*d), a*a+c*c-b*b-d*d, 2*(c*d-a*b)],
+                  [2*(b*d-a*c), 2*(c*d+a*b), a*a+d*d-b*b-c*c]])
+    return R
