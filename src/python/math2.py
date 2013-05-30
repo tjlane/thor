@@ -24,8 +24,6 @@ from matplotlib import nxutils
 from matplotlib import pyplot as plt
 
 from odin.interp import Bcinterp
-
-    
         
 def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1):
     """
@@ -268,3 +266,45 @@ def ER_rotation_matrix(axis, theta):
                   [2*(b*c+a*d), a*a+c*c-b*b-d*d, 2*(c*d-a*b)],
                   [2*(b*d-a*c), 2*(c*d+a*b), a*a+d*d-b*b-c*c]])
     return R
+
+def RandRot(rands = None):
+    """
+    Compute a uniform, random rotation matrix. 
+    
+    Optional Parameters
+    ------------------
+    rands : np.ndarray, float, shape( 3,)
+        3 random numbers used to define matrix
+
+    Returns
+    -------
+    RU : np.matrix, float
+        A 3x3 matrix defining a uniform, random rotation.
+    
+    Reference
+    ---------
+    http://www.google.com/url?sa=t&rct=j&q=uniform%20random%20rotation%20matrix&source=web&cd=5&ved=0CE8QFjAE&url=http%3A%2F%2Fciteseerx.ist.psu.edu%2Fviewdoc%2Fdownload%3Fdoi%3D10.1.1.53.1357%26rep%3Drep1%26type%3Dps&ei=lw2cUa2eIMKRiQKXnIDwBQ&usg=AFQjCNHViFXwwa8kv_tobzteWYM8EaKF-w&sig2=148RpesMoZvJmtse2oerjg&bvm=bv.46751780,d.cGE
+    """
+#   3 random numbers
+    np.random.seed()
+    if rands == None:
+        rands = np.random.random(( 3, ) )
+
+    x1 = rands[0] * np.pi * 2
+    x2 = rands[1] * np.pi * 2
+    x3 = rands[2]
+
+#   matrix for rotation about z-axis
+    Rz1 = [ np.cos(x1), np.sin(x1), 0]
+    Rz2 = [-np.sin(x1), np.cos(x1), 0]
+    Rz = np.matrix(  [ Rz1, Rz2, [ 0, 0, 1 ] ]  )
+
+
+#   matrix for rotating the pole
+    v = np.array( [ np.cos(x2) * np.sqrt(x3) ,
+                    np.sin(x2) * np.sqrt(x3) ,
+                    np.sqrt( 1 - x3 ) ] )
+    H  = np.identity( 3 ) - 2 * np.outer(v,v)
+    RU = -H*Rz
+    return RU
+

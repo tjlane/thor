@@ -247,6 +247,14 @@ cpuscatter = Extension('odin.cpuscatter',
                     include_dirs = [numpy_include, 'src/scatter'],
                     language='c++')
                         
+concscatter = Extension('odin.concscatter',
+                    sources=['src/scatter/conc_scatter.pyx', 'src/scatter/conc.cpp'],
+                    extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile,
+                                        'g++': ['--fast-math', '-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] + omp_compile},
+                    runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
+                    extra_link_args = ['-lstdc++', '-lm'] + omp_link,
+                    include_dirs = [numpy_include, 'src/scatter'],
+                    language='c++')
                         
 bcinterp = Extension('odin.interp',
                      sources=['src/interp/cyinterp.pyx', 'src/interp/bcinterp.cpp'],
@@ -266,72 +274,12 @@ corr = Extension('odin.corr',
                      include_dirs = [numpy_include, 'src/corr'],
                      language='c++')
 
-#########################################
-#
-#            FIND HDF5 DIR
-#  (MOST OF THIS STOLEN FROM H5PY)   
-#         \\..// ( ^.^ ) \\,,// 
-#
-#########################################
-
-def scrape_eargs():
-    """ Locate settings in environment vars """
-    settings = {}
-
-    hdf5 = os.environ.get("HDF5_DIR", "")
-    if hdf5 != '':
-        settings['hdf5'] = hdf5
-
-    return settings
-
-def scrape_cargs():
-    """ Locate settings in command line """
-    settings_ = {}
-    for arg in sys.argv[:]:
-        if arg.find('--hdf5=') == 0:
-            hdf5 = arg.split('=')[-1]
-            if hdf5.lower() == 'default':
-                settings_.pop('hdf5', None)
-            else:
-                settings_['hdf5'] = hdf5
-            sys.argv.remove(arg)
-    return settings_
-
-# automatically locates HDF5 install dir if using Enthought python distribution
-if re.search('EPD',sys.version):
-  HDF5 = sys.prefix                  # default if using EPD
-else:
-  settings = scrape_eargs()          # lowest priority
-  settings.update(scrape_cargs())    # highest priority
-  HDF5 = settings.get('hdf5')
-
-if HDF5 is not None:
-  ringscatter = Extension('odin.ringscatter',
-    sources              = ['src/ring/ring_scatter.pyx','src/ring/ring.cpp'],
-    extra_compile_args   = {'gcc':['--fast-math','-O3','-fPIC','-Wall'],
-                            'g++':['--fast-math','-O3','-fPIC','-Wall'] },
-    include_dirs         = [os.path.join(HDF5, 'include'),'src/ring'],
-    library_dirs         = [os.path.join(HDF5, 'lib')],
-    runtime_library_dirs = [os.path.join(HDF5, 'lib'),'usr/lib','/usr/local/lib'],
-    libraries            = ['hdf5','hdf5_hl'],
-    extra_link_args      = ['-lstdc++','-lhdf5'],
-    language             =  'c++')
-else:
-  print "\n  COULD NOT FIND THE HDF5 INSTALL DIRECTORY.\n"
-  print "   Please export the environment variable HDF5_DIR\n   or pass the cmd line option --hdf5=/path/to/hdf5"
-  print "   to setup.py, where HDF5_DIR or /path/to/hdf5 is\n   the directory containing both the include and lib" 
-  print "   directories of your hdf5 build.\n"
-  print "   Otherwise proceeding without ringscatter support...\n"
-
 metadata['packages']     = ['odin', 'odin.scripts']
 metadata['package_dir']  = {'odin' : 'src/python', 'odin.scripts' : 'scripts'}
 
-metadata['ext_modules']  = [bcinterp, cpuscatter, corr]
+metadata['ext_modules']  = [bcinterp, cpuscatter, concscatter,corr]
 if gpuscatter:
     metadata['ext_modules'].append(gpuscatter)
-    
-if HDF5 is not None:
-    metadata['ext_modules'].append(ringscatter)
 
 metadata['scripts']      = [s for s in glob('scripts/*') if not s.endswith('__.py')]
 metadata['data_files']   = [('reference', glob('./reference/*'))]
@@ -359,19 +307,6 @@ def print_warnings():
      
     print "\n"
 
-    if HDF5 is None:    
-        wrn_str = "*"*65 + "\n"
-        wrn_str+= "*  WARNING: COULD NOT FIND THE HDF5 INSTALL DIRECTORY.\n"
-        wrn_str+= '*  ---------------------------------------------------\n'
-        wrn_str+= "*   Please export the environment variable HDF5_DIR\n*   or pass the cmd line option --hdf5=/path/to/hdf5\n"
-        wrn_str+= "*   to setup.py, where HDF5_DIR or /path/to/hdf5 is\n*   the directory containing both the include and lib\n" 
-        wrn_str+= "*   directories of your hdf5 build. Careful with env-\n*   variables when using sudo...\n"
-        wrn_str+= "*   Otherwise proceeding without ringscatter support...\n"
-        wrn_str+= "*"*65
-        print wrn_str
-    return
-        
-        
 def write_install_py(module_info, filename='src/python/installed.py'):
     """
     module_info is a dict, where each key is an optional module name followed by
