@@ -9,6 +9,9 @@ from nose import SkipTest
 import numpy as np
 from numpy.testing import assert_array_almost_equal, assert_array_equal
 
+import logging
+logging.basicConfig()
+logger = logging.getLogger(__name__)
 
 # decorator to skip tests
 def skip(rason):
@@ -56,17 +59,19 @@ def ref_file(filename):
     """
     fn = resource_filename('odin', os.path.join('../reference', filename))
     
-    # if that doesn't work, try to find the refdata in the git repo
-    # this is mostly for Travis CI
+#   if that doesn't work, try to find the refdata in the git repo
+#   this is mostly for Travis CI
     if not os.path.exists(fn):
-        
-        # check if we're in the base odin dir of the repo
+#       check if we're in the base odin dir of the repo
         if os.path.exists('reference'):
             fn = os.path.join(os.path.abspath(os.curdir), 'reference', filename)
+#       else if we're in  the odin/test directory in the repo
+        elif os.path.exists('../reference'):
+            fn = os.path.join(os.path.abspath(os.curdir), '../reference', filename)
         else:
             logger.info('%s' % os.path.abspath(os.curdir))
             raise RuntimeError('Could not locate reference file: %s' % filename)
-        
+
     return fn
     
     
