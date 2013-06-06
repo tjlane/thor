@@ -267,7 +267,7 @@ def ER_rotation_matrix(axis, theta):
                   [2*(b*d-a*c), 2*(c*d+a*b), a*a+d*d-b*b-c*c]])
     return R
 
-def RandRot(rands = None):
+def rand_rot(rands = None):
     """
     Compute a uniform, random rotation matrix. 
     
