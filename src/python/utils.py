@@ -137,7 +137,6 @@ def random_pairs(total_elements, num_pairs): #, extra=10):
 
     return np.array ( inter_pairs[0:num_pairs] )
 
-    
 def maxima(a):
     """
     Returns the indices where `a` is at a local max.
