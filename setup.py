@@ -206,7 +206,7 @@ class custom_build_ext(build_ext):
 
 # -----------------------------------------------------------------------------
 # INSTALL C/C++ EXTENSIONS
-# gpuscatter, cpuscatter, bcinterp
+# gpuscatter, cpuscatter, interp
 # 
 
 
@@ -238,8 +238,8 @@ if CUDA:
 else:
     gpuscatter = None
 
-cpuscatter = Extension('odin.cpuscatter',
-                    sources=['src/scatter/cpuscatter_wrap.pyx', 'src/scatter/cpuscatter.cpp'],
+_cpuscatter = Extension('odin._cpuscatter',
+                    sources=['src/scatter/cpuscatter_wrap.pyx', 'src/scatter/_cpuscatter.cpp'],
                     extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile,
                                         'g++': ['--fast-math', '-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] + omp_compile},
                     runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
@@ -248,7 +248,7 @@ cpuscatter = Extension('odin.cpuscatter',
                     language='c++')
                         
                         
-bcinterp = Extension('odin.interp',
+interp = Extension('odin.interp',
                      sources=['src/interp/cyinterp.pyx', 'src/interp/bcinterp.cpp'],
                      extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile,
                                          'g++': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile},
@@ -326,7 +326,7 @@ else:
 metadata['packages']     = ['odin', 'odin.scripts']
 metadata['package_dir']  = {'odin' : 'src/python', 'odin.scripts' : 'scripts'}
 
-metadata['ext_modules']  = [bcinterp, cpuscatter, corr]
+metadata['ext_modules']  = [interp, _cpuscatter, corr]
 if gpuscatter:
     metadata['ext_modules'].append(gpuscatter)
     
