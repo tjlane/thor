@@ -10,10 +10,10 @@ from time import time
 import os
 
 from odin.refdata import get_cromermann_parameters
-from odin import installed
 
-
-if not installed.gpuscatter:
+try:
+    from odin import _gpuscatter
+except ImportError as e:
     raise RuntimeError("GPU scatter code called but not installed!")
 
     
