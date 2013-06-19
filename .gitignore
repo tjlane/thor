@@ -82,3 +82,9 @@ depend/cbflib/template_adscquantum4_2304x2304.cbf
 depend/cbflib/template_mar345_2300x2300.cbf
 depend/cbflib/template_pilatus6m_2463x2527.cbf
 
+reference/p2sec_p3d_11_1_00010.bin
+reference/test1.cbf
+reference/refshot.shot
+ext/ring_test_files/gold_11k.ring
+src/popi/test_files/p3deg_p7s_26_1_00001.bin
+
