@@ -24,7 +24,8 @@ from matplotlib import nxutils
 from matplotlib import pyplot as plt
 
 from odin.interp import Bcinterp
-        
+
+    
 def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1):
     """
     Locates the center of a circular image.

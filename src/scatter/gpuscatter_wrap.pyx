@@ -9,11 +9,13 @@ cimport numpy as np
 from time import time
 import os
 
-from odin.scatter import get_cromermann_parameters, output_sanity_check
-from odin import installed
 
 
-if not installed.gpuscatter:
+from odin.refdata import get_cromermann_parameters
+
+try:
+    from odin import _gpuscatter
+except ImportError as e:
     raise RuntimeError("GPU scatter code called but not installed!")
 
     
