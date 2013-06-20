@@ -274,9 +274,6 @@ metadata['ext_modules']  = [interp, cpuscatter, corr]
 if gpuscatter:
     metadata['ext_modules'].append(gpuscatter)
     
-if HDF5 is not None:
-    metadata['ext_modules'].append(ringscatter)
-
 metadata['scripts']      = [s for s in glob('scripts/*') if not s.endswith('__.py')]
 metadata['data_files']   = [('reference', glob('./reference/*'))]
 metadata['cmdclass']     = {'build_ext': custom_build_ext}
@@ -303,5 +300,6 @@ def print_warnings():
      
     print "\n"
 
+if __name__ == '__main__':
     setup(**metadata) # ** will unpack dictionary 'metadata' providing the values as arguments
     print_warnings()
