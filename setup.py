@@ -248,15 +248,6 @@ cpuscatter = Extension('odin._cpuscatter',
                     include_dirs = [numpy_include, 'src/scatter'],
                     language='c++')
                         
-concscatter = Extension('odin.concscatter',
-                    sources=['src/scatter/conc_scatter.pyx', 'src/scatter/conc.cpp'],
-                    extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile,
-                                        'g++': ['--fast-math', '-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] + omp_compile},
-                    runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
-                    extra_link_args = ['-lstdc++', '-lm'] + omp_link,
-                    include_dirs = [numpy_include, 'src/scatter'],
-                    language='c++')
-                        
 interp = Extension('odin.interp',
                      sources=['src/interp/cyinterp.pyx', 'src/interp/bcinterp.cpp'],
                      extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile,
