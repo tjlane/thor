@@ -247,15 +247,6 @@ cpuscatter = Extension('odin._cpuscatter',
                     extra_link_args = ['-lstdc++', '-lm'] + omp_link,
                     include_dirs = [numpy_include, 'src/scatter'],
                     language='c++')
-                        
-interp = Extension('odin.interp',
-                     sources=['src/interp/cyinterp.pyx', 'src/interp/bcinterp.cpp'],
-                     extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile,
-                                         'g++': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile},
-                     runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
-                     extra_link_args = ['-lstdc++', '-lm'] + omp_link,
-                     include_dirs = [numpy_include, 'src/interp'],
-                     language='c++')
 
 corr = Extension('odin.corr',
                      sources=['src/corr/correlate.pyx', 'src/corr/corr.cpp'],
@@ -270,7 +261,7 @@ corr = Extension('odin.corr',
 metadata['packages']     = ['odin', 'odin.scripts']
 metadata['package_dir']  = {'odin' : 'src/python', 'odin.scripts' : 'scripts'}
 
-metadata['ext_modules']  = [interp, cpuscatter, corr]
+metadata['ext_modules']  = [cpuscatter, corr]
 if gpuscatter:
     metadata['ext_modules'].append(gpuscatter)
     

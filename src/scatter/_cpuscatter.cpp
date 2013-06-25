@@ -108,8 +108,8 @@ void kernel( float const * const __restrict__ q_x,
     float qr;
 
     // main loop
-    #pragma omp parallel for shared(outQ) private(rand1, rand2, rand3, q0, q1, q2, \
-    q3, qx, qy, qz, Qsumx, Qsumy, mq, qo, fi, tind, rx, ry, rz, id, ax, ay, az, qr)
+    // #pragma omp parallel for shared(outQ) private(rand1, rand2, rand3, q0, q1, q2, \
+    //     q3, qx, qy, qz, Qsumx, Qsumy, mq, qo, fi, tind, rx, ry, rz, id, ax, ay, az, qr)
     for( int im = 0; im < n_rotations; im++ ) {
        
         // determine the rotated locations
@@ -172,7 +172,7 @@ void kernel( float const * const __restrict__ q_x,
             } // finished one molecule.
                         
             // add the output to the total intensity array
-            #pragma omp critical
+            // #pragma omp critical
             outQ[iq] += (Qsumx*Qsumx + Qsumy*Qsumy); // / n_rotations;
             
         }

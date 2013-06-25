@@ -17,13 +17,11 @@ import numpy as np
 from random import randrange, seed
 
 from scipy import ndimage, stats, optimize, spatial
-from scipy.ndimage import filters
+from scipy.ndimage import filters, interpolation
 from scipy.signal import fftconvolve
  
 from matplotlib import nxutils
 from matplotlib import pyplot as plt
-
-from odin.interp import Bcinterp
 
     
 def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1):
@@ -50,16 +48,14 @@ def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1):
     
     rx = np.repeat(r, num_phi) * np.cos(np.tile(phi, num_r))
     ry = np.repeat(r, num_phi) * np.sin(np.tile(phi, num_r))
-        
-    # interpolate the image
-    interp = Bcinterp(image2d.T.flatten(), 1.0, 1.0, x_size, y_size, 0.0, 0.0)
     
     def objective(center):
         """
         Returns the peak height in radial space.
         """
         
-        ri = interp.evaluate(rx + center[0], ry + center[1])
+        # interpolate the image
+        ri = interpolation.map_coordinates(image2d, [rx + center[0], ry + center[1]], order=1)
         a = np.mean( ri.reshape(num_r, num_phi), axis=1 )
         m = np.max(a)
 
