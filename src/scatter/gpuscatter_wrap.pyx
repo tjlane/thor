@@ -99,7 +99,11 @@ def simulate(n_molecules, qxyz, rxyz, atomic_numbers, poisson_parameter=0.0,
         
     if not n_molecules % 512 == 0:
         raise ValueError('`n_rotations` must be a multiple of 512')
-    bpg = 512 / n_molecules # blocks-per-grid
+    bpg = int(n_molecules) / 512 # blocks-per-grid
+
+    if bpg <= 0:
+        print "Error, bpg = %d" % bpg 
+        raise RuntimeError('bpg <= 0; invalid number of molecules passed: %d' % n_molecules)
     
     # A NOTE ABOUT ARRAY ORDERING
     # In what follows, for multi-dimensional arrays I often take the transpose

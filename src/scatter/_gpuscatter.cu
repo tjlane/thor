@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <iostream>
 #include <assert.h>
 #include <fstream>
 #include <sstream>
@@ -269,6 +270,7 @@ GPUScatter::GPUScatter (int device_id_,
      *   (1) a float pointer to the beginning of the array to be passed
      *   (2) ints representing the size of each array
      */
+
 
     assert( bpg_ * 512 == nRot_ );
     
