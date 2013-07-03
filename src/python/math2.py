@@ -10,9 +10,6 @@ logging.basicConfig()
 logger = logging.getLogger(__name__)
 logger.setLevel("DEBUG")
 
-import multiprocessing as mp
-from utils import parmap
-
 import numpy as np
 from random import randrange, seed
 
@@ -21,8 +18,7 @@ from scipy.ndimage import filters, interpolation
 from scipy.signal import fftconvolve
  
 from matplotlib import nxutils
-from matplotlib import pyplot as plt
-
+import matplotlib.pyplot as plt
     
 def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1):
     """
@@ -49,13 +45,19 @@ def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1):
     rx = np.repeat(r, num_phi) * np.cos(np.tile(phi, num_r))
     ry = np.repeat(r, num_phi) * np.sin(np.tile(phi, num_r))
     
+    # compute spline coefficients
+    #coeff = ndimage.spline_filter(image2d.astype(np.float32), order=3, output=np.float32)
+    
     def objective(center):
         """
         Returns the peak height in radial space.
         """
         
         # interpolate the image
+        logger.info('Current center: (%.2f, %.2f)' % ( float(center[0]), float(center[1]) ) )
+        # ri = interpolation.map_coordinates(coeff, [rx + center[0], ry + center[1]], prefilter=False)
         ri = interpolation.map_coordinates(image2d, [rx + center[0], ry + center[1]], order=1)
+        
         a = np.mean( ri.reshape(num_r, num_phi), axis=1 )
         m = np.max(a)
 
