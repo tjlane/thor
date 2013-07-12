@@ -53,8 +53,7 @@ cdef extern from "gpuscatter.hh":
 cdef C_GPUScatter * gpu_scatter_obj
 
 
-def simulate(n_molecules, qxyz, rxyz, atomic_numbers, poisson_parameter=0.0,
-             device_id=0, rfloats=None):
+def simulate(n_molecules, qxyz, rxyz, atomic_numbers, device_id=0, rfloats=None):
     """
     Parameters
     ----------
@@ -70,12 +69,6 @@ def simulate(n_molecules, qxyz, rxyz, atomic_numbers, poisson_parameter=0.0,
 
     atomic_numbers : ndarray, int
         A 1d array of the atomic numbers of each atom (same len as `rxyz`).
-
-    poisson_parameter : float
-        The poisson parameter describing discrete photon statistics. For each
-        molecule, the number of photons scatterd is n ~ Pois(poisson_parameter).
-        If `poisson_parameter` == 0.0, then discrete photon statistics gets
-        turned off and the continuous intensity pattern is returned.
         
     Optional Parameters
     -------------------

@@ -276,6 +276,7 @@ GPUScatter::GPUScatter (int device_id_,
     
     // unpack arguments
     device_id = device_id_;
+    //cout << "device id: " << device_id << endl;
     bpg = bpg_;
 
     nQ = nQ_;
