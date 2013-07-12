@@ -39,6 +39,18 @@ class odinparser(ArgumentParser):
         pprint(args.__dict__)
         return args
         
+        
+def is_iterable(obj):
+    """
+    Determine if `obj` is iterable. Returns bool.
+    """
+    try:
+        for x in obj:
+            pass
+        return True
+    except:
+        return False
+        
 
 def parmap(f, jobs, procs=12):
     """
