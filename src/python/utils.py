@@ -92,6 +92,15 @@ def parmap(f, jobs, procs=12):
     return flat_output
 
     
+def all_pairs(n):
+    """
+    Generator that yields all unique pairs formed by the integers {0, ..., n-1}
+    """
+    for i in xrange(n):
+        for j in xrange(i+1,n):
+            yield (i,j)
+    
+    
 def unique_rows(a):
     """
     For a two-dim array, returns unique rows.
