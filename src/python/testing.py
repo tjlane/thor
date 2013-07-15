@@ -145,8 +145,7 @@ def brute_force_masked_correlation(x, mask, normed=True):
     """
     
     mask = mask.astype(np.bool)
-    x = x * mask.astype(np.float)
-    x_bar = np.ma.masked_array( x, mask=np.logical_not(mask) ).mean()
+    x_bar = np.mean( x[mask] )
     
     n_x = len(x)
     ref_corr = np.zeros(n_x)
@@ -156,7 +155,7 @@ def brute_force_masked_correlation(x, mask, normed=True):
         
         for i in range(n_x):    
             j = (i + delta) % n_x
-
+            
             if np.logical_and(mask[i], mask[j]):
                 ref_corr[delta] += (x[i] - x_bar) * (x[j] - x_bar)
                 n_delta += 1.0
