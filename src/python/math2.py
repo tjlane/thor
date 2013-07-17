@@ -8,7 +8,7 @@ Various mathematical functions and operations.
 import logging
 logging.basicConfig()
 logger = logging.getLogger(__name__)
-logger.setLevel("DEBUG")
+#logger.setLevel("DEBUG")
 
 import numpy as np
 from random import randrange, seed
@@ -20,7 +20,7 @@ from scipy.signal import fftconvolve
 from matplotlib import nxutils
 import matplotlib.pyplot as plt
     
-def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1):
+def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1, window=5):
     """
     Locates the center of a circular image.
     """
@@ -45,8 +45,20 @@ def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1):
     rx = np.repeat(r, num_phi) * np.cos(np.tile(phi, num_r))
     ry = np.repeat(r, num_phi) * np.sin(np.tile(phi, num_r))
     
-    # compute spline coefficients
-    #coeff = ndimage.spline_filter(image2d.astype(np.float32), order=3, output=np.float32)
+    # find the maximum intensity and narrow our search to include a window
+    # around only that value
+    ri = interpolation.map_coordinates(image2d, [rx + initial_guess[0], 
+                                                 ry + initial_guess[1]], order=1)
+    a = np.mean( ri.reshape(num_r, num_phi), axis=1 )
+    rind_max = np.argmax(a)
+    
+    rlow  = max([0,     rind_max - window])
+    rhigh = min([num_r, rind_max + window])
+    num_r = rhigh - rlow
+    
+    rx = np.repeat(r[rlow:rhigh], num_phi) * np.cos(np.tile(phi, num_r))
+    ry = np.repeat(r[rlow:rhigh], num_phi) * np.sin(np.tile(phi, num_r))
+    
     
     def objective(center):
         """
@@ -55,7 +67,6 @@ def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1):
         
         # interpolate the image
         logger.info('Current center: (%.2f, %.2f)' % ( float(center[0]), float(center[1]) ) )
-        # ri = interpolation.map_coordinates(coeff, [rx + center[0], ry + center[1]], prefilter=False)
         ri = interpolation.map_coordinates(image2d, [rx + center[0], ry + center[1]], order=1)
         
         a = np.mean( ri.reshape(num_r, num_phi), axis=1 )
