@@ -7,18 +7,8 @@ import logging
 logging.basicConfig()
 logger = logging.getLogger(__name__)
 
-import cPickle
-import os
-import signal
-import struct
-import sys
-import time
-import __builtin__
-
 from pprint import pprint
 from argparse import ArgumentParser
-from multiprocessing import Process, Pipe
-from itertools import izip
 
 import numpy as np
 
@@ -50,46 +40,6 @@ def is_iterable(obj):
         return True
     except:
         return False
-        
-
-def parmap(f, jobs, procs=12):
-    """
-    Similar to multiprocessing.map(), but can be called from within a class.    
-    """
-    
-    # split the `jobs` into a list of size 
-    X = [ jobs[i::procs] for i in range(procs) ]
-    
-    # now make a function that iterates over all those sub-lists
-    def g(list_of_items):
-        """ version of `f` that iterates over a list """
-        return map(f, list_of_items)
-        
-    # distribute all the jobs
-    def spawn(f):
-        """
-        Helper function for parmap()
-        """
-        def fun(pipe,x):
-            pipe.send(f(x))
-            pipe.close()
-        return fun
-    
-    # send em off to some kiddies
-    pipe=[Pipe() for x in X]
-    proc=[Process(target=spawn(g),args=(c,x)) for x,(p,c) in izip(X,pipe)]
-    
-    # wait for kids to finish playing
-    [p.start() for p in proc]
-    [p.join() for p in proc]
-    
-    # take toys away from kids
-    output = [p.recv() for (p,c) in pipe]
-    
-    # flatten output
-    flat_output = [item for sublist in output for item in sublist]
-    
-    return flat_output
 
     
 def all_pairs(n):
@@ -146,17 +96,18 @@ def random_pairs(total_elements, num_pairs): #, extra=10):
     
     return p[0:num_pairs]
     """
-
+    
     np.random.seed()
-    inter_pairs  = []
+    inter_pairs = []
     factor = 2
     while len(inter_pairs) < num_pairs:
         rand_pairs   = np.random.randint( 0, total_elements, (num_pairs*factor,2) )
         unique_pairs = list( set( tuple(pair) for pair in rand_pairs ) )
         inter_pairs  = filter( lambda x:x[0] != x[1], unique_pairs)
         factor += 1
+        
+    return np.array(inter_pairs[0:num_pairs])
 
-    return np.array ( inter_pairs[0:num_pairs] )
 
 def maxima(a):
     """
@@ -203,35 +154,6 @@ def write_sample_input(filename='sample.odin'):
     logger.info("Wrote: %s" % filename)
     return
     
-
-def plot_polar_intensities(shot, output_file=None):
-    """
-    Plot an intensity map in polar coordinates.
-    
-    Parameters
-    ----------
-    shot : odin.xray.Shot
-        A shot to plot.
-    output_file : str
-        The filename to write. If `None`, will display the image on screen and
-        not save.
-    """
-
-    pi = shot.polar_grid
-
-    colors = shot.polar_intensities # color by intensity
-    ax = plt.subplot(111, polar=True)
-    c = plt.scatter(pi[:,1], pi[:,0], c=colors, cmap=cm.hsv)
-    c.set_alpha(0.75)
-
-    if output_file:
-        plt.savefig(output_file)
-        logger.info("Saved: %s" % output_file)
-    else:
-        plt.show()
-
-    return
-
 
 graphic = """
 	                                    .  
