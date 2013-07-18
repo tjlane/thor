@@ -20,7 +20,7 @@ from scipy.signal import fftconvolve
 from matplotlib import nxutils
 import matplotlib.pyplot as plt
     
-def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1, window=5):
+def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1, window=25):
     """
     Locates the center of a circular image.
     """
