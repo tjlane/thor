@@ -8,7 +8,7 @@ Various mathematical functions and operations.
 import logging
 logging.basicConfig()
 logger = logging.getLogger(__name__)
-logger.setLevel("DEBUG")
+#logger.setLevel("DEBUG")
 
 import numpy as np
 from random import randrange, seed
@@ -18,11 +18,40 @@ from scipy.ndimage import filters, interpolation
 from scipy.signal import fftconvolve
  
 from matplotlib import nxutils
-import matplotlib.pyplot as plt
+
     
-def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1):
+def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1, window=25):
     """
-    Locates the center of a circular image.
+    Locates the center of an image of a circle.
+    
+    Parameters
+    ----------
+    image2d : ndarray
+        The image -- should be two dimensional array.
+        
+    Optional Parameters
+    -------------------
+    mask : ndarray, bool
+        A boolean mask to apply to `image2d`, should be same shape. `True`
+        indicates a pixel should be kept.
+        
+    initial_guess : 2-tuple of floats
+        An initial guess for the center, in pixel units. If `None`, then the
+        center of the image is guessed.
+        
+    pix_res : float
+        The desired resolution of the center. Higher resolution takes longer to
+        converge.
+        
+    window : int
+        The size, in pix_res units, of the search area for the algorithm. If the
+        default settings don't seem to find the center, try giving a better
+        `initial_guess` as to the center and increase this value a bit.
+    
+    Returns
+    -------
+    center : 2-tuple of floats
+        The (x,y) position of the center, in pixel units.
     """
     
     logger.info('Finding the center of the strongest ring...')
@@ -31,6 +60,9 @@ def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1):
     y_size = image2d.shape[1]
     
     if mask != None:
+        if not mask.shape == image2d.shape:
+            raise ValueError('Mask and image must have same shape! Got %s, %s'
+                             ' respectively.' % ( str(mask.shape), str(image2d.shape) ))
         image2d *= mask.astype(np.bool)
     
     if initial_guess == None:
@@ -45,8 +77,20 @@ def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1):
     rx = np.repeat(r, num_phi) * np.cos(np.tile(phi, num_r))
     ry = np.repeat(r, num_phi) * np.sin(np.tile(phi, num_r))
     
-    # compute spline coefficients
-    #coeff = ndimage.spline_filter(image2d.astype(np.float32), order=3, output=np.float32)
+    # find the maximum intensity and narrow our search to include a window
+    # around only that value
+    ri = interpolation.map_coordinates(image2d, [rx + initial_guess[0], 
+                                                 ry + initial_guess[1]], order=1)
+    a = np.mean( ri.reshape(num_r, num_phi), axis=1 )
+    rind_max = np.argmax(a)
+    
+    rlow  = max([0,     rind_max - window])
+    rhigh = min([num_r, rind_max + window])
+    num_r = rhigh - rlow
+    
+    rx = np.repeat(r[rlow:rhigh], num_phi) * np.cos(np.tile(phi, num_r))
+    ry = np.repeat(r[rlow:rhigh], num_phi) * np.sin(np.tile(phi, num_r))
+    
     
     def objective(center):
         """
@@ -55,7 +99,6 @@ def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1):
         
         # interpolate the image
         logger.info('Current center: (%.2f, %.2f)' % ( float(center[0]), float(center[1]) ) )
-        # ri = interpolation.map_coordinates(coeff, [rx + center[0], ry + center[1]], prefilter=False)
         ri = interpolation.map_coordinates(image2d, [rx + center[0], ry + center[1]], order=1)
         
         a = np.mean( ri.reshape(num_r, num_phi), axis=1 )
@@ -119,20 +162,24 @@ def arctan3(y, x):
     return theta
     
 
-def rand_pairs(numItems,numPairs):
-	seed()
-	i = 0
-	pairs = []
-	while i < numPairs:
-		ind1 = randrange(numItems)
-		ind2 = ind1
-		while ind2 == ind1:
-			ind2 = randrange(numItems)
-		pair = [ind1,ind2]
-		if pairs.count(pair) == 0:
-			pairs.append(pair)
-			i += 1
-	return pairs
+def rand_pairs(num_items, num_pairs):
+    """
+    Generate `num_pairs` random pairs of two from the integers 
+    {0, 1, ..., num_items}.
+    """
+    seed() # initialize random seed
+    i = 0
+    pairs = []
+    while i < num_pairs:
+        ind1 = randrange(num_items)
+        ind2 = ind1
+        while ind2 == ind1:
+            ind2 = randrange(num_items)
+        pair = [ind1, ind2]
+        if pairs.count(pair) == 0:
+            pairs.append(pair)
+            i += 1
+    return pairs
 
 
 def fft_acf(data):
@@ -266,6 +313,7 @@ def ER_rotation_matrix(axis, theta):
                   [2*(b*d-a*c), 2*(c*d+a*b), a*a+d*d-b*b-c*c]])
     return R
 
+
 def rand_rot(rands = None):
     """
     Compute a uniform, random rotation matrix. 
@@ -282,9 +330,10 @@ def rand_rot(rands = None):
     
     Reference
     ---------
-    http://www.google.com/url?sa=t&rct=j&q=uniform%20random%20rotation%20matrix&source=web&cd=5&ved=0CE8QFjAE&url=http%3A%2F%2Fciteseerx.ist.psu.edu%2Fviewdoc%2Fdownload%3Fdoi%3D10.1.1.53.1357%26rep%3Drep1%26type%3Dps&ei=lw2cUa2eIMKRiQKXnIDwBQ&usg=AFQjCNHViFXwwa8kv_tobzteWYM8EaKF-w&sig2=148RpesMoZvJmtse2oerjg&bvm=bv.46751780,d.cGE
+    ..[1] http://www.google.com/url?sa=t&rct=j&q=uniform%20random%20rotation%20matrix&source=web&cd=5&ved=0CE8QFjAE&url=http%3A%2F%2Fciteseerx.ist.psu.edu%2Fviewdoc%2Fdownload%3Fdoi%3D10.1.1.53.1357%26rep%3Drep1%26type%3Dps&ei=lw2cUa2eIMKRiQKXnIDwBQ&usg=AFQjCNHViFXwwa8kv_tobzteWYM8EaKF-w&sig2=148RpesMoZvJmtse2oerjg&bvm=bv.46751780,d.cGE
     """
-#   3 random numbers
+    
+    # 3 random numbers
     np.random.seed()
     if rands == None:
         rands = np.random.random(( 3, ) )
@@ -293,13 +342,13 @@ def rand_rot(rands = None):
     x2 = rands[1] * np.pi * 2
     x3 = rands[2]
 
-#   matrix for rotation about z-axis
+    # matrix for rotation about z-axis
     Rz1 = [ np.cos(x1), np.sin(x1), 0]
     Rz2 = [-np.sin(x1), np.cos(x1), 0]
     Rz = np.matrix(  [ Rz1, Rz2, [ 0, 0, 1 ] ]  )
 
 
-#   matrix for rotating the pole
+    # matrix for rotating the pole
     v = np.array( [ np.cos(x2) * np.sqrt(x3) ,
                     np.sin(x2) * np.sqrt(x3) ,
                     np.sqrt( 1 - x3 ) ] )
