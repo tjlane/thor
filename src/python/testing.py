@@ -59,17 +59,20 @@ def ref_file(filename):
     """
     fn = resource_filename('odin', os.path.join('../reference', filename))
     
-#   if that doesn't work, try to find the refdata in the git repo
-#   this is mostly for Travis CI
+    # if that doesn't work, try to find the refdata in the git repo
+    # this is mostly for Travis CI
     if not os.path.exists(fn):
-#       check if we're in the base odin dir of the repo
+        
+        # check if we're in the base odin dir of the repo
         if os.path.exists('reference'):
             fn = os.path.join(os.path.abspath(os.curdir), 'reference', filename)
-#       else if we're in  the odin/test directory in the repo
+            
+        # else if we're in  the odin/test directory in the repo
         elif os.path.exists('../reference'):
             fn = os.path.join(os.path.abspath(os.curdir), '../reference', filename)
+            
         else:
-            logger.info('%s' % os.path.abspath(os.curdir))
+            logger.info('working dir: %s' % os.path.abspath(os.curdir))
             raise RuntimeError('Could not locate reference file: %s' % filename)
 
     return fn
@@ -117,7 +120,7 @@ def assert_spase_matrix_equal(m1, m2, decimal=6):
     assert_array_almost_equal((m1 - m2).sum(), 0, decimal=decimal)
     
     
-def brute_force_masked_correlation(x, mask):
+def brute_force_masked_correlation(x, mask, normed=True):
     """
     Performes a masked correlation in a brute-force manner. Used in 
     test/test_xray.py to test methods in xray.py.
@@ -127,8 +130,12 @@ def brute_force_masked_correlation(x, mask):
     x : np.ndarray
         The array to (auto) correlate. Should be one-D
         
-    mask : np.ndarray
+    mask : np.ndarray, np.bool
         The mask to use. True is keep, false discard.
+        
+    normed : bool
+        Returns the std/trace normalized correlation function, if True. Else
+        no normalization.
         
     Returns
     -------
@@ -138,25 +145,27 @@ def brute_force_masked_correlation(x, mask):
     """
     
     mask = mask.astype(np.bool)
-    x = x * mask.astype(np.float)
-    x_bar = np.ma.masked_array( x, mask=np.logical_not( mask ) ).mean()
+    x_bar = np.mean( x[mask] )
     
     n_x = len(x)
     ref_corr = np.zeros(n_x)
     
     for delta in range(n_x):
         n_delta = 0.0
-
+        
         for i in range(n_x):    
             j = (i + delta) % n_x
-
+            
             if np.logical_and(mask[i], mask[j]):
-                ref_corr[delta] += (x[i]-x_bar ) * (x[j] - x_bar )
+                ref_corr[delta] += (x[i] - x_bar) * (x[j] - x_bar)
                 n_delta += 1.0
 
         if n_delta > 0.0:
-            ref_corr[delta] /= ( n_delta * (x_bar ** 2) )
+            ref_corr[delta] /= n_delta
         else:
-            ref_corr[delta] = 0.0
+            ref_corr[delta] = 1e-300 # zero that can be divided
+
+    if normed:
+        ref_corr /= ref_corr[0]
             
     return ref_corr

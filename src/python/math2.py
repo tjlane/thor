@@ -160,26 +160,6 @@ def arctan3(y, x):
     theta = np.arctan2(y,x)
     theta[theta < 0.0] += 2 * np.pi
     return theta
-    
-
-def rand_pairs(num_items, num_pairs):
-    """
-    Generate `num_pairs` random pairs of two from the integers 
-    {0, 1, ..., num_items}.
-    """
-    seed() # initialize random seed
-    i = 0
-    pairs = []
-    while i < num_pairs:
-        ind1 = randrange(num_items)
-        ind2 = ind1
-        while ind2 == ind1:
-            ind2 = randrange(num_items)
-        pair = [ind1, ind2]
-        if pairs.count(pair) == 0:
-            pairs.append(pair)
-            i += 1
-    return pairs
 
 
 def fft_acf(data):
