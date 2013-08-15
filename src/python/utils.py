@@ -38,7 +38,52 @@ class odinparser(ArgumentParser):
         args = super(odinparser, self).parse_args()
         pprint(args.__dict__)
         return args
+    
         
+class ProgressConsoleHandler(logging.StreamHandler):
+    """
+    A handler class which allows the cursor to stay on one line for selected 
+    messages
+    
+    http://stackoverflow.com/questions/3118059/how-to-write-custom-python-logging-handler?answertab=active#tab-top
+    
+    Example
+    -------
+    >>> import time
+    >>> progress = ProgressConsoleHandler()
+    >>> console  = logging.StreamHandler()  
+    
+    >>> logger = logging.getLogger('test')
+    >>> logger.setLevel(logging.DEBUG) 
+    >>> logger.addHandler(progress)
+    
+    >>> logger.info('test1')
+    >>> for i in range(3):
+    >>>     logger.info('remaining %d seconds', i, extra={'same_line':True})
+    >>>     time.sleep(1)   
+    >>> logger.info('test2')
+    """
+    on_same_line = False
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            stream = self.stream
+            same_line = hasattr(record, 'same_line')
+            if self.on_same_line and not same_line:
+                stream.write(self.terminator)
+            stream.write(msg)
+            if same_line:
+                stream.write('... ')
+                self.on_same_line = True
+            else:
+                stream.write(self.terminator)
+                self.on_same_line = False
+            self.flush()
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except:
+            self.handleError(record)
+
 
 def parmap(f, jobs, procs=12):
     """
