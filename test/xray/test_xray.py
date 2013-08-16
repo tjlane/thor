@@ -386,7 +386,7 @@ class TestShotset(object):
         rfloats = np.random.rand(num_molecules, 3)
 
         # --- first, scatter onto a perfect ring
-        q_grid = xray._q_grid_as_xyz(q_values, num_phi, multi_d.k)
+        q_grid = xray.xray._q_grid_as_xyz(q_values, num_phi, multi_d.k)
 
         ring_i = _cpuscatter.simulate(num_molecules, q_grid, xyzlist,
                                       atomic_numbers, rfloats=rfloats)
@@ -968,7 +968,7 @@ class TestMisc(object):
         num_phi = 360
         k = 2.0 * np.pi / 1.4
 
-        qxyz = xray._q_grid_as_xyz(q_values, num_phi, k)
+        qxyz = xray.xray._q_grid_as_xyz(q_values, num_phi, k)
 
         # assert that the above vectors are the correct length
         assert np.all( np.abs( np.sqrt( np.sum( np.power(qxyz,2), axis=1 ) ) - \
