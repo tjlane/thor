@@ -250,8 +250,10 @@ cpuscatter = Extension('odin._cpuscatter',
 
 
 
-metadata['packages']     = ['odin', 'odin.scripts']
-metadata['package_dir']  = {'odin' : 'src/python', 'odin.scripts' : 'scripts'}
+metadata['packages']     = ['odin', 'odin.scripts', 'odin.xray']
+metadata['package_dir']  = {'odin' : 'src/python',
+                            'odin.scripts' : 'scripts',
+                            'odin.xray' : 'src/python/xray'}
 
 metadata['ext_modules']  = [cpuscatter]
 if gpuscatter:
