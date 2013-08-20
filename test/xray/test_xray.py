@@ -598,7 +598,7 @@ class TestRings(object):
         self.q_values  = np.array([1.0, 2.0])
         self.num_phi   = 360
         self.traj      = trajectory.load(ref_file('ala2.pdb'))
-        self.num_shots = 2
+        self.num_shots = 3
         self.rings     = xray.Rings.simulate(self.traj, 1, self.q_values,
                                              self.num_phi, self.num_shots) # 1 molec
 
@@ -834,6 +834,23 @@ class TestRings(object):
         # also smoke test random pairs
         rings2 = xray.Rings.simulate(self.traj, 1, self.q_values, self.num_phi, 3) # 1 molec, 3 shots
         inter = rings2.correlate_inter(q, q, mean_only=True, num_pairs=1)
+        
+    def test_correlate_inter_mean_only(self, rtol=1e-6, atol=0.0):
+        q = 1.0
+        inter1 = self.rings.correlate_inter(q, q, mean_only=True,  normed=False)
+        inter2 = self.rings.correlate_inter(q, q, mean_only=False, normed=False)
+        inter2_mean = inter2.mean(axis=0)
+        assert_allclose(inter1 / inter1[0], inter2_mean / inter2_mean[0],
+                        rtol=rtol, atol=atol, 
+                        err_msg='mean_only and rand pairs dont match')
+        assert_allclose(inter1, inter2_mean, rtol=rtol, atol=atol, 
+                        err_msg='mean_only and rand pairs non-std normalization doesnt match')
+                        
+        inter1 = self.rings.correlate_inter(q, q, mean_only=True,  normed=True)
+        inter2 = self.rings.correlate_inter(q, q, mean_only=False, normed=True)
+        inter2_mean = inter2.mean(axis=0)
+        assert_allclose(inter1, inter2_mean, rtol=rtol, atol=atol, 
+                        err_msg='mean_only and rand pairs std normalization doesnt match')
         
     @skip # skip until convention is set
     def test_convert_to_kam(self):
