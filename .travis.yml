@@ -23,4 +23,5 @@ install:
 env:
   - TESTFOLDER=test
   - TESTFOLDER=test/xray
+  - TESTFOLDER=test/scatter
 script: nosetests -v "$TESTFOLDER"
