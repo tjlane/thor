@@ -1,9 +1,15 @@
-
+// solidangle.cpp
 /*
  * Solid angle corrections for pixel array detectors.
  *
- * Written:           Jonas Sellberg <sellberg@slac.stanford.edu>
- * Modified for odin: TJ Lane <tjlane@stanford.edu>
+ * Written as part of Cheetah: Jonas Sellberg <sellberg@slac.stanford.edu>
+ * Modified for odin:          TJ Lane <tjlane@stanford.edu>
+ *
+ * Citations
+ * ---------
+ * [1] van Oosterom, A. & Strackee, J. The solid angle of a plane triangle. IEEE
+ * Trans Biomed Eng 30, 125–126 (1983).
+ * [2] Sellberg and Loh. See documentation.
  *
  */
 
@@ -16,12 +22,12 @@
 void fastSAC(int num_pixels, float * theta, float * correction_factor) {
 	/* 
 	 * Azimuthally symmetrical correction. Fast approximation to 
-	 * `rigorousSolidAngleCorrection`.
+	 * `rigorousSolidAngleCorrection`. See [2].
 	 * 
 	 * Parameters
 	 * ----------
 	 * num_pixels :        the number of pixels
-	 * theta :             scattering angle theta for each pixel (IS THIS TWO-THETA?)
+	 * theta :             scattering angle for each pixel (sometimes called 2-theta)
 	 * correction_factor : multiply this by intensities to correct
 	 */
 			
@@ -41,7 +47,7 @@ void rigorousGridSAC(int num_pixels_s,
      * Rigorous solid angle correction, for a single element of a BasisGrid. See
      * the Odin documentation for how this representation works. See also the
      * rigorousExplicitSAC() function below for computing the SAC on an
-     * explicit represenatation of the detector.
+     * explicit represenatation of the detector. See [1].
      * 
      * Parameters
      * ----------
@@ -50,8 +56,12 @@ void rigorousGridSAC(int num_pixels_s,
      * s : slow scan vector for grid
      * f : fast scan vector for grid
      * p : data origin for grid
-     * correction_factor  (OUTPUT) : the corrections get put here
+     * correction_factor (OUTPUT) : the corrections get put here
      */
+     
+     double constantFactor;
+     
+     constant_factor = pixel_size * pixel_size / 
  
     // for each pixel...
     // OMP possible here
@@ -82,7 +92,7 @@ void rigorousGridSAC(int num_pixels_s,
         }
 
 	    // compute the corner positions
-	    // TJL to JAS : does the order here matter? Right now the comments are not *necessarily* correct...
+	    // JAS says:the 
 	    for (int j = 0; j < 3; j++) {
         	corner_coordinates[0][j] = v[j] - d2[j] // upper left corner
         	corner_coordinates[1][j] = v[j] + d1[j] // upper right corner
@@ -92,7 +102,7 @@ void rigorousGridSAC(int num_pixels_s,
 	
     	// remove constant term to only get theta/phi dependent part of 
     	// solid angle correction for 2D pattern
-    	correction_factor[i] /= pixelSolidAngle(corner_coordinates) / solidAngle; // TJL to JAS : what is `solidAngle` here?, also might need to pass address...
+    	correction_factor[i] /= pixelSolidAngle(corner_coordinates) / constant_factor;
     }
 }
 
