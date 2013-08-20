@@ -3,20 +3,10 @@
 Functions that are useful in various places, but have no common theme.
 """
 
-import logging
-logging.basicConfig()
-logger = logging.getLogger(__name__)
-
 from pprint import pprint
 from argparse import ArgumentParser
 
 import numpy as np
-
-try:
-    import matplotlib.pyplot as plt
-    import matplotlib.cm as cm
-except:
-    logger.warning('could not load matplotlib -- plotting disabled')
 
 
 class odinparser(ArgumentParser):
@@ -40,51 +30,10 @@ def is_iterable(obj):
         return True
     except:
         return False
+    
         
-        
-class ProgressConsoleHandler(logging.StreamHandler):
-    """
-    A handler class which allows the cursor to stay on one line for selected 
-    messages
-    
-    http://stackoverflow.com/questions/3118059/how-to-write-custom-python-logging-handler?answertab=active#tab-top
-    
-    Example
-    -------
-    >>> import time
-    >>> progress = ProgressConsoleHandler()
-    >>> console  = logging.StreamHandler()  
-    
-    >>> logger = logging.getLogger('test')
-    >>> logger.setLevel(logging.DEBUG) 
-    >>> logger.addHandler(progress)
-    
-    >>> logger.info('test1')
-    >>> for i in range(3):
-    >>>     logger.info('remaining %d seconds', i, extra={'same_line':True})
-    >>>     time.sleep(1)   
-    >>> logger.info('test2')
-    """
-    on_same_line = False
-    def emit(self, record):
-        try:
-            msg = self.format(record)
-            stream = self.stream
-            same_line = hasattr(record, 'same_line')
-            if self.on_same_line and not same_line:
-                stream.write(self.terminator)
-            stream.write(msg)
-            if same_line:
-                stream.write('... ')
-                self.on_same_line = True
-            else:
-                stream.write(self.terminator)
-                self.on_same_line = False
-            self.flush()
-        except (KeyboardInterrupt, SystemExit):
-            raise
-        except:
-            self.handleError(record)
+# http://stackoverflow.com/questions/11984684/display-only-one-logging-line
+logger_return = '\x1b[80D\x1b[1A\x1b[K'
 
     
 def all_pairs(n):
