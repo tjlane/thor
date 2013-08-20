@@ -6,13 +6,12 @@ import os, sys,re
 from os.path import join as pjoin
 from glob import glob
 
-#from setuptools import setup, Extension
+try:
+    from setuptools import Extension, setup
+except:
+    from distutils.extension import Extension
+    from distutils.core import setup
 
-from distutils.extension import Extension
-from distutils.core import setup
-
-from distutils.unixccompiler import UnixCCompiler
-from distutils.command.install import install as DistutilsInstall
 from Cython.Distutils import build_ext
 
 import numpy
@@ -24,7 +23,7 @@ from subprocess import CalledProcessError
 # HEADER
 # 
 
-VERSION     = "0.1a"
+VERSION     = "0.0.1"
 ISRELEASED  = False
 __author__  = "TJ Lane"
 __version__ = VERSION
@@ -38,9 +37,9 @@ metadata = {
     'url': 'https://github.com/tjlane/odin',
     'download_url': 'https://github.com/tjlane/odin',
     'install_requires': ['numpy', 'scipy', 'matplotlib', 'pyyaml', 'mdtraj', 
-                         'nose', 'cython>=0.16'], # 'fabio'
-    'dependency_links' : ['https://github.com/rmcgibbo/mdtraj/tarball/master#egg=mdtraj-0.0.0'],#
-                          #'https://fable.svn.sourceforge.net/svnroot/fable/fabio/branches/v0.1.0#egg=fabio-0.1.0'],
+                         'nose', 'cython>=0.16', 'tables'],
+    'dependency_links' : ['https://github.com/rmcgibbo/mdtraj/tarball/master#egg=mdtraj-0.0.0',
+                          'https://svn.code.sf.net/p/fable/code/fabio/branches/v0.1.2/#egg=fabio-0.1.2'],
     'platforms': ['Linux', 'OSX'],
     'zip_safe': False,
     'test_suite': "nose.collector",

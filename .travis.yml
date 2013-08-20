@@ -17,7 +17,7 @@ before_install:
   - pip install --use-mirrors -qq tables
   - pip install --use-mirrors -qq pyyaml
   - pip install git+git://github.com/rmcgibbo/mdtraj.git
-  - svn co https://fable.svn.sourceforge.net/svnroot/fable/fabio/branches/v0.1.0 fabio; cd fabio; python setup.py install; cd ..
+  - svn co https://svn.code.sf.net/p/fable/code/fabio/branches/v0.1.2 fabio; cd fabio; python setup.py install; cd ..
 install:
   - python setup.py install
 env:
