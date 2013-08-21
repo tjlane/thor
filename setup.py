@@ -6,11 +6,12 @@ import os, sys,re
 from os.path import join as pjoin
 from glob import glob
 
-try:
-    from setuptools import Extension, setup
-except:
-    from distutils.extension import Extension
-    from distutils.core import setup
+#try:
+    #from setuptools import Extension, setup
+#except:
+
+from distutils.extension import Extension
+from distutils.core import setup
 
 from Cython.Distutils import build_ext
 
