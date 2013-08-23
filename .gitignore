@@ -1,6 +1,9 @@
 *.py[co]
 install.sh
 
+# fabio
+fabio
+
 # ignore distutils files (including cython'd .cpp)
 src/python/installed.py
 src/interp/cyinterp.cpp

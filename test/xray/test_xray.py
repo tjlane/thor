@@ -835,7 +835,7 @@ class TestRings(object):
         rings2 = xray.Rings.simulate(self.traj, 1, self.q_values, self.num_phi, 3) # 1 molec, 3 shots
         inter = rings2.correlate_inter(q, q, mean_only=True, num_pairs=1)
         
-    def test_correlate_inter_mean_only(self, rtol=1e-6, atol=0.0):
+    def test_correlate_inter_mean_only(self, rtol=1e-4, atol=0.0):
         q = 1.0
         inter1 = self.rings.correlate_inter(q, q, mean_only=True,  normed=False)
         inter2 = self.rings.correlate_inter(q, q, mean_only=False, normed=False)
