@@ -7,10 +7,9 @@ before_install:
   - sudo apt-get install -qq libatlas3gf-base libatlas-dev 
   - pip install --use-mirrors -qq numexpr
   - sudo apt-get update
-  - sudo apt-get install -qq python-numpy 
+  - sudo apt-get install -qq python-numpy
   - sudo apt-get install -qq python-scipy
   - sudo apt-get install -qq python-matplotlib
-  - sudo apt-get install -qq swig
   - sudo apt-get install -qq libhdf5-serial-dev
   - pip install --use-mirrors -qq nose
   - pip install --use-mirrors -qq cython

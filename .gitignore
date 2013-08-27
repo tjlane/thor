@@ -9,6 +9,9 @@ src/scatter/cpuscatter_wrap.cpp
 src/ring/ring_scatter.cpp
 src/corr/correlate.cpp
 
+# fabio installs
+fabio/
+
 # ignore mac metadata files
 ._*
 .DS_*
