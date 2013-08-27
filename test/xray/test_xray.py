@@ -969,6 +969,10 @@ class TestRingsFromDisk(TestRings):
     def test_correlate_inter(self):
         # see comment above
         super(TestRingsFromDisk, self).test_correlate_inter(rtol=0.1, atol=0.1)
+        
+    def test_correlate_inter_mean_only(self):
+        # see comment above
+        super(TestRingsFromDisk, self).test_correlate_inter_mean_only(rtol=0.1, atol=0.1)
 
     def teardown(self):
         self.tables_file.close()
