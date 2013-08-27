@@ -598,7 +598,7 @@ class TestRings(object):
         self.q_values  = np.array([1.0, 2.0])
         self.num_phi   = 360
         self.traj      = trajectory.load(ref_file('ala2.pdb'))
-        self.num_shots = 3
+        self.num_shots = 2
         self.rings     = xray.Rings.simulate(self.traj, 1, self.q_values,
                                              self.num_phi, self.num_shots) # 1 molec
 
@@ -925,7 +925,7 @@ class TestRingsFromDisk(TestRings):
         self.q_values  = np.array([1.0, 2.0])
         self.num_phi   = 360
         self.traj      = trajectory.load(ref_file('ala2.pdb'))
-        self.num_shots = 3
+        self.num_shots = 2
 
         # generate the tables file on disk, then re-open it
         intensities = np.abs( np.random.randn(self.num_shots, len(self.q_values),
