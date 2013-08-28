@@ -655,9 +655,9 @@ class TestRings(object):
         assert self.rings.q_index(self.q_values[0]) == 0
         assert self.rings.q_index(self.q_values[1]) == 1
         
-    def test_depolarize(self):
+    def test_correct_polarization(self):
         
-        xaxis_polarization = 0.99 # chosen for use w/real data below
+        yaxis_polarization = 0.99 # chosen for use w/real data below
         
         # two part test -- first take a real (polarized) ring and make sure
         # it gets corrected
@@ -668,9 +668,9 @@ class TestRings(object):
         # note this isn't really a correction, since we're doing it to
         # simulation data w/o any polarization
         
-        # --> dermen's code below
+        # --> dermen's code below (reference implementation)
         
-        out_of_plane = 1.0 - xaxis_polarization
+        out_of_plane = yaxis_polarization
         
         qs = self.rings.q_values
         wave = 2. * np.pi / self.rings.k
@@ -687,7 +687,7 @@ class TestRings(object):
             
         # <-- end reference implementation
         
-        self.rings.depolarize(xaxis_polarization)
+        self.rings.correct_polarization(yaxis_polarization)
         ip = self.rings.polar_intensities
         assert_allclose(ip / ip[None,None,0], ref_i / ref_i[None,None,0])
 
