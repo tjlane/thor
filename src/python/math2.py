@@ -17,7 +17,7 @@ from scipy import ndimage, stats, optimize, spatial
 from scipy.ndimage import filters, interpolation
 from scipy.signal import fftconvolve
  
-from matplotlib import nxutils
+from matplotlib.path import Path
         
 
 def smooth(x, beta=10.0, window_size=11):
@@ -159,7 +159,9 @@ def find_overlap(area_points, test_points):
         ordered += [point for point in unordered.pop(next) if point != ordered[-1]]
     
     ordered_pts = area_points[ordered]
-    in_area = nxutils.points_inside_poly(test_points, ordered_pts)
+    
+    path = Path(ordered_pts)
+    in_area = path.contains_points(test_points)
     
     assert len(in_area) == test_points.shape[0]
     
