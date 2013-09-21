@@ -735,7 +735,7 @@ class TestRings(object):
         assert_allclose(ref / ref[0], ring / ring[0], 
                         err_msg='failed w/forced normalization')
         assert_allclose(ref, ring, err_msg='error in normalization')
-
+        
     def test_corr_rows_w_mask(self):
 
         q1 = 1.0 # chosen arb.
@@ -831,8 +831,8 @@ class TestRings(object):
         print 'tols:', rtol, atol
         assert_allclose(ref / ref[0], inter / inter[0], rtol=rtol, atol=atol, 
                         err_msg='doesnt match reference implementation')
-        # assert_allclose(ref, inter, rtol=rtol, atol=atol, 
-        #                 err_msg='normalization doesnt match reference implementation')
+        assert_allclose(ref, inter, rtol=rtol, atol=atol, 
+                        err_msg='normalization doesnt match reference implementation')
         
         # also smoke test random pairs
         rings2 = xray.Rings.simulate(self.traj, 1, self.q_values, self.num_phi, 3) # 1 molec, 3 shots
@@ -981,6 +981,21 @@ class TestRingsFromDisk(TestRings):
         self.tables_file.close()
         if os.path.exists('tmp_tables.h5'):
             os.remove('tmp_tables.h5')
+        return
+    
+        
+class TestRingsFFTPack(TestRings):
+    """
+    Test the rings class when pyfftw is not available
+    """
+
+    def setup(self):
+        xray.xray.FORCE_NO_FFTW = True
+        super(TestRingsFFTPack, self).setup()
+        return
+        
+    def teardow(self):
+        xray.xray.FORCE_NO_FFTW = False
         return
 
 
