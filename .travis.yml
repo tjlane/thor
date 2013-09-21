@@ -7,10 +7,10 @@ before_install:
   - sudo apt-get install -qq libfftw3-dev
   - sudo apt-get install -qq libatlas3gf-base libatlas-dev 
   - pip install --use-mirrors -qq numexpr
-  - sudo apt-get install -qq python-numpy 
+  - sudo apt-get update
+  - sudo apt-get install -qq python-numpy
   - sudo apt-get install -qq python-scipy
   - sudo apt-get install -qq python-matplotlib
-  - sudo apt-get install -qq swig
   - sudo apt-get install -qq libhdf5-serial-dev
   - sudo apt-get install -qq python-numpy
   - sudo apt-get install -qq python-scipy
@@ -21,8 +21,7 @@ before_install:
   - pip install --use-mirrors -qq cython
   - pip install --use-mirrors -qq tables
   - pip install --use-mirrors -qq pyyaml
-  - pip install --use-mirrors -qq pyfftw
-  - pip install git+git://github.com/rmcgibbo/mdtraj.git
+  - pip install --use-mirrors -qq mdtraj
   - svn co https://svn.code.sf.net/p/fable/code/fabio/branches/v0.1.2 fabio; cd fabio; python setup.py install; cd ..
 install:
   - python setup.py install
