@@ -18,10 +18,12 @@ before_install:
   - sudo apt-get install -qq swig
   - sudo apt-get install -qq libhdf5-serial-dev
   - sudo apt-get install -qq lic
+  - sudo apt-get install -qq libfftw3-dev libfftw3-doc
   - pip install --use-mirrors -qq cython
   - pip install --use-mirrors -qq tables
   - pip install --use-mirrors -qq pyyaml
   - pip install --use-mirrors -qq mdtraj
+  - pip install --use-mirrors -qq pyfftw
   - svn co https://svn.code.sf.net/p/fable/code/fabio/branches/v0.1.2 fabio; cd fabio; python setup.py install; cd ..
 install:
   - python setup.py install
