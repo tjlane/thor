@@ -4,21 +4,15 @@ python:
 virtualenv:
   system_site_packages: true
 before_install:
-  - sudo apt-get install -qq libfftw3-dev
-  - sudo apt-get install -qq libatlas3gf-base libatlas-dev 
+  - sudo apt-get install -qq libatlas3gf-base libatlas-dev
   - pip install --use-mirrors -qq numexpr
   - sudo apt-get update
   - sudo apt-get install -qq python-numpy
   - sudo apt-get install -qq python-scipy
   - sudo apt-get install -qq python-matplotlib
   - sudo apt-get install -qq libhdf5-serial-dev
-  - sudo apt-get install -qq python-numpy
-  - sudo apt-get install -qq python-scipy
-  - sudo apt-get install -qq python-matplotlib
-  - sudo apt-get install -qq swig
-  - sudo apt-get install -qq libhdf5-serial-dev
-  - sudo apt-get install -qq lic
-  - sudo apt-get install -qq libfftw3-dev libfftw3-doc
+  - sudo apt-get install -qq libfftw3-dev libfftw3-doc 
+  - pip install --use-mirrors -qq nose
   - pip install --use-mirrors -qq cython
   - pip install --use-mirrors -qq tables
   - pip install --use-mirrors -qq pyyaml
