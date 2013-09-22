@@ -890,6 +890,17 @@ class TestRings(object):
         # reconstruct the correlation function
         pred = np.polynomial.legendre.legval(self.rings.cospsi(q1, q1), cl)
         assert_allclose(pred, ring, rtol=0.1, atol=0.1)
+        
+    def test_correlation_significance(self):
+        
+        fake_intra = np.random.randn(1000, 360)
+        fake_inter = np.random.randn(1000, 360)
+        
+        p = self.rings.correlation_significance(1.0, 1.0, intra=fake_intra, inter=fake_inter)
+        print 'p', p
+        
+        # smoke test version where it computes correlators
+        #p = self.rings.correlation_significance(1.0, 1.0)
 
     def test_io(self):
         if os.path.exists('test.ring'): os.remove('test.ring')
