@@ -286,10 +286,26 @@ def print_warnings():
         print '* --------------------------'
         print '* Could not install one or more CUDA/GPU features. Look for'
         print '* warnings in the setup.py output (above) for more details. ODIN'
-        print '* will function without any GPU-acceleration. Note that for  '
+        print '* will function without any GPU-acceleration. EVERYTHING WILL STILL'
+        print '* WORK -- just certain things will be a bit slower. Note that for  '
         print '* successful installation of GPU support, you must have an nVidia'
         print '* Fermi-class GPU (or better) and the CUDA toolkit installed. See'
         print '* the nVidia website for more details.'
+        print '*'*65
+        
+    try:
+        import pyfftw
+    except:
+        print 
+        print '*'*65
+        print '* WARNING : PYFFTW SUPPORT'
+        print '* --------------------------'
+        print '* Could not load the pyfftw package, EVERYTHING WILL STILL'
+        print '* WORK -- just certain things will be a bit slower. Install FFTW'
+        print '* and pyfftw if you wish to accelerate any calculation involving '
+        print '* FFTs, most notably correlation computations.'
+        print '* (https://pypi.python.org/pypi/pyFFTW)'
+        print '* (http://www.fftw.org/)'
         print '*'*65
      
     print "\n"

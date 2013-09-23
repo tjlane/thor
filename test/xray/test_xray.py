@@ -9,6 +9,9 @@ import warnings
 import tables
 from nose import SkipTest
 
+import numpy as np
+from scipy import stats
+
 from odin import utils
 from odin import math2
 from odin import utils
@@ -28,7 +31,6 @@ try:
 except ImportError as e:
     GPU = False
 
-import numpy as np
 from numpy.testing import (assert_almost_equal, assert_array_almost_equal,
                            assert_allclose, assert_array_equal)
 
@@ -740,7 +742,7 @@ class TestRings(object):
         assert_allclose(ref / ref[0], ring / ring[0], 
                         err_msg='failed w/forced normalization')
         assert_allclose(ref, ring, err_msg='error in normalization')
-
+        
     def test_corr_rows_w_mask(self):
 
         q1 = 1.0 # chosen arb.
@@ -786,7 +788,7 @@ class TestRings(object):
     def test_correlate_intra(self, rtol=1e-6, atol=0.0):
 
         # test autocorrelator
-        intra = self.rings.correlate_intra(1.0, 1.0, normed=True,)
+        intra = self.rings.correlate_intra(1.0, 1.0, normed=True)
         assert intra.shape == (self.rings.num_phi,)
         
         q_ind = self.rings.q_index(1.0)
@@ -796,8 +798,10 @@ class TestRings(object):
             ref_corr += brute_force_masked_correlation(x, np.ones(len(x), dtype=np.bool), normed=True)
         ref_corr /= float(self.num_shots)
         
-        assert_allclose(intra, ref_corr, rtol=rtol, atol=atol,
+        assert_allclose(intra / intra[0], ref_corr / ref_corr[0], rtol=rtol, atol=atol,
                         err_msg='doesnt match reference implementation')
+        assert_allclose(intra, ref_corr, rtol=rtol, atol=atol,
+                        err_msg='doesnt match reference implementation normalization')
         
         # test norming
         assert np.abs(intra[0] - 1.0) < rtol
@@ -832,15 +836,16 @@ class TestRings(object):
         ref /= float(n)
         
         print 'tols:', rtol, atol
-        
-        assert_allclose(ref, inter, rtol=rtol, atol=atol, 
+        assert_allclose(ref / ref[0], inter / inter[0], rtol=rtol, atol=atol, 
                         err_msg='doesnt match reference implementation')
+        assert_allclose(ref, inter, rtol=rtol, atol=atol, 
+                        err_msg='normalization doesnt match reference implementation')
         
         # also smoke test random pairs
         rings2 = xray.Rings.simulate(self.traj, 1, self.q_values, self.num_phi, 3) # 1 molec, 3 shots
         inter = rings2.correlate_inter(q, q, mean_only=True, num_pairs=1)
         
-    def test_correlate_inter_mean_only(self, rtol=1e-6, atol=0.0):
+    def test_correlate_inter_mean_only(self, rtol=1e-4, atol=0.0):
         q = 1.0
         inter1 = self.rings.correlate_inter(q, q, mean_only=True,  normed=False)
         inter2 = self.rings.correlate_inter(q, q, mean_only=False, normed=False)
@@ -892,6 +897,33 @@ class TestRings(object):
         # reconstruct the correlation function
         pred = np.polynomial.legendre.legval(self.rings.cospsi(q1, q1), cl)
         assert_allclose(pred, ring, rtol=0.1, atol=0.1)
+        
+    def test_correlation_significance(self):
+        
+        # accept null hypothesis
+        fake_intra = np.random.randn(1000, 360)
+        fake_inter = np.random.randn(1000, 360)
+        p = self.rings.correlation_significance(1.0, 1.0, intra=fake_intra, inter=fake_inter)
+        print 'accept p:', p
+        assert p > 0.01 # null hypothesis should be accepted
+        
+        # reject null hypothesis
+        fake_intra = np.random.randn(1000, 360)
+        fake_inter = np.random.randn(1000, 360) + 0.10
+        p = self.rings.correlation_significance(1.0, 1.0, intra=fake_intra, inter=fake_inter)
+        print 'reject p:', p
+        assert p < 0.01 # null hypothesis should be rejected
+        
+        # ensure univariate version gives same result as scipy
+        # first when we should accept null hypothesis
+        fake_intra = np.random.randn(1000, 1)
+        fake_inter = np.random.randn(1000, 1)
+        p = self.rings.correlation_significance(1.0, 1.0, intra=fake_intra, inter=fake_inter)
+        _, p_ref = stats.ttest_ind(fake_intra[:,0], fake_inter[:,0])
+        assert_allclose(p_ref, p)
+        
+        # smoke test version where it computes correlators
+        #p = self.rings.correlation_significance(1.0, 1.0)
 
     def test_io(self):
         if os.path.exists('test.ring'): os.remove('test.ring')
@@ -983,6 +1015,21 @@ class TestRingsFromDisk(TestRings):
         self.tables_file.close()
         if os.path.exists('tmp_tables.h5'):
             os.remove('tmp_tables.h5')
+        return
+    
+        
+class TestRingsFFTPack(TestRings):
+    """
+    Test the rings class when pyfftw is not available
+    """
+
+    def setup(self):
+        xray.xray.FORCE_NO_FFTW = True
+        super(TestRingsFFTPack, self).setup()
+        return
+        
+    def teardow(self):
+        xray.xray.FORCE_NO_FFTW = False
         return
 
 
