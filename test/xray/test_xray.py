@@ -556,6 +556,11 @@ class TestShotset(object):
             n += 1
         assert ss.num_shots == n
         
+    def test_write_cxidb(self):
+        # smoke test for now
+        self.shot.save_as_cxi('testx.cxi')
+        if os.path.exists('testx.cxi'): os.remove('testx.cxi')
+        
         
 class TestShotsetFromDisk(TestShotset):
     """
