@@ -23,7 +23,8 @@ install:
   - python setup.py install
 env:
   - TESTFOLDER=test
-  - TESTFOLDER=test/xray
-  - TESTFOLDER=test/xray/more
   - TESTFOLDER=test/scatter
+  - TESTFOLDER=test/xray/test_xray.py
+  - TESTFOLDER=test/xray/test_xray2.py
+  - TESTFOLDER=test/xray/more
 script: nosetests -v "$TESTFOLDER"
