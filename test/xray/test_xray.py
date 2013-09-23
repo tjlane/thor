@@ -9,6 +9,9 @@ import warnings
 import tables
 from nose import SkipTest
 
+import numpy as np
+from scipy import stats
+
 from odin import utils
 from odin import math2
 from odin import utils
@@ -28,7 +31,6 @@ try:
 except ImportError as e:
     GPU = False
 
-import numpy as np
 from numpy.testing import (assert_almost_equal, assert_array_almost_equal,
                            assert_allclose, assert_array_equal)
 
@@ -893,11 +895,27 @@ class TestRings(object):
         
     def test_correlation_significance(self):
         
+        # accept null hypothesis
         fake_intra = np.random.randn(1000, 360)
         fake_inter = np.random.randn(1000, 360)
-        
         p = self.rings.correlation_significance(1.0, 1.0, intra=fake_intra, inter=fake_inter)
-        print 'p', p
+        print 'accept p:', p
+        assert p > 0.01 # null hypothesis should be accepted
+        
+        # reject null hypothesis
+        fake_intra = np.random.randn(1000, 360)
+        fake_inter = np.random.randn(1000, 360) + 0.10
+        p = self.rings.correlation_significance(1.0, 1.0, intra=fake_intra, inter=fake_inter)
+        print 'reject p:', p
+        assert p < 0.01 # null hypothesis should be rejected
+        
+        # ensure univariate version gives same result as scipy
+        # first when we should accept null hypothesis
+        fake_intra = np.random.randn(1000, 1)
+        fake_inter = np.random.randn(1000, 1)
+        p = self.rings.correlation_significance(1.0, 1.0, intra=fake_intra, inter=fake_inter)
+        _, p_ref = stats.ttest_ind(fake_intra[:,0], fake_inter[:,0])
+        assert_allclose(p_ref, p)
         
         # smoke test version where it computes correlators
         #p = self.rings.correlation_significance(1.0, 1.0)
