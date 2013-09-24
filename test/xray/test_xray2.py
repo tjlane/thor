@@ -3,10 +3,41 @@
 Some extras on test_xray. Split up so Travis can parallelize them.
 """
 
-from test_xray import *
+import os
+import sys
+import warnings
+import tables
+from nose import SkipTest
+
+import numpy as np
+from scipy import stats
+
+from odin import utils
+from odin import math2
+from odin import utils
+from odin import xray
+from odin import _cpuscatter
+from odin.xray import parse
+from odin.xray import structure
+from odin.testing import (skip, ref_file, expected_failure, 
+                          brute_force_masked_correlation)
+from odin.refdata import cromer_mann_params
+
+from mdtraj import trajectory, io
+
+try:
+    from odin import _gpuscatter
+    GPU = True
+except ImportError as e:
+    GPU = False
+
+from numpy.testing import (assert_almost_equal, assert_array_almost_equal,
+                           assert_allclose, assert_array_equal)
+
+import test_xray
 
 
-class TestShotsetFromDisk(TestShotset):
+class TestShotsetFromDisk(test_xray.TestShotset):
     """
     Test all the same shotset functionality, but working from the intensities
     on disk via pytables. Works by subclassing TestShotset but overwriting the
@@ -40,7 +71,7 @@ class TestShotsetFromDisk(TestShotset):
         os.remove('tmp_tables.h5')
         return
 
-class TestRingsFromDisk(TestRings):
+class TestRingsFromDisk(test_xray.TestRings):
     """
     Test the rings class when the handle is a tables array.
     """
@@ -106,7 +137,7 @@ class TestRingsFromDisk(TestRings):
         return
     
         
-class TestRingsFFTPack(TestRings):
+class TestRingsFFTPack(test_xray.TestRings):
     """
     Test the rings class when pyfftw is not available
     """
