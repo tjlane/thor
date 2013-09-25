@@ -19,7 +19,7 @@
 #include <iostream>
 
 
-void fastSAC(int num_pixels, float * theta, float * correction_factor) {
+void fastSAC(int num_pixels, double * theta, double * correction_factor) {
 	/* 
 	 * Azimuthally symmetrical correction. Fast approximation to 
 	 * `rigorousSolidAngleCorrection`. See [2].
@@ -32,17 +32,101 @@ void fastSAC(int num_pixels, float * theta, float * correction_factor) {
 	 */
 			
 	for (int i = 0; i < num_pixels; i++) {
-		correction_factor[i] /= cos(theta[i])*cos(theta[i])*cos(theta[i]);
+		correction_factor[i] = 1.0 / cos(theta[i])*cos(theta[i])*cos(theta[i]);
 	}
 }
 
+double pixelSolidAngle(double ccords[4][3]) {
+    /*
+     * Compute the solid angle of a single pixel, given the corner coordinates.
+     *
+     * Parameters
+     * ----------
+     * ccords : 
+     */
+        
+	double determinant;
+	double denominator;
+	double solid_angle[2]; // solid angles of the two plane triangles that form the pixel
+	double total_solid_angle;
+    
+    // distances of pixel corners, index starts from upper left corner and goes
+    // around clock-wise
+    double corner_distances[4];
+    for (int j = 0; j < 4; j++) {
+		corner_distances[j] = sqrt(ccords[j][0]*ccords[j][0] +
+		                           ccords[j][1]*ccords[j][1] +
+		                           ccords[j][2]*ccords[j][2]);
+	}
+    
+    // first triangle made up of upper left, upper right, and lower right corner
+    // numerator in expression for solid angle of a plane triangle --
+    // magnitude of triple product of first 3 corners
+    determinant = fabs( ccords[0][0]*(ccords[1][1]*ccords[2][2]  - 
+                                                  ccords[1][2]*ccords[2][1]) - 
+                        ccords[0][1]*(ccords[1][0]*ccords[2][2]  - 
+                                                  ccords[1][2]*ccords[2][0]) + 
+                        ccords[0][2]*(ccords[1][0]*ccords[2][1]  - 
+                                                  ccords[1][1]*ccords[2][0]) );
+				   
+    denominator = corner_distances[0]*corner_distances[1]*corner_distances[2] + 
+                  corner_distances[2]*(ccords[0][0]*ccords[1][0]  + 
+                                       ccords[0][1]*ccords[1][1]  + 
+                                       ccords[0][2]*ccords[1][2]) + 
+                  corner_distances[1]*(ccords[0][0]*ccords[2][0]  + 
+                                       ccords[0][1]*ccords[2][1]  + 
+                                       ccords[0][2]*ccords[2][2]) + 
+                  corner_distances[0]*(ccords[1][0]*ccords[2][0]  + 
+                                       ccords[1][1]*ccords[2][1]  + 
+                                       ccords[1][2]*ccords[2][2]);
+
+    solid_angle[0] = atan2(determinant, denominator);
+
+    // If det > 0 and denom < 0 arctan2 returns < 0, so add PI
+    if (solid_angle[0] < 0) {
+    	solid_angle[0] += M_PI;
+    }
+
+    // second triangle made up of lower right, lower left, and upper left corner
+    // numerator in expression for solid angle of a plane triangle -- 
+    // magnitude of triple product of last 3 corners
+    determinant = fabs( ccords[0][0]*(ccords[3][1]*ccords[2][2]  - 
+                                                  ccords[3][2]*ccords[2][1]) - 
+                        ccords[0][1]*(ccords[3][0]*ccords[2][2]  - 
+                                                  ccords[3][2]*ccords[2][0]) + 
+                        ccords[0][2]*(ccords[3][0]*ccords[2][1]  - 
+                                                  ccords[3][1]*ccords[2][0]) );
+                                              
+    denominator = corner_distances[2]*corner_distances[3]*corner_distances[0] + 
+                  corner_distances[2]*(ccords[0][0]*ccords[3][0]  + 
+                                       ccords[0][1]*ccords[3][1]  + 
+                                       ccords[0][2]*ccords[3][2]) + 
+                  corner_distances[3]*(ccords[0][0]*ccords[2][0]  + 
+                                       ccords[0][1]*ccords[2][1]  + 
+                                       ccords[0][2]*ccords[2][2]) + 
+                  corner_distances[0]*(ccords[3][0]*ccords[2][0]  +
+                                       ccords[3][1]*ccords[2][1]  + 
+                                       ccords[3][2]*ccords[2][2]);
+
+    solid_angle[1] = atan2(determinant, denominator);
+
+    // If det > 0 and denom < 0 arctan2 returns < 0, so add PI
+    if (solid_angle[1] < 0) {
+    	solid_angle[1] += M_PI;
+    }
+
+    total_solid_angle = 2*(solid_angle[0] + solid_angle[1]);
+    
+    return total_solid_angle;
+}
 		
 void rigorousGridSAC(int num_pixels_s,
                      int num_pixels_f,
-                     float * s,
-                     float * f,
-                     float * p,
-                     float * correction_factor) {
+                     // double pixel_size,
+                     double * s,
+                     double * f,
+                     double * p,
+                     double * correction_factor) {
     /* 
      * Rigorous solid angle correction, for a single element of a BasisGrid. See
      * the Odin documentation for how this representation works. See also the
@@ -59,12 +143,15 @@ void rigorousGridSAC(int num_pixels_s,
      * correction_factor (OUTPUT) : the corrections get put here
      */
      
-     double constantFactor;
-     
-     constant_factor = pixel_size * pixel_size / 
+    // this constantFactor is essentially a conversion to the units of 
+    // solid angle -- it is approximate at best, but shouldn't really matter
+    // unless one is trying to count photons, or the like
+    // double constantFactor; 
+    // constant_factor = pixel_size * pixel_size / (z_dist * z_dist)
  
     // for each pixel...
     // OMP possible here
+    int num_pixels = num_pixels_s * num_pixels_f;
     for (int i = 0; i < num_pixels; i++) {
 	
     	// compute vector coordinates of pixel corners
@@ -92,22 +179,22 @@ void rigorousGridSAC(int num_pixels_s,
         }
 
 	    // compute the corner positions
-	    // JAS says:the 
+	    // JAS says: only relative order matters
 	    for (int j = 0; j < 3; j++) {
-        	corner_coordinates[0][j] = v[j] - d2[j] // upper left corner
-        	corner_coordinates[1][j] = v[j] + d1[j] // upper right corner
-        	corner_coordinates[2][j] = v[j] + d2[j] // lower right corner
-        	corner_coordinates[3][j] = v[j]	- d1[j] // lower left corner
+            corner_coordinates[0][j] = v[j] - d2[j]; // upper left corner
+            corner_coordinates[1][j] = v[j] + d1[j]; // upper right corner
+            corner_coordinates[2][j] = v[j] + d2[j]; // lower right corner
+            corner_coordinates[3][j] = v[j]	- d1[j]; // lower left corner
 	    }
 	
     	// remove constant term to only get theta/phi dependent part of 
     	// solid angle correction for 2D pattern
-    	correction_factor[i] /= pixelSolidAngle(corner_coordinates) / constant_factor;
+        correction_factor[i] = pixelSolidAngle(corner_coordinates);  // / constant_factor;
     }
 }
 
-void rigorousExplicitSAC(float * pixel_xyz,
-                         float * correction_factor) {
+void rigorousExplicitSAC(double * pixel_xyz,
+                         double * correction_factor) {
     /*
      * Compute the solid angle correction from an explicit xyz representation
      * of each pixel
@@ -120,86 +207,4 @@ void rigorousExplicitSAC(float * pixel_xyz,
 }
 
 
-float pixelSolidAngle(float * corner_coordinates) {
-    /*
-     * Compute the solid angle of a single pixel, given the corner coordinates.
-     *
-     * Parameters
-     * ----------
-     * corner_coordinates : 
-     */
-        
-	double determinant;
-	double denominator;
-	double solid_angle[2]; // solid angles of the two plane triangles that form the pixel
-	double total_solid_angle;
-    
-    // distances of pixel corners, index starts from upper left corner and goes
-    // around clock-wise
-    double corner_distances[4];
-    for (int j = 0; j < 4; j++) {
-		corner_distances[j] = sqrt(corner_coordinates[j][0]*corner_coordinates[j][0] +
-		                           corner_coordinates[j][1]*corner_coordinates[j][1] +
-		                           corner_coordinates[j][2]*corner_coordinates[j][2]);
-	}
-    
-    // first triangle made up of upper left, upper right, and lower right corner
-    // numerator in expression for solid angle of a plane triangle --
-    // magnitude of triple product of first 3 corners
-    determinant = fabs( corner_coordinates[0][0]*(corner_coordinates[1][1]*corner_coordinates[2][2]  - 
-                                                  corner_coordinates[1][2]*corner_coordinates[2][1]) - 
-                        corner_coordinates[0][1]*(corner_coordinates[1][0]*corner_coordinates[2][2]  - 
-                                                  corner_coordinates[1][2]*corner_coordinates[2][0]) + 
-                        corner_coordinates[0][2]*(corner_coordinates[1][0]*corner_coordinates[2][1]  - 
-                                                  corner_coordinates[1][1]*corner_coordinates[2][0]) );
-				   
-    denominator = corner_distances[0]*corner_distances[1]*corner_distances[2] + 
-                  corner_distances[2]*(corner_coordinates[0][0]*corner_coordinates[1][0]  + 
-                                       corner_coordinates[0][1]*corner_coordinates[1][1]  + 
-                                       corner_coordinates[0][2]*corner_coordinates[1][2]) + 
-                  corner_distances[1]*(corner_coordinates[0][0]*corner_coordinates[2][0]  + 
-                                       corner_coordinates[0][1]*corner_coordinates[2][1]  + 
-                                       corner_coordinates[0][2]*corner_coordinates[2][2]) + 
-                  corner_distances[0]*(corner_coordinates[1][0]*corner_coordinates[2][0]  + 
-                                       corner_coordinates[1][1]*corner_coordinates[2][1]  + 
-                                       corner_coordinates[1][2]*corner_coordinates[2][2]);
 
-    solid_angle[0] = atan2(determinant, denominator);
-
-    // If det > 0 and denom < 0 arctan2 returns < 0, so add PI
-    if (solid_angle[0] < 0) {
-    	solid_angle[0] += M_PI;
-    }
-
-    // second triangle made up of lower right, lower left, and upper left corner
-    // numerator in expression for solid angle of a plane triangle -- 
-    // magnitude of triple product of last 3 corners
-    determinant = fabs( corner_coordinates[0][0]*(corner_coordinates[3][1]*corner_coordinates[2][2]  - 
-                                                  corner_coordinates[3][2]*corner_coordinates[2][1]) - 
-                        corner_coordinates[0][1]*(corner_coordinates[3][0]*corner_coordinates[2][2]  - 
-                                                  corner_coordinates[3][2]*corner_coordinates[2][0]) + 
-                        corner_coordinates[0][2]*(corner_coordinates[3][0]*corner_coordinates[2][1]  - 
-                                                  corner_coordinates[3][1]*corner_coordinates[2][0]) );
-                                              
-    denominator = corner_distances[2]*corner_distances[3]*corner_distances[0] + 
-                  corner_distances[2]*(corner_coordinates[0][0]*corner_coordinates[3][0]  + 
-                                       corner_coordinates[0][1]*corner_coordinates[3][1]  + 
-                                       corner_coordinates[0][2]*corner_coordinates[3][2]) + 
-                  corner_distances[3]*(corner_coordinates[0][0]*corner_coordinates[2][0]  + 
-                                       corner_coordinates[0][1]*corner_coordinates[2][1]  + 
-                                       corner_coordinates[0][2]*corner_coordinates[2][2]) + 
-                  corner_distances[0]*(corner_coordinates[3][0]*corner_coordinates[2][0]  +
-                                       corner_coordinates[3][1]*corner_coordinates[2][1]  + 
-                                       corner_coordinates[3][2]*corner_coordinates[2][2]);
-
-    solid_angle[1] = atan2(determinant, denominator);
-
-    // If det > 0 and denom < 0 arctan2 returns < 0, so add PI
-    if (solid_angle[1] < 0) {
-    	solid_angle[1] += M_PI;
-    }
-
-    total_solid_angle = 2*(solid_angle[0] + solid_angle[1]);
-    
-    return total_solid_angle;
-}

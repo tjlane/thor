@@ -8,15 +8,15 @@ import numpy as np
 cimport numpy as np
 
 cdef extern from "solidangle.hh":
-    void fastSAC(int num_pixels, float * theta, float * correction_factor)
+    void fastSAC(int num_pixels, double * theta, double * correction_factor)
     void rigorousGridSAC(int num_pixels_s,
                          int num_pixels_f,
-                         float * s,
-                         float * f,
-                         float * p,
-                         float * correction_factor)
-    void rigorousExplicitSAC(float * pixel_xyz,
-                             float * correction_factor)
+                         double * s,
+                         double * f,
+                         double * p,
+                         double * correction_factor)
+    void rigorousExplicitSAC(double * pixel_xyz,
+                             double * correction_factor)
 
                              
 class SolidAngle(object):
@@ -40,36 +40,45 @@ class SolidAngle(object):
         self._use_fast_approximation = use_fast_approximation
         
         # initialize output array
-        cdef float[::1] correction = np.zeros(detector.num_pixels, dtype=np.float64)
+        cdef double[:] correction = np.zeros(detector.num_pixels, dtype=np.float64)
+        cdef double[:] theta = np.ascontiguousarray(detector.polar[:,1], dtype=np.float64)            
+        
+        cdef double[:] cs = np.zeros(3, dtype=np.float64)
+        cdef double[:] cf = np.zeros(3, dtype=np.float64)
+        cdef double[:] cp = np.zeros(3, dtype=np.float64)
         
         if use_fast_approximation:
-            cdef float[::1] theta = np.ascontiguousarray(detector.polar[:,1], dtype=np.float64)            
             fastSAC(detector.num_pixels, &theta[0], &correction[0])
             
         else: # use rigorous
         
-            if self.detector._xyz_type == 'implicit':
+            if detector._xyz_type == 'implicit':
                 bg = detector._basis_grid
                 
                 start = 0
+                end   = 0
                 for i in range(bg.num_grids):
                     
                     p, s, f, shp = bg.get_grid(i)
                     num_grid_pixels = np.product(shp)
-                    cdef float[::1] grid_correction = np.zeros(num_grid_pixels, dtype=np.float64)
+                    
+                    cs = s.astype(np.float64)
+                    cf = f.astype(np.float64)
+                    cp = p.astype(np.float64)
+                    
                     end += np.product(num_grid_pixels)
                     
                     rigorousGridSAC(shp[0], shp[1],
-                                    &s[0], &f[0], &p[0],
-                                    &grid_correction[0])
-                    
-                    correction[start:end] = grid_correction
+                                    &cs[0], # s
+                                    &cf[0], # f
+                                    &cp[0], # p
+                                    &correction[start])
                     
                     start = end
                     
                 assert end == detector.num_pixels # sanity check
                 
-            elif self.detector._xyz_type == 'explicit':
+            elif detector._xyz_type == 'explicit':
                 raise NotImplementedError('SAC for explicit detectors')
                 
             else:
@@ -84,7 +93,7 @@ class SolidAngle(object):
         """
         Apply the correction to an array of intensities
         """
-        if not intensities.shape == self._correlation.shape:
+        if not intensities.shape == self._correction.shape:
             raise ValueError('`intensities` must be a one-D array with length '
                              'equal to the number of pixels in the detector '
                              'originally registered with the SolidAngle '
