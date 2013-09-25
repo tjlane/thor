@@ -9,6 +9,9 @@ import warnings
 import tables
 from nose import SkipTest
 
+import numpy as np
+from scipy import stats
+
 from odin import utils
 from odin import math2
 from odin import utils
@@ -28,14 +31,8 @@ try:
 except ImportError as e:
     GPU = False
 
-import numpy as np
 from numpy.testing import (assert_almost_equal, assert_array_almost_equal,
                            assert_allclose, assert_array_equal)
-
-import logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-logging.basicConfig()
 
 
 class TestBeam(object):
@@ -556,42 +553,12 @@ class TestShotset(object):
             n += 1
         assert ss.num_shots == n
         
-        
-class TestShotsetFromDisk(TestShotset):
-    """
-    Test all the same shotset functionality, but working from the intensities
-    on disk via pytables. Works by subclassing TestShotset but overwriting the
-    setup() method.
-    """
+    def test_write_cxidb(self):
+        # smoke test for now
+        self.shot.save_as_cxi('testx.cxi')
+        if os.path.exists('testx.cxi'): os.remove('testx.cxi')
     
-    def setup(self):
         
-        self.q_values = np.array([1.0, 2.0])
-        self.num_phi  = 360
-        self.l = 50.0
-        self.d = xray.Detector.generic(spacing=0.4, l=self.l)
-        self.t = trajectory.load(ref_file('ala2.pdb'))
-        
-        self.num_shots = 2
-        intensities = np.abs(np.random.randn(self.num_shots, self.d.num_pixels))
-        io.saveh('tmp_tables.h5', data=intensities)
-        
-        self.tables_file = tables.File('tmp_tables.h5')
-        self.i = self.tables_file.root.data
-        
-        self.shot = xray.Shotset(self.i, self.d)
-        
-        return
-        
-    def test_average_intensity(self):
-        assert_array_almost_equal(self.i.read().mean(0), self.shot.average_intensity)
-        
-    def teardown(self):
-        self.tables_file.close()
-        os.remove('tmp_tables.h5')
-        return
-
-
 class TestRings(object):
 
     def setup(self):
@@ -655,9 +622,9 @@ class TestRings(object):
         assert self.rings.q_index(self.q_values[0]) == 0
         assert self.rings.q_index(self.q_values[1]) == 1
         
-    def test_depolarize(self):
+    def test_correct_polarization(self):
         
-        xaxis_polarization = 0.99 # chosen for use w/real data below
+        yaxis_polarization = 0.99 # chosen for use w/real data below
         
         # two part test -- first take a real (polarized) ring and make sure
         # it gets corrected
@@ -668,9 +635,9 @@ class TestRings(object):
         # note this isn't really a correction, since we're doing it to
         # simulation data w/o any polarization
         
-        # --> dermen's code below
+        # --> dermen's code below (reference implementation)
         
-        out_of_plane = 1.0 - xaxis_polarization
+        out_of_plane = yaxis_polarization
         
         qs = self.rings.q_values
         wave = 2. * np.pi / self.rings.k
@@ -687,7 +654,7 @@ class TestRings(object):
             
         # <-- end reference implementation
         
-        self.rings.depolarize(xaxis_polarization)
+        self.rings.correct_polarization(yaxis_polarization)
         ip = self.rings.polar_intensities
         assert_allclose(ip / ip[None,None,0], ref_i / ref_i[None,None,0])
 
@@ -735,7 +702,7 @@ class TestRings(object):
         assert_allclose(ref / ref[0], ring / ring[0], 
                         err_msg='failed w/forced normalization')
         assert_allclose(ref, ring, err_msg='error in normalization')
-
+        
     def test_corr_rows_w_mask(self):
 
         q1 = 1.0 # chosen arb.
@@ -781,7 +748,7 @@ class TestRings(object):
     def test_correlate_intra(self, rtol=1e-6, atol=0.0):
 
         # test autocorrelator
-        intra = self.rings.correlate_intra(1.0, 1.0, normed=True,)
+        intra = self.rings.correlate_intra(1.0, 1.0, normed=True)
         assert intra.shape == (self.rings.num_phi,)
         
         q_ind = self.rings.q_index(1.0)
@@ -791,8 +758,10 @@ class TestRings(object):
             ref_corr += brute_force_masked_correlation(x, np.ones(len(x), dtype=np.bool), normed=True)
         ref_corr /= float(self.num_shots)
         
-        assert_allclose(intra, ref_corr, rtol=rtol, atol=atol,
+        assert_allclose(intra / intra[0], ref_corr / ref_corr[0], rtol=rtol, atol=atol,
                         err_msg='doesnt match reference implementation')
+        assert_allclose(intra, ref_corr, rtol=rtol, atol=atol,
+                        err_msg='doesnt match reference implementation normalization')
         
         # test norming
         assert np.abs(intra[0] - 1.0) < rtol
@@ -827,13 +796,31 @@ class TestRings(object):
         ref /= float(n)
         
         print 'tols:', rtol, atol
-        
-        assert_allclose(ref, inter, rtol=rtol, atol=atol, 
+        assert_allclose(ref / ref[0], inter / inter[0], rtol=rtol, atol=atol, 
                         err_msg='doesnt match reference implementation')
+        assert_allclose(ref, inter, rtol=rtol, atol=atol, 
+                        err_msg='normalization doesnt match reference implementation')
         
         # also smoke test random pairs
         rings2 = xray.Rings.simulate(self.traj, 1, self.q_values, self.num_phi, 3) # 1 molec, 3 shots
         inter = rings2.correlate_inter(q, q, mean_only=True, num_pairs=1)
+        
+    def test_correlate_inter_mean_only(self, rtol=1e-4, atol=0.0):
+        q = 1.0
+        inter1 = self.rings.correlate_inter(q, q, mean_only=True,  normed=False)
+        inter2 = self.rings.correlate_inter(q, q, mean_only=False, normed=False)
+        inter2_mean = inter2.mean(axis=0)
+        assert_allclose(inter1 / inter1[0], inter2_mean / inter2_mean[0],
+                        rtol=rtol, atol=atol, 
+                        err_msg='mean_only and rand pairs dont match')
+        assert_allclose(inter1, inter2_mean, rtol=rtol, atol=atol, 
+                        err_msg='mean_only and rand pairs non-std normalization doesnt match')
+                        
+        inter1 = self.rings.correlate_inter(q, q, mean_only=True,  normed=True)
+        inter2 = self.rings.correlate_inter(q, q, mean_only=False, normed=True)
+        inter2_mean = inter2.mean(axis=0)
+        assert_allclose(inter1, inter2_mean, rtol=rtol, atol=atol, 
+                        err_msg='mean_only and rand pairs std normalization doesnt match')
         
     @skip # skip until convention is set
     def test_convert_to_kam(self):
@@ -870,6 +857,33 @@ class TestRings(object):
         # reconstruct the correlation function
         pred = np.polynomial.legendre.legval(self.rings.cospsi(q1, q1), cl)
         assert_allclose(pred, ring, rtol=0.1, atol=0.1)
+        
+    def test_correlation_significance(self):
+        
+        # accept null hypothesis
+        fake_intra = np.random.randn(1000, 360)
+        fake_inter = np.random.randn(1000, 360)
+        p = self.rings.correlation_significance(1.0, 1.0, intra=fake_intra, inter=fake_inter)
+        print 'accept p:', p
+        assert p > 0.01 # null hypothesis should be accepted
+        
+        # reject null hypothesis
+        fake_intra = np.random.randn(1000, 360)
+        fake_inter = np.random.randn(1000, 360) + 0.10
+        p = self.rings.correlation_significance(1.0, 1.0, intra=fake_intra, inter=fake_inter)
+        print 'reject p:', p
+        assert p < 0.01 # null hypothesis should be rejected
+        
+        # ensure univariate version gives same result as scipy
+        # first when we should accept null hypothesis
+        fake_intra = np.random.randn(1000, 1)
+        fake_inter = np.random.randn(1000, 1)
+        p = self.rings.correlation_significance(1.0, 1.0, intra=fake_intra, inter=fake_inter)
+        _, p_ref = stats.ttest_ind(fake_intra[:,0], fake_inter[:,0])
+        assert_allclose(p_ref, p)
+        
+        # smoke test version where it computes correlators
+        #p = self.rings.correlation_significance(1.0, 1.0)
 
     def test_io(self):
         if os.path.exists('test.ring'): os.remove('test.ring')
@@ -897,68 +911,6 @@ class TestRings(object):
         
         if os.path.exists('test.ring'): os.remove('test.ring')
         
-        
-class TestRingsFromDisk(TestRings):
-    """
-    Test the rings class when the handle is a tables array.
-    """
-
-    def setup(self):
-
-        self.q_values  = np.array([1.0, 2.0])
-        self.num_phi   = 360
-        self.traj      = trajectory.load(ref_file('ala2.pdb'))
-        self.num_shots = 3
-
-        # generate the tables file on disk, then re-open it
-        intensities = np.abs( np.random.randn(self.num_shots, len(self.q_values),
-                                              self.num_phi) / 100.0 + \
-                              np.cos( np.linspace(0.0, 4.0*np.pi, self.num_phi) ) )
-
-        if os.path.exists('tmp_tables.h5'):
-            os.remove('tmp_tables.h5')
-            
-        hdf = tables.File('tmp_tables.h5', 'w')
-        a = tables.Atom.from_dtype(np.dtype(np.float64))
-        node = hdf.createEArray(where='/', name='data',
-                                shape=(0, len(self.q_values), self.num_phi), 
-                                atom=a, filters=io.COMPRESSION)
-        node.append(intensities)
-        hdf.close()
-
-        self.tables_file = tables.File('tmp_tables.h5', 'r+')
-        pi = self.tables_file.root.data
-        pm = np.random.binomial(1, 0.9, size=(len(self.q_values), self.num_phi))
-        k = 1.0
-        
-        self.rings = xray.Rings(self.q_values, pi, k, pm)
-
-        return
-        
-    def test_conversion_to_nparray(self):
-        pitx = self.rings.polar_intensities
-        for i,ref_i in enumerate(self.rings.polar_intensities_iter):
-            assert_allclose(ref_i, pitx[i])
-        
-    def test_polar_intensities_type(self):
-        assert self.rings._polar_intensities_type == 'tables'
-        
-    def test_correlate_intra(self):
-        # because we have noise in these sims, the error tol needs to be higher
-        # this is uncomfortably high right now, but better to have a basic
-        # sanity check than no test at all...
-        super(TestRingsFromDisk, self).test_correlate_intra(rtol=0.1, atol=0.1)
-        
-    def test_correlate_inter(self):
-        # see comment above
-        super(TestRingsFromDisk, self).test_correlate_inter(rtol=0.1, atol=0.1)
-
-    def teardown(self):
-        self.tables_file.close()
-        if os.path.exists('tmp_tables.h5'):
-            os.remove('tmp_tables.h5')
-        return
-
 
 class TestMisc(object):
 

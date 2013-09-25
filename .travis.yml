@@ -4,23 +4,27 @@ python:
 virtualenv:
   system_site_packages: true
 before_install:
-  - sudo apt-get install -qq libatlas3gf-base libatlas-dev 
+  - sudo apt-get install -qq libatlas3gf-base libatlas-dev
   - pip install --use-mirrors -qq numexpr
   - sudo apt-get update
-  - sudo apt-get install -qq python-numpy 
+  - sudo apt-get install -qq python-numpy
   - sudo apt-get install -qq python-scipy
   - sudo apt-get install -qq python-matplotlib
-  - sudo apt-get install -qq swig
   - sudo apt-get install -qq libhdf5-serial-dev
+  - sudo apt-get install -qq libfftw3-dev libfftw3-doc 
   - pip install --use-mirrors -qq nose
   - pip install --use-mirrors -qq cython
   - pip install --use-mirrors -qq tables
   - pip install --use-mirrors -qq pyyaml
-  - pip install git+git://github.com/rmcgibbo/mdtraj.git
-  - svn co https://fable.svn.sourceforge.net/svnroot/fable/fabio/branches/v0.1.0 fabio; cd fabio; python setup.py install; cd ..
+  - pip install --use-mirrors -qq mdtraj
+  - git clone --depth 5 https://github.com/hgomersall/pyFFTW.git; cd pyFFTW; python setup.py build_ext --inplace ; sudo python setup.py install ; cd ..
+  - svn co https://svn.code.sf.net/p/fable/code/fabio/branches/v0.1.2 fabio; cd fabio; python setup.py install; cd ..
 install:
   - python setup.py install
 env:
   - TESTFOLDER=test
-  - TESTFOLDER=test/xray
+  - TESTFOLDER=test/scatter
+  - TESTFOLDER=test/xray/test_xray.py
+  - TESTFOLDER=test/xray/test_xray2.py
+  - TESTFOLDER=test/xray/more
 script: nosetests -v "$TESTFOLDER"

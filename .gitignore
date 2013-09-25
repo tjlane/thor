@@ -1,6 +1,9 @@
 *.py[co]
 install.sh
 
+# fabio
+fabio
+
 # ignore distutils files (including cython'd .cpp)
 src/python/installed.py
 src/interp/cyinterp.cpp
@@ -8,6 +11,9 @@ src/scatter/gpuscatter_wrap.cpp
 src/scatter/cpuscatter_wrap.cpp
 src/ring/ring_scatter.cpp
 src/corr/correlate.cpp
+
+# fabio installs
+fabio/
 
 # ignore mac metadata files
 ._*

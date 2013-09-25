@@ -6,13 +6,13 @@ import os, sys,re
 from os.path import join as pjoin
 from glob import glob
 
-#from setuptools import setup, Extension
+#try:
+    #from setuptools import Extension, setup
+#except:
 
 from distutils.extension import Extension
 from distutils.core import setup
 
-from distutils.unixccompiler import UnixCCompiler
-from distutils.command.install import install as DistutilsInstall
 from Cython.Distutils import build_ext
 
 import numpy
@@ -24,7 +24,7 @@ from subprocess import CalledProcessError
 # HEADER
 # 
 
-VERSION     = "0.1a"
+VERSION     = "0.0.1"
 ISRELEASED  = False
 __author__  = "TJ Lane"
 __version__ = VERSION
@@ -38,9 +38,9 @@ metadata = {
     'url': 'https://github.com/tjlane/odin',
     'download_url': 'https://github.com/tjlane/odin',
     'install_requires': ['numpy', 'scipy', 'matplotlib', 'pyyaml', 'mdtraj', 
-                         'nose', 'cython>=0.16'], # 'fabio'
-    'dependency_links' : ['https://github.com/rmcgibbo/mdtraj/tarball/master#egg=mdtraj-0.0.0'],#
-                          #'https://fable.svn.sourceforge.net/svnroot/fable/fabio/branches/v0.1.0#egg=fabio-0.1.0'],
+                         'nose', 'cython>=0.16', 'tables'],
+    'dependency_links' : ['https://github.com/rmcgibbo/mdtraj/tarball/master#egg=mdtraj-0.0.0',
+                          'https://svn.code.sf.net/p/fable/code/fabio/branches/v0.1.2/#egg=fabio-0.1.2'],
     'platforms': ['Linux', 'OSX'],
     'zip_safe': False,
     'test_suite': "nose.collector",
@@ -248,6 +248,7 @@ cpuscatter = Extension('odin._cpuscatter',
                     include_dirs = [numpy_include, 'src/scatter'],
                     language='c++')
                     
+
 misc = Extension('odin.misc_ext',
                     sources=['src/misc/misc_wrap.pyx', 'src/misc/solidangle.cpp'],
                     extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile,
@@ -257,6 +258,14 @@ misc = Extension('odin.misc_ext',
                     include_dirs = [numpy_include, 'src/scatter'],
                     language='c++')
 
+corr = Extension('odin.corr',
+                     sources=['src/corr/correlate.pyx', 'src/corr/corr.cpp'],
+                     extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'],
+                                         'g++': ['--fast-math', '-O3', '-fPIC', '-Wall']},
+                     runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
+                     extra_link_args = ['-lstdc++', '-lm'],
+                     include_dirs = [numpy_include, 'src/corr'],
+                     language='c++')
 
 
 metadata['packages']     = ['odin', 'odin.scripts', 'odin.xray']
@@ -264,7 +273,7 @@ metadata['package_dir']  = {'odin' :         'src/python',
                             'odin.scripts' : 'scripts',
                             'odin.xray' :    'src/python/xray'}
 
-metadata['ext_modules']  = [cpuscatter, misc]
+metadata['ext_modules']  = [cpuscatter, misc, corr]
 if gpuscatter:
     metadata['ext_modules'].append(gpuscatter)
     
@@ -286,10 +295,26 @@ def print_warnings():
         print '* --------------------------'
         print '* Could not install one or more CUDA/GPU features. Look for'
         print '* warnings in the setup.py output (above) for more details. ODIN'
-        print '* will function without any GPU-acceleration. Note that for  '
+        print '* will function without any GPU-acceleration. EVERYTHING WILL STILL'
+        print '* WORK -- just certain things will be a bit slower. Note that for  '
         print '* successful installation of GPU support, you must have an nVidia'
         print '* Fermi-class GPU (or better) and the CUDA toolkit installed. See'
         print '* the nVidia website for more details.'
+        print '*'*65
+        
+    try:
+        import pyfftw
+    except:
+        print 
+        print '*'*65
+        print '* WARNING : PYFFTW SUPPORT'
+        print '* --------------------------'
+        print '* Could not load the pyfftw package, EVERYTHING WILL STILL'
+        print '* WORK -- just certain things will be a bit slower. Install FFTW'
+        print '* and pyfftw if you wish to accelerate any calculation involving '
+        print '* FFTs, most notably correlation computations.'
+        print '* (https://pypi.python.org/pypi/pyFFTW)'
+        print '* (http://www.fftw.org/)'
         print '*'*65
      
     print "\n"
