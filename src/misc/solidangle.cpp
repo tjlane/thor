@@ -19,8 +19,6 @@
 #include <cmath>
 #include <iostream>
 
-#include "solidangle.hh"
-
 
 /* 
  * Azimuthally symmetrical correction. Fast approximation to 

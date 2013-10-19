@@ -14,8 +14,6 @@
  *
  */
 
-#ifndef _solidangle_hh
-#define _solidangle_hh
 
 /* 
  * Azimuthally symmetrical correction. Fast approximation to 
@@ -79,5 +77,3 @@ void rigorousGridSAC(int num_pixels_s, int num_pixels_f, double * s,
  * of each pixel
  */
 void rigorousExplicitSAC(double * pixel_xyz, double * correction_factor);'
-
-#endif
