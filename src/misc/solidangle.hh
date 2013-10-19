@@ -76,4 +76,4 @@ void rigorousGridSAC(int num_pixels_s, int num_pixels_f, double * s,
  * Compute the solid angle correction from an explicit xyz representation
  * of each pixel
  */
-void rigorousExplicitSAC(double * pixel_xyz, double * correction_factor);'
+void rigorousExplicitSAC(double * pixel_xyz, double * correction_factor);
