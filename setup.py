@@ -248,6 +248,16 @@ cpuscatter = Extension('odin._cpuscatter',
                     include_dirs = [numpy_include, 'src/scatter'],
                     language='c++')
                     
+
+misc = Extension('odin.misc_ext',
+                    sources=['src/misc/misc_wrap.pyx', 'src/misc/solidangle.cpp'],
+                    extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'] + omp_compile,
+                                        'g++': ['--fast-math', '-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] + omp_compile},
+                    runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
+                    extra_link_args = ['-lstdc++', '-lm'] + omp_link,
+                    include_dirs = [numpy_include, 'src/scatter'],
+                    language='c++')
+
 corr = Extension('odin.corr',
                      sources=['src/corr/correlate.pyx', 'src/corr/corr.cpp'],
                      extra_compile_args={'gcc': ['--fast-math', '-O3', '-fPIC', '-Wall'],
@@ -258,13 +268,12 @@ corr = Extension('odin.corr',
                      language='c++')
 
 
-
 metadata['packages']     = ['odin', 'odin.scripts', 'odin.xray']
-metadata['package_dir']  = {'odin' : 'src/python',
+metadata['package_dir']  = {'odin' :         'src/python',
                             'odin.scripts' : 'scripts',
-                            'odin.xray' : 'src/python/xray'}
+                            'odin.xray' :    'src/python/xray'}
 
-metadata['ext_modules']  = [cpuscatter, corr]
+metadata['ext_modules']  = [cpuscatter, misc, corr]
 if gpuscatter:
     metadata['ext_modules'].append(gpuscatter)
     
