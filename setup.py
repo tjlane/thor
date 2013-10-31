@@ -39,8 +39,7 @@ metadata = {
     'download_url': 'https://github.com/tjlane/odin',
     'install_requires': ['numpy', 'scipy', 'matplotlib', 'pyyaml', 'mdtraj', 
                          'nose', 'cython>=0.16', 'tables'],
-    'dependency_links' : ['https://github.com/rmcgibbo/mdtraj/tarball/master#egg=mdtraj-0.0.0',
-                          'https://svn.code.sf.net/p/fable/code/fabio/branches/v0.1.2/#egg=fabio-0.1.2'],
+    'dependency_links' : ['https://github.com/kif/fabio/tarball/master#egg=fabio-0.1.3'],
     'platforms': ['Linux', 'OSX'],
     'zip_safe': False,
     'test_suite': "nose.collector",
@@ -268,10 +267,11 @@ corr = Extension('odin.corr',
                      language='c++')
 
 
-metadata['packages']     = ['odin', 'odin.scripts', 'odin.xray']
+metadata['packages']     = ['odin', 'odin.scripts', 'odin.xray', 'odin.smfret']
 metadata['package_dir']  = {'odin' :         'src/python',
                             'odin.scripts' : 'scripts',
-                            'odin.xray' :    'src/python/xray'}
+                            'odin.xray'    : 'src/python/xray',
+                            'odin.smfret'  : 'src/python/smfret'}
 
 metadata['ext_modules']  = [cpuscatter, misc, corr]
 if gpuscatter:

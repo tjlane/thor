@@ -863,14 +863,14 @@ class TestRings(object):
         # accept null hypothesis
         fake_intra = np.random.randn(1000, 360)
         fake_inter = np.random.randn(1000, 360)
-        p = self.rings.correlation_significance(1.0, 1.0, intra=fake_intra, inter=fake_inter)
+        p = self.rings.correlation_significance(1.0, 1.0, intra=fake_intra, inter=fake_inter, trim=0)
         print 'accept p:', p
         assert p > 0.01 # null hypothesis should be accepted
         
         # reject null hypothesis
         fake_intra = np.random.randn(1000, 360)
         fake_inter = np.random.randn(1000, 360) + 0.10
-        p = self.rings.correlation_significance(1.0, 1.0, intra=fake_intra, inter=fake_inter)
+        p = self.rings.correlation_significance(1.0, 1.0, intra=fake_intra, inter=fake_inter, trim=0)
         print 'reject p:', p
         assert p < 0.01 # null hypothesis should be rejected
         
@@ -878,7 +878,7 @@ class TestRings(object):
         # first when we should accept null hypothesis
         fake_intra = np.random.randn(1000, 1)
         fake_inter = np.random.randn(1000, 1)
-        p = self.rings.correlation_significance(1.0, 1.0, intra=fake_intra, inter=fake_inter)
+        p = self.rings.correlation_significance(1.0, 1.0, intra=fake_intra, inter=fake_inter, trim=0)
         _, p_ref = stats.ttest_ind(fake_intra[:,0], fake_inter[:,0])
         assert_allclose(p_ref, p)
         
