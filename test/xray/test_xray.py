@@ -552,6 +552,7 @@ class TestShotset(object):
         for i in ss.intensities:
             n += 1
         assert ss.num_shots == n
+        assert np.sum(ss.mask) > 1000
         
     def test_write_cxidb(self):
         # smoke test for now
