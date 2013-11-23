@@ -14,6 +14,7 @@ import numpy as np
 from random import randrange, seed
 
 from scipy import ndimage, stats, optimize, spatial
+from scipy.misc import factorial
 from scipy.ndimage import filters, interpolation
 from scipy.signal import fftconvolve
  
@@ -245,3 +246,91 @@ def rand_rot(rands = None):
     RU = -H*Rz
     return RU
 
+
+def Wigner3j(j1, j2, j3, m1, m2, m3):
+    """
+    Compute the Wigner 3j symbol using the Racah formula [1]. 
+    
+                         / j1 j2 j3 \
+                         |          |  
+                         \ m1 m2 m3 /
+     
+    Parameters
+    ----------
+    j : angular momentum quantum numbers
+    m : magnetic quantum numbers
+    
+    Returns
+    -------
+    wigner3j : float
+        The 3j symbol value.
+     
+    References
+    ----------
+    ..[1] Wigner 3j-Symbol entry of Eric Weinstein's Mathworld: 
+    http://mathworld.wolfram.com/Wigner3j-Symbol.html
+    
+    Notes
+    -----
+    Adapted from Wigner3j.m by David Terr, Raytheon, 6-17-04
+    """
+    
+    # Error checking
+    if ( ( 2*j1 != np.floor(2*j1) ) | ( 2*j2 != np.floor(2*j2) ) | ( 2*j3 != np.floor(2*j3) ) | ( 2*m1 != np.floor(2*m1) ) | ( 2*m2 != np.floor(2*m2) ) | ( 2*m3 != np.floor(2*m3) ) ):
+        raise ValueError('All arguments must be integers or half-integers.')
+        
+    # Additional check if the sum of the second row equals zero
+    if ( m1+m2+m3 != 0.0 ):
+        logger.debug('3j-Symbol unphysical')
+        return 0.0
+
+    if ( j1 - m1 != np.floor ( j1 - m1 ) ):
+        logger.debug('2*j1 and 2*m1 must have the same parity')
+        return 0.0
+
+    if ( j2 - m2 != np.floor ( j2 - m2 ) ):
+        logger.debug('2*j2 and 2*m2 must have the same parity')
+        return 0.0
+
+    if ( j3 - m3 != np.floor ( j3 - m3 ) ):
+        logger.debug('2*j3 and 2*m3 must have the same parity')
+        return 0.0
+
+    if ( j3 > j1 + j2)  | ( j3 < abs(j1 - j2) ):
+        logger.debug('j3 is out of bounds.')
+        return 0.0
+
+    if abs(m1) > j1:
+        logger.debug('m1 is out of bounds.')
+        return 0.0
+
+    if abs(m2) > j2:
+        logger.debug('m2 is out of bounds.')
+        return 0.0
+
+    if abs(m3) > j3:
+        logger.debug('m3 is out of bounds.')
+        return 0.0
+
+    t1 = j2 - m1 - j3
+    t2 = j1 + m2 - j3
+    t3 = j1 + j2 - j3
+    t4 = j1 - m1
+    t5 = j2 + m2
+
+    tmin = max( 0.0, max( t1, t2 ) )
+    tmax = min( t3, min( t4, t5 ) )
+    tvec = np.arange(tmin, tmax+1.0, 1.0)
+
+    wigner = 0.0
+
+    for t in tvec:
+        wigner += (-1.0)**t / float( factorial(t) * factorial(t-t1) * factorial(t-t2) *\
+                  factorial(t3-t) * factorial(t4-t) * factorial(t5-t) )
+
+    w3j = wigner * (-1)**(j1-j2-m3) * np.sqrt( factorial(j1+j2-j3) * \
+          factorial(j1-j2+j3) * factorial(-j1+j2+j3) / factorial(j1+j2+j3+1) * \
+          factorial(j1+m1) * factorial(j1-m1) * factorial(j2+m2) * \
+          factorial(j2-m2) * factorial(j3+m3) * factorial(j3-m3) )
+    
+    return w3j
