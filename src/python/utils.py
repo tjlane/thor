@@ -3,6 +3,8 @@
 Functions that are useful in various places, but have no common theme.
 """
 
+import functools
+
 from pprint import pprint
 from argparse import ArgumentParser
 
@@ -147,8 +149,40 @@ def write_sample_input(filename='sample.odin'):
     f.close()
     logger.info("Wrote: %s" % filename)
     return
-    
 
+    
+def memoize(obj):
+    """
+    An expensive memoizer that works with unhashables
+    """
+    # stolen unashamedly from pymc3
+    cache = obj.cache = {}
+    
+    @functools.wraps(obj)
+    def memoizer(*args, **kwargs):
+        key = (hashable(args), hashable(kwargs))
+        
+        if key not in cache:
+            cache[key] = obj(*args, **kwargs)
+            
+        return cache[key]
+    
+    return memoizer
+
+    
+def hashable(a):
+    """
+    Turn some unhashable objects into hashable ones.
+    """
+    # stolen unashamedly from pymc3
+    if isinstance(a, dict):
+        return hashable(a.iteritems())
+    try:
+        return tuple(map(hashable,a))
+    except:
+        return a
+
+        
 graphic = """
 	                                    .  
 	                                  .#   
