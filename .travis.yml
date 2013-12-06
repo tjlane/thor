@@ -6,6 +6,7 @@ virtualenv:
 before_install:
   - sudo apt-get install -qq libatlas3gf-base libatlas-dev
   - pip install --use-mirrors -qq numexpr
+  - pip install --use-mirrors -qq pyparsing
   - sudo apt-get update
   - sudo apt-get install -qq python-numpy
   - sudo apt-get install -qq python-scipy
