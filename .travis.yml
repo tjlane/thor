@@ -19,6 +19,7 @@ before_install:
   - pip install --use-mirrors -qq pyyaml
   - pip install --use-mirrors -qq mdtraj
   - pip install --use-mirrors -qq theano
+  - pip install --use-mirrors -qq ipython
   - git clone --depth 5 https://github.com/hgomersall/pyFFTW.git; cd pyFFTW; python setup.py build_ext --inplace ; sudo python setup.py install ; cd ..
   - svn co https://svn.code.sf.net/p/fable/code/fabio/branches/v0.1.2 fabio; cd fabio; python setup.py install; cd ..
   - git clone --depth 5 https://github.com/pymc-devs/pymc.git; cd pymc; sudo python setup.py install ; cd ..

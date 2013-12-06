@@ -746,7 +746,7 @@ class TestRings(object):
         assert_allclose(corr_mask, corr_mask2)
         assert_allclose(corr_mask, corr_nomask)
         
-    def test_correlate_intra(self, rtol=1e-6, atol=0.0):
+    def test_correlate_intra(self, rtol=1e-4, atol=0.0):
 
         # test autocorrelator
         intra = self.rings.correlate_intra(1.0, 1.0, normed=True)
