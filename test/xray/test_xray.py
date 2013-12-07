@@ -307,6 +307,12 @@ class TestShotset(object):
     # missing test: num_phi_to_spacing
 
     # missing test: test_assemble (ok for now)
+    
+    def test_augment_mask(self):
+        # smoke test only (really)
+        n_masked = np.sum(self.shot.mask)
+        self.shot.augment_mask(first_moment_cutoff=1.0, second_moment_cutoff=1.0)
+        assert np.sum(self.shot.mask) > n_masked # make sure at least one got masked
 
     def test_polar_grid(self):
         pg = self.shot.polar_grid([1.0], 360)
