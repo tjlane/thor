@@ -1,5 +1,5 @@
 u"""
-setup.py: Install ODIN
+setup.py: Install THOR
 """
 
 import os, sys,re
@@ -30,13 +30,13 @@ __author__  = "TJ Lane"
 __version__ = VERSION
 
 metadata = {
-    'name': 'odin',
+    'name': 'thor',
     'version': VERSION,
     'author': __author__,
     'author_email': 'tjlane@stanford.edu',
     'license': 'GPL v3.0',
-    'url': 'https://github.com/tjlane/odin',
-    'download_url': 'https://github.com/tjlane/odin',
+    'url': 'https://github.com/tjlane/thor',
+    'download_url': 'https://github.com/tjlane/thor',
     'install_requires': ['numpy', 'scipy', 'matplotlib', 'pyyaml', 'mdtraj', 
                          'nose', 'cython>=0.16', 'tables'],
     'dependency_links' : ['https://github.com/kif/fabio/tarball/master#egg=fabio-0.1.3'],
@@ -44,7 +44,7 @@ metadata = {
     'zip_safe': False,
     'test_suite': "nose.collector",
     'description': "Code for Structure Determination",
-    'long_description': """ODIN is a simulation toolpackage for producing
+    'long_description': """THOR is a simulation toolpackage for producing
 models of biomolecular structures consistent with a large set of experimental
 data."""}
 
@@ -222,7 +222,7 @@ else:
 
 if CUDA:
     print "Attempting to install GPU functionality"
-    gpuscatter = Extension('odin._gpuscatter',
+    gpuscatter = Extension('thor._gpuscatter',
                         sources=['src/scatter/gpuscatter_wrap.pyx', 'src/scatter/_gpuscatter.cu'],
                         extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
                                             'g++': ['-O3', '-fPIC', '-Wall'] + omp_compile,
@@ -238,7 +238,7 @@ if CUDA:
 else:
     gpuscatter = None
 
-cpuscatter = Extension('odin._cpuscatter',
+cpuscatter = Extension('thor._cpuscatter',
                     sources=['src/scatter/cpuscatter_wrap.pyx', 'src/scatter/_cpuscatter.cpp'],
                     extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
                                         'g++': ['-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] + omp_compile},
@@ -248,7 +248,7 @@ cpuscatter = Extension('odin._cpuscatter',
                     language='c++')
                     
 
-misc = Extension('odin.misc_ext',
+misc = Extension('thor.misc_ext',
                     sources=['src/misc/misc_wrap.pyx', 'src/misc/solidangle.cpp'],
                     extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
                                         'g++': ['-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] + omp_compile},
@@ -257,7 +257,7 @@ misc = Extension('odin.misc_ext',
                     include_dirs = [numpy_include, 'src/scatter'],
                     language='c++')
 
-corr = Extension('odin.corr',
+corr = Extension('thor.corr',
                      sources=['src/corr/correlate.pyx', 'src/corr/corr.cpp'],
                      extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
                                          'g++': ['-O3', '-fPIC', '-Wall'] + omp_compile},
@@ -267,11 +267,11 @@ corr = Extension('odin.corr',
                      language='c++')
 
 
-metadata['packages']     = ['odin', 'odin.scripts', 'odin.xray', 'odin.smfret']
-metadata['package_dir']  = {'odin' :         'src/python',
-                            'odin.scripts' : 'scripts',
-                            'odin.xray'    : 'src/python/xray',
-                            'odin.smfret'  : 'src/python/smfret'}
+metadata['packages']     = ['thor', 'thor.scripts', 'thor.xray', 'thor.smfret']
+metadata['package_dir']  = {'thor' :         'src/python',
+                            'thor.scripts' : 'scripts',
+                            'thor.xray'    : 'src/python/xray',
+                            'thor.smfret'  : 'src/python/smfret'}
 
 metadata['ext_modules']  = [cpuscatter, misc, corr]
 if gpuscatter:
@@ -294,7 +294,7 @@ def print_warnings():
         print '* WARNING : CUDA/GPU SUPPORT'
         print '* --------------------------'
         print '* Could not install one or more CUDA/GPU features. Look for'
-        print '* warnings in the setup.py output (above) for more details. ODIN'
+        print '* warnings in the setup.py output (above) for more details. THOR'
         print '* will function without any GPU-acceleration. EVERYTHING WILL STILL'
         print '* WORK -- just certain things will be a bit slower. Note that for  '
         print '* successful installation of GPU support, you must have an nVidia'

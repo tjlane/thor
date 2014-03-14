@@ -1,0 +1,63 @@
+#!/usr/bin/env python
+
+"""
+Convert CXIdb files into odin rings.
+"""
+
+import os
+import numpy as np
+
+from odin.utils import odinparser
+from odin.xray import Shotset
+
+def main(input_fn, detector, mask, q_values, num_phi, output_fn):
+        
+    print "Loading single file: %s" % input_fn
+    ss = Shotset.load_cxi(input_fn, detector, mask)
+    ss.to_rings(q_values, num_phi=num_phi, rings_filename=output_fn)
+
+    return
+    
+    
+if __name__ == '__main__':
+    
+    parser = odinparser('''Convert CXIdb files into ODIN rings file (.ring).''')
+    
+    parser.add_argument('-i', '--input', type=str, required=True,
+                        help='''CXIdb file to convert''')
+    parser.add_argument('-d', '--detector', type=str, required=True,
+                        help='''An odin detector file (.dtc) specifying the 
+                                geometry of the detector.''')
+    parser.add_argument('-m', '--mask', type=str, default=None,
+                        help='''A pypad mask (.mask) file to apply. Default: 
+                                No masking.''')
+    parser.add_argument('-q', '--qvals', type=float, nargs='+',
+                        help='''The q-values to simulate at, in inv ang. Example:
+                        "-q 2.67 3.08" to simulate at q=2.67, 3.08 inv ang. See
+                        also the -f/--qfile option.''')
+    parser.add_argument('-f', '--qfile', type=str,
+                        help='''Instead of passing a million q-values on the
+                        command line using -q/--qvals, you can pass a file here
+                        that contains all the q-values you want to use in a
+                        flat text file.''')
+    parser.add_argument('-x', '--numphi', type=int, default=360,
+                        help='Number of pixels around each ring. Default: 360.')
+    parser.add_argument('-o', '--output', default='shots.ring',
+                        help='The output file name. Default: shots.ring')
+
+    args = parser.parse_args()
+
+    # convert q-values to an array
+    if not (args.qvals or args.qfile):
+        parser.error('Missing argument -- require one of: QVALS or QFILE.')
+    elif (args.qvals and args.qfile):
+        parser.error('Overspecification -- please pass onyly one of: QVALS, QFILE.')
+    elif args.qvals:
+        q_values = np.array( args.qvals )
+    elif args.qfile:
+        q_values = np.genfromtxt( args.qfile ).flatten()
+    else:
+        raise RuntimeError('Fundamental code error...')
+
+    main(args.input, args.detector, args.mask, args.qvals, args.numphi, args.output)
+

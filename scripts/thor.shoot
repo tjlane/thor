@@ -1,0 +1,113 @@
+#!/usr/bin/env python
+
+"""
+Simulate the scattering experiment (SAXS, WAXS).
+"""
+
+import multiprocessing as mp
+
+from mdtraj import trajectory
+from odin import xray, structure
+from odin.utils import odinparser
+
+import numpy as np
+
+
+def main_wrap(args):
+    return main(*args)
+
+def main(traj, num_shots, num_molecules, detector, traj_weights=None, device_id=0):
+    shotset = xray.Shotset.simulate(traj, detector, num_molecules, num_shots, traj_weights=None, device_id=device_id)    
+    return shotset
+    
+def save(output_file, shotset):
+    shotset.save(output_file)
+    print "Wrote: %s" % output_file
+    return 
+    
+if __name__ == '__main__':
+    
+    parser = odinparser('Simulate a scattering experiment, generating a `shot`.')
+
+    parser.add_argument('-s', '--structures', type=str,
+                        help='''A a PDB, coor, or trajectory file (.lh5 only 
+                        right now), defining the molecular geometrie(s) to shoot.''')
+    parser.add_argument('-n', '--numshots', type=int, default=1,
+                        help='Number of shots (experiments) to perform.')
+    parser.add_argument('-m', '--nummolec', type=int, default=1200,
+                        help='Number of molecules in each shot. Default: 1200')
+    parser.add_argument('-d', '--detector', type=str, default='NONE',
+                        help='''A Detector object, on disk. Default: generate a 
+                        generic detector.''')
+    parser.add_argument('-w', '--weights', type=str, default='NONE',
+                        help='''A flat text file specifing the ensemble weights 
+                        for each snapshot in the trajectory. Places snapshots in 
+                        to the `experiment` with the appropriate weight. Default:
+                        None (even weights). ''')
+    parser.add_argument('-p', '--parallel', type=int, default=1,
+                        help='''Number of local GPUs to employ in parallel. 
+                        Will use device IDs 0, 1, ..., p-1. If you pass a 
+                        *negative* number, the code runs in serial on the
+                        device indexed by the abs. value of the number you
+                        pass (e.g. '-1' means run on device 1). Default: 
+                        Device 0 only.''')
+    parser.add_argument('-o', '--output', default='shotset.shot',
+                        help='A Shotset object, written to disk in h5 format. Default: shotset.shot')
+
+    args = parser.parse_args()
+
+    if args.structures == None:
+        raise ValueError('structure (-s) argument required!')
+    
+    # load up filenames
+    if args.structures.endswith('.coor') or args.structures.endswith('.xyz'):
+        traj = structure.load_coor(args.structures)
+    else:
+        traj = trajectory.load(args.structures)
+    
+    if args.detector != 'NONE':
+        detector = xray.Detector.load(args.detector)
+    else:
+        detector = xray.Detector.generic()
+        
+    if args.weights == 'NONE':
+        weights = None
+    else:
+        if traj.n_frames == 1:
+            raise ValueError('You can\'t weight a single snapshot, silly!')
+        
+    # deal w/parallel
+    if args.parallel == 1:
+        shotset = xray.Shotset.simulate(traj, detector, args.nummolec, args.numshots, 
+                                        traj_weights=weights, device_id=0) 
+    elif args.parallel < 0:
+        did = -1 * args.parallel
+        shotset = xray.Shotset.simulate(traj, detector, args.nummolec, args.numshots,
+                                        traj_weights=weights, device_id=did)
+    else:
+        p = args.parallel
+        gpudev = range(p)
+        print "Running on GPU Devices:", gpudev
+
+        # make a list of ints, representing the n_shots each GPU will do
+        n_shots_list = [ args.numshots / p ]*p
+        for i in range( args.numshots % p ):
+            n_shots_list[i] += 1
+        
+        pool = mp.Pool(processes=p)
+        main_args = zip([traj]*p, 
+                        n_shots_list, 
+                        [args.nummolec]*p,
+                        [detector]*p,
+                        [weights]*p,
+                        gpudev)
+        shotsets = pool.map(main_wrap, main_args)
+    
+        # aggregate all the shotsets into one
+        intensities = np.zeros(( len(shotsets), len(shotsets[0].intensities) ))
+        for s in shotsets:
+            intensities[i,:] = s.intensities
+        shotset = xray.Shotset(intensities, shotsets[0].detector, shotsets[0].mask)
+        
+    save(args.output, shotset)
+

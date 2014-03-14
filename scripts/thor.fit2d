@@ -1,0 +1,229 @@
+#!/usr/bin/env python
+
+"""
+Read the output from fitd2 to make an odin detector object. Assumes the
+detector is a contiguous grid
+"""
+
+import re
+import os
+import numpy as np
+
+from odin import xray
+from odin.math2 import ER_rotation_matrix
+from odin.utils import odinparser
+
+def parse_fit2d(text):
+    """
+    Parse the output of fit2d into a dictionary of useful items.
+
+    Parameters
+    ----------
+    text : str
+        A string of the output from fit2d, usually something like INFO: ... = ...
+
+    Returns
+    -------
+    fit2d_geom : dict
+        A dictionary containing the necessary values for constructing the
+        detector.
+    """
+
+    print ""
+    print "Parsing output of fit2d"
+    print "-----------------------"
+
+    # try and grap anything in case we need it later
+    fit = {} # generic output
+    for line in text:
+        if not line[0] == '#':
+            try:
+                key, value = line[6:].split('=')
+                fit[key.strip()] = value.strip()
+            except:
+                pass
+
+    # now parse specifics we'll need
+
+    g_center = re.search('Refined Beam centre =\s+(\d+\.\d+)\s+(\d+\.\d+)\s+\(mm\)', text)
+    mm_center = ( float(g_center.group(1)), float(g_center.group(2)) ) # in mm
+    print 'Center [mm]:\t\t%s' % str(mm_center)
+
+    g_distance = re.search('Refined sample to detector distance =\s+(\d+\.\d+) mm', text)
+    distance = float(g_distance.group(1))
+    print 'Detector distance [mm]:\t %.3f' % distance
+
+    g_energy = re.search('Energy \(keV\) =\s+(\d+\.\d+)', text)
+    energy = float(g_energy.group(1)) # keV
+    print 'Beam energy [keV]:\t %.4f' % energy
+
+    g_plane_rotation = re.search('Refined tilt plane rotation angle =\s+(\d+\.\d+)\s+degrees', text)
+    plane_rotation = float( g_plane_rotation.group(1) )
+    print 'Plane rotation [deg]:\t %.4f' % plane_rotation
+
+    g_tilt_angle = re.search('Refined tilt angle =\s+(\d+\.\d+)\s+degrees', text)
+    tilt_angle = float( g_tilt_angle.group(1) )
+    print 'Tilt angle [deg]:\t %.4f' % tilt_angle
+
+    fit2d_geom = {'center'   : mm_center,
+                  'distance' : distance,
+                  'energy'   : energy,
+                  'planerot' : plane_rotation,
+                  'tilt'     : tilt_angle }
+
+    return fit2d_geom
+
+
+def xy_rotation_matrix(theta):
+    """
+    Return a rotation matrix that will rotate a vector in the
+    x/y plane `theta` radians in the counter-clockwise direction.
+
+    Parameters
+    ----------
+    theta : float
+        The rotation angle, in radians.
+
+    Returns
+    -------
+    R : np.ndarray
+        3x3 array representing the rotation matrix
+    """
+    return np.array([[ np.cos(theta), -np.sin(theta), 0.0],
+                     [ np.sin(theta),  np.cos(theta), 0.0],
+                     [           0.0,            0.0, 1.0] ])
+
+
+def assemble_detector(fit2d_geom, array_shape, pixel_size):
+    """
+    Take the output from fit2d and create an odin Detector object.
+
+    Parameters
+    ----------
+    fit2d_geom : dict
+        The output of parse_fit2d()
+
+    array_shape : tuple of ints
+        The shape of the detector grid
+
+    pixel_size : float
+        The size of each pixel (in mm)
+
+    Returns
+    -------
+    dtc : odin.xray.Detector
+        The full specification of the detector object in
+        odin format.
+
+    References
+    ----------
+    ..[1] The Fit2d documentation. http://www.esrf.eu/computing/scientific/FIT2
+          D/FIT2D_REF/node49.html#SECTION000142100000000000000
+    """
+
+    print "Assembling detector object..."
+ 
+    # if you're trying to understand this, highly recommend you take a
+    # look at ref [1] first!
+
+    # we assume that the beam is oriented perfectly along [0, 0, 1] and
+    # that fit2d's detector distance is the distance from the interaction
+    # site to the intersection of the plane of the detector along this
+    # direction (which is the z-axis)
+
+    # basis vectors in the lab frame
+    ex = np.array([1.0, 0.0, 0.0])
+    ey = np.array([0.0, 1.0, 0.0])
+    ez = np.array([0.0, 0.0, 1.0])
+ 
+    # generate a rotation in the "idealized" plane to define the plane
+    # in which the detector is tilted
+    theta = np.radians(fit2d_geom['planerot'])
+    R1 = xy_rotation_matrix(theta)
+    ey_prime = np.dot(R1, ey) # rotate the y basis vec
+    
+    # now take the rotated y basis vector and use it as an axis
+    # of rotation for the entire detector -- this is the way fit2d
+    # defines the relation between the "idealized" lab frame and
+    # the detector
+    R2 = ER_rotation_matrix(ey_prime, np.radians(fit2d_geom['tilt']))
+    ex_prime = np.dot(R2, ex)
+    ey_prime = np.dot(R2, ey)
+
+    # the scan vectors are scaled to be lenght-one-px
+    f = ex_prime / np.linalg.norm(ex_prime) * pixel_size
+    s = ey_prime / np.linalg.norm(ey_prime) * pixel_size
+
+    # the p-vector points from the interaction site to the
+    # center of the first pixel read from memory
+    # NOTE: for some reason the center is reflected around the origin!
+    p = np.array([ -(array_shape[0] * pixel_size - fit2d_geom['center'][0]),
+                   -(array_shape[1] * pixel_size - fit2d_geom['center'][1]),
+                     fit2d_geom['distance'] ])
+
+    print 's =', s
+    print 'f =', f
+    print 'p =', p
+
+    bg = xray.BasisGrid()
+    bg.add_grid(p, s, f, array_shape)
+    #print bg.get_grid_corners(0)    
+
+    b = xray.Beam(energy = fit2d_geom['energy']) # both in keV
+    dtc = xray.Detector(bg, b)
+
+    print '    ... finished. Final q-max: %.2f' % dtc.q_max
+
+    return dtc
+
+
+def main():
+    
+    parser = odinparser('''Convert a fit2d geometry optimization into a
+ Detector object''')
+    parser.add_argument('-f', '--fit2d', required=True,
+                        help = 'Log of fit2d output')
+    parser.add_argument('-s', '--pixel-size', required=True,
+                        help = 'Size of each pixel, in mm.', type=float)
+    parser.add_argument('-x', '--xshape', required=True,
+                        help = 'The shape of the detector shape in x')
+    parser.add_argument('-y', '--yshape', required=False,
+                        help = '''The shape of the detector shape in y 
+                                  (OPTIONAL: if not passed assumes square
+                                   detector and uses the x-shape for this
+                                   value.''')
+    parser.add_argument('-o', '--output', default='fit2d.dtc',
+                        help='Filename to write output to. Default: fitd2.dtc')
+
+    args = parser.parse_args()
+
+    # get the fit2d results
+    if os.path.exists(args.fit2d):
+        f = open(args.fit2d, 'r')
+    else:
+        raise IOError('File does not exist: %s' % args.fit2d)
+
+    try:
+        fit2d_geom = parse_fit2d(f.read())
+    except AttributeError as e:
+        print e
+        raise IOError('Could not parse one or more required fields in fit2d '
+                      'output file: %s' % args.fit2d)
+    f.close()
+
+    if not args.yshape:
+        array_shape = (int(args.xshape),)*2
+    else:
+        array_shape = ( int(args.xshape), int(args.yshape) )
+
+    dtc = assemble_detector(fit2d_geom, array_shape, args.pixel_size)
+
+    dtc.save(args.output)
+
+    return
+
+
+if __name__ == '__main__':
+   main()
+
+

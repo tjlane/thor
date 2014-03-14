@@ -1,0 +1,124 @@
+#!/usr/bin/env python
+
+"""
+Simulate the scattering experiment (SAXS, WAXS).
+"""
+
+import sys
+import multiprocessing as mp
+
+from mdtraj import trajectory
+from odin import xray, structure
+from odin.utils import odinparser
+
+import numpy as np
+
+
+def main_wrap(args):
+    return main(*args)
+
+def main(traj, num_molecules, q_values, num_phi, num_shots,
+         total_photons, device_id=0):
+    return xray.Rings.simulate(traj, num_molecules, q_values, num_phi, num_shots, 
+                               photons_scattered_per_shot=total_photons, 
+                               device_id=device_id)    
+    
+
+if __name__ == '__main__':
+    
+    parser = odinparser('Simulate a scattering experiment, generating a `shot`.')
+
+    parser.add_argument('-s', '--structures', type=str,
+                        help='''A a PDB, coor, or trajectory file (.lh5 only 
+                        right now), defining the molecular geometrie(s) to shoot.''')
+    parser.add_argument('-q', '--qvals', type=float, nargs='+',
+                        help='''The q-values to simulate at, in inv ang. Example:
+                        "-q 2.67 3.08" to simulate at q=2.67, 3.08 inv ang. See
+                        also the -f/--qfile option.''')
+    parser.add_argument('-f', '--qfile', type=str,
+                        help='''Instead of passing a million q-values on the
+                        command line using -q/--qvals, you can pass a file here
+                        that contains all the q-values you want to use in a
+                        flat text file.''')
+    parser.add_argument('-x', '--numphi', type=int, default=1,
+                        help='Number of pixels around each ring.')
+    parser.add_argument('-n', '--numshots', type=int, default=1,
+                        help='Number of shots (experiments) to perform.')
+    parser.add_argument('-m', '--nummolec', type=int, default=1200,
+                        help='Number of molecules in each shot. Default: 1200')
+    parser.add_argument('-g', '--numphoton', type=float, default=0,
+                        help=''''Number of photons scattered in each shot. Pass 0 
+                        for the infinite classical limit. Default: inf photons''')
+    parser.add_argument('-p', '--parallel', type=int, default=1,
+                        help='''Number of local GPUs to employ in args.parallel. 
+                        Will use device IDs 0, 1, ..., p-1. If you pass a 
+                        *negative* number, the code runs in serial on the
+                        device indexed by the abs. value of the number you
+                        pass (e.g. '-1' means run on device 1). Default: 
+                        Device 0 only.''')
+    parser.add_argument('-o', '--output', default='shotset.rings',
+                        help='A Rings object, written to disk in h5 format. Default: shotset.ring')
+
+    args = parser.parse_args()
+    
+    
+    # load up filenames
+    if args.structures.endswith('.coor') or args.structures.endswith('.xyz'):
+        traj = structure.load_coor(args.structures)
+    else:
+        traj = trajectory.load(args.structures)
+    
+    
+    p = args.parallel
+    gpudev = range(p)
+    print "Running on Devices:", gpudev
+
+    # make a list of ints, representing the args.numshots each GPU will do
+    numshots_list = [ args.numshots / p ]*p
+    for i in range( args.numshots % p ):
+        numshots_list[i] += 1
+
+    # finite photon stats
+    if args.numphoton == 0:
+        total_photons = False # inf photons
+    else:
+        total_photons = args.numphoton
+        
+    # convert q-values to an array
+    if not (args.qvals or args.qfile):
+        parser.error('Missing argument -- require one of: QVALS or QFILE.')
+    elif (args.qvals and args.qfile):
+        parser.error('Overspecification -- please pass onyly one of: QVALS, QFILE.')        
+    elif args.qvals:
+        q_values = np.array( args.qvals )
+    elif args.qfile:
+        q_values = np.genfromtxt( args.qfile ).flatten()
+    else:
+        raise RuntimeError('Fundamental code error...')
+    print "Simulating at q=%s inv. ang." % str(q_values)
+
+
+    pool = mp.Pool(processes=p)
+    main_args = zip([traj]*p, 
+                    [args.nummolec]*p, 
+                    [q_values]*p,
+                    [args.numphi]*p,
+                    numshots_list,
+                    [total_photons]*p,
+                    gpudev)
+    rings = pool.map(main_wrap, main_args)
+
+    # aggregate all the shotsets into one
+    pi = np.zeros(( args.numshots, len(q_values), args.numphi ))
+
+    for i,r in enumerate(rings):
+        start = int( np.sum( numshots_list[:i] ) )
+        stop  = int( np.sum( numshots_list[:i+1] ) )
+        pi[start:stop,:,:] = r.polar_intensities
+
+    agg_rings = xray.Rings(q_values, pi, rings[0].k)
+    
+    # save
+    agg_rings.save(args.output)
+    print "Saved: %s" % args.output
+    
