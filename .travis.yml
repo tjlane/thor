@@ -24,7 +24,6 @@ before_install:
 install:
   - python setup.py install
 env:
-  - TESTFOLDER=test
   - TESTFOLDER=test/scatter
   - TESTFOLDER=test/xray/test_xray.py
   - TESTFOLDER=test/xray/test_xray2.py
