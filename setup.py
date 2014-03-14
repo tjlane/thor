@@ -267,11 +267,8 @@ corr = Extension('thor.corr',
                      language='c++')
 
 
-metadata['packages']     = ['thor', 'thor.scripts', 'thor.xray', 'thor.smfret']
-metadata['package_dir']  = {'thor' :         'src/python',
-                            'thor.scripts' : 'scripts',
-                            'thor.xray'    : 'src/python/xray',
-                            'thor.smfret'  : 'src/python/smfret'}
+metadata['packages']     = ['thor']
+metadata['package_dir']  = {'thor' :         'src/python'}
 
 metadata['ext_modules']  = [cpuscatter, misc, corr]
 if gpuscatter:
