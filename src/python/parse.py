@@ -456,7 +456,7 @@ class CBF(SingleShotBase):
         
         Returns
         -------
-        cbf : odin.xray.Shotset
+        cbf : thor.xray.Shotset
             The CBF file as an ODIN shotset.
         """
         
@@ -796,7 +796,7 @@ class CheetahCXI(CXIdb, MultiShotBase):
     
     
     @staticmethod
-    def cheetah_instensities_to_odin(intensities):
+    def cheetah_instensities_to_thor(intensities):
 
         if not intensities.shape == (1480, 1552):
             raise ValueError('`intensities` argument array incorrect shape! Must be:'

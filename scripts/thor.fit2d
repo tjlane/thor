@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Read the output from fitd2 to make an odin detector object. Assumes the
+Read the output from fitd2 to make an thor detector object. Assumes the
 detector is a contiguous grid
 """
 
@@ -9,9 +9,9 @@ import re
 import os
 import numpy as np
 
-from odin import xray
-from odin.math2 import ER_rotation_matrix
-from odin.utils import odinparser
+from thor import xray
+from thor.math2 import ER_rotation_matrix
+from thor.utils import Parser
 
 def parse_fit2d(text):
     """
@@ -96,7 +96,7 @@ def xy_rotation_matrix(theta):
 
 def assemble_detector(fit2d_geom, array_shape, pixel_size):
     """
-    Take the output from fit2d and create an odin Detector object.
+    Take the output from fit2d and create an thor Detector object.
 
     Parameters
     ----------
@@ -111,9 +111,9 @@ def assemble_detector(fit2d_geom, array_shape, pixel_size):
 
     Returns
     -------
-    dtc : odin.xray.Detector
+    dtc : thor.xray.Detector
         The full specification of the detector object in
-        odin format.
+        thor format.
 
     References
     ----------
@@ -179,7 +179,7 @@ def assemble_detector(fit2d_geom, array_shape, pixel_size):
 
 def main():
     
-    parser = odinparser('''Convert a fit2d geometry optimization into a
+    parser = Parser('''Convert a fit2d geometry optimization into a
  Detector object''')
     parser.add_argument('-f', '--fit2d', required=True,
                         help = 'Log of fit2d output')

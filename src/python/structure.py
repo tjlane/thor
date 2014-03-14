@@ -13,8 +13,8 @@ from mdtraj import trajectory
 from mdtraj.topology import Topology
 from mdtraj.pdb.element import Element
 
-from odin.math2 import rand_rot
-from odin.refdata import periodic_table
+from thor.math2 import rand_rot
+from thor.refdata import periodic_table
 
 import logging
 logger = logging.getLogger(__name__)

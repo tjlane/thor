@@ -125,7 +125,7 @@ def plot_polar_intensities(shot, output_file=None):
 
     Parameters
     ----------
-    shot : odin.xray.Shot
+    shot : thor.xray.Shot
         A shot to plot.
     output_file : str
         The filename to write. If `None`, will display the image on screen and

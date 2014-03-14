@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 
 """
-Convert CXIdb files into odin rings.
+Convert CXIdb files into thor rings.
 """
 
 import os
 import numpy as np
 
-from odin.utils import odinparser
-from odin.xray import Shotset
+from thor.utils import Parser
+from thor.xray import Shotset
 
 def main(input_fn, detector, mask, q_values, num_phi, output_fn):
         
@@ -21,12 +21,12 @@ def main(input_fn, detector, mask, q_values, num_phi, output_fn):
     
 if __name__ == '__main__':
     
-    parser = odinparser('''Convert CXIdb files into ODIN rings file (.ring).''')
+    parser = Parser('''Convert CXIdb files into thor rings file (.ring).''')
     
     parser.add_argument('-i', '--input', type=str, required=True,
                         help='''CXIdb file to convert''')
     parser.add_argument('-d', '--detector', type=str, required=True,
-                        help='''An odin detector file (.dtc) specifying the 
+                        help='''An thor detector file (.dtc) specifying the 
                                 geometry of the detector.''')
     parser.add_argument('-m', '--mask', type=str, default=None,
                         help='''A pypad mask (.mask) file to apply. Default: 

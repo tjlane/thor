@@ -1,4 +1,4 @@
-# THIS FILE IS PART OF ODIN
+# THIS FILE IS PART OF thor
 
 """
 Classes, methods, functions for use with xray scattering experiments.
@@ -22,12 +22,12 @@ from scipy import interpolate as sciinterp
 from scipy.ndimage import filters
 from scipy.ndimage import interpolation as ndinterp
 
-from odin import math2
-from odin import utils
-from odin.xray import scatter
-from odin.xray import parse
-from odin.xray import write
-from odin.corr import correlate as brute_correlate
+from thor import math2
+from thor import utils
+from thor import scatter
+from thor import parse
+from thor import write
+from thor.corr import correlate as brute_correlate
 
 from mdtraj import io
 from mdtraj.utils.arrays import ensure_type
@@ -137,7 +137,7 @@ class BasisGrid(object):
     a single rectangular pixel grid lives in. They may also be called the y and
     x dimensions without any loss of generality.
 
-    The convention here -- and in all of ODIN -- is one of Row-Major ordering,
+    The convention here -- and in all of thor -- is one of Row-Major ordering,
     which is consistent with C/python. This means that y is the slow dim, x is
     the fast dim, and when ordering these two they will appear as (slow, fast).
 
@@ -454,7 +454,7 @@ class Detector(Beam):
             or a BasisGrid object with a vectorized representation of the
             pixels. The latter yeilds higher performance, and is recommended.
 
-        k : float or odin.xray.Beam
+        k : float or thor.xray.Beam
             The wavenumber of the incident beam to use. Optionally a Beam
             object, defining the beam energy.
 
@@ -483,7 +483,7 @@ class Detector(Beam):
 
         else:
             raise TypeError("`xyz` type must be one of {'np.ndarray', "
-                            "'odin.xray.BasisGrid'}")
+                            "'thor.xray.BasisGrid'}")
 
 
         # parse wavenumber
@@ -494,7 +494,7 @@ class Detector(Beam):
             self.k = k
             self.beam = None
         else:
-            raise TypeError('`k` must be a float or odin.xray.Beam')
+            raise TypeError('`k` must be a float or thor.xray.Beam')
 
         # parse beam_vector -- is guarenteed to be a unit vector
         if beam_vector != None:
@@ -755,7 +755,7 @@ class Detector(Beam):
             raise RuntimeError('intersections can only be computed for implicit'
                                ' detectors')
 
-        # compute the scattering vectors correspoding to q_vectors
+        # compute the scattering vectors corresponding to q_vectors
         S = (q_vectors / self.k) + self.beam_vector
 
         # compute intersections
@@ -819,7 +819,7 @@ class Detector(Beam):
 
         Returns
         -------
-        detector : odin.xray.Detector
+        detector : thor.xray.Detector
             An instance of the detector that meets the specifications of the
             parameters
         """
@@ -907,7 +907,7 @@ class Detector(Beam):
 
         Returns
         -------
-        shotset : odin.xray.Shotset
+        shotset : thor.xray.Shotset
             A shotset object
         """
 
@@ -941,7 +941,7 @@ class Shotset(object):
             numpy array in memory, or as a tables array object that will iterate
             over individual shots.
 
-        detector : odin.xray.Detector
+        detector : thor.xray.Detector
             A detector object, containing the pixel positions in space.
 
         Optional Parameters
@@ -1694,7 +1694,7 @@ class Shotset(object):
             the sample consists of a single homogenous structure, replecated
             `num_molecules` times.
 
-        detector : odin.xray.Detector
+        detector : thor.xray.Detector
             A detector object the shot will be projected onto.
 
         num_molecules : int
@@ -1721,7 +1721,7 @@ class Shotset(object):
 
         Returns
         -------
-        shotset : odin.xray.Shotset
+        shotset : thor.xray.Shotset
             A Shotset instance, containing the simulated shots.
         """
 
@@ -1746,7 +1746,7 @@ class Shotset(object):
 
         This automatically interpolates the dataset onto a polar grid and then
         converts those polar values into a class that facilitates computation
-        in that space. See odin.xray.Rings for more info.
+        in that space. See thor.xray.Rings for more info.
 
         Parameters
         ----------
@@ -1882,7 +1882,7 @@ class Shotset(object):
         return
         
         
-    def save_as_cxi(self, filename, sample_name='odinshotset'):
+    def save_as_cxi(self, filename, sample_name='thorshotset'):
         """
         Write a shotset to disk in CXIdb format.
 
@@ -1896,7 +1896,7 @@ class Shotset(object):
         sample_name : str
             The name of the sample, to aid future researchers
         """
-        write.write_cxidb(filename, self, sample_name='odinshotset')
+        write.write_cxidb(filename, self, sample_name='thorshotset')
         logger.info('Wrote CXIdb file: %s' % filename)
         return
 
@@ -1926,7 +1926,7 @@ class Shotset(object):
 
         Returns
         -------
-        shotset : odin.xray.Shotset
+        shotset : thor.xray.Shotset
             A shotset object
             
         See Also
@@ -2030,7 +2030,7 @@ class Shotset(object):
                 logger.critical(e)
                 raise ImportError('must have pypad installed to load a .mask file')
             padmask = PadMask.load(mask)
-            m = parse.CheetahCXI.cheetah_instensities_to_odin(padmask.mask2d)
+            m = parse.CheetahCXI.cheetah_instensities_to_thor(padmask.mask2d)
         elif type(mask) == np.ndarray:
             m = mask.astype(np.bool)
         elif mask == None:
@@ -2041,7 +2041,7 @@ class Shotset(object):
                             
         cxi = parse.CheetahCXI(filename)               
         ss = cls(cxi._ds1_data, dtc, m, 
-                filters=[parse.CheetahCXI.cheetah_instensities_to_odin])
+                filters=[parse.CheetahCXI.cheetah_instensities_to_thor])
                 
         # save a handle to the file so it doesn't get garbage collected
         ss._file_handle = cxi
@@ -2068,7 +2068,7 @@ class Shotset(object):
 
         Returns
         -------
-        shotset : odin.xray.Shotset
+        shotset : thor.xray.Shotset
             A Shotset representation of the SACLA h5 file.
         """
 
@@ -2138,7 +2138,7 @@ class Shotset(object):
 
             # All the SACLA octal panels are positioned with respect to an origin at
             # (0,0) -- the coordinates describing the panel give the center of the
-            # first pixel in the data stream. This corresponds to the odin p-vector.
+            # first pixel in the data stream. This corresponds to the thor p-vector.
             # This position is decribed by a set of default coordinates as well as a
             # translation due to the detector aperature size/position.
 
@@ -2209,9 +2209,9 @@ class Shotset(object):
     def fromfiles(cls, list_of_files, detector=None, mask=None):
         """
         Convert a bunch of files containing x-ray exposure information into
-        a single ODIN shotset instance. For instance, you might have a large
+        a single thor shotset instance. For instance, you might have a large
         collection of CBF files on disk; this function is the cannonical way to
-        get that data into Odin.
+        get that data into thor.
         
         File formats currently supported:
             -- .cbf  (crystallographic binary files)
@@ -2226,9 +2226,9 @@ class Shotset(object):
         
         Optional Parameters
         -------------------
-        detector : odin.xray.Detector
+        detector : thor.xray.Detector
             A detector object to employ with the intensity data in the files
-            you passed. If `None`, Odin will attempt to infer this information
+            you passed. If `None`, thor will attempt to infer this information
             from the file metadata.
             
         mask : np.ndarray, bool
@@ -2238,7 +2238,7 @@ class Shotset(object):
             
         Returns
         -------
-        ss : odin.xray.Shotset
+        ss : thor.xray.Shotset
             The shotset object.
         """
         
@@ -3467,7 +3467,7 @@ class Rings(object):
 
         Returns
         -------
-        rings : odin.xray.Rings
+        rings : thor.xray.Rings
             A Rings instance, containing the simulated shots.
         """
 
@@ -3712,8 +3712,8 @@ class _FileIterator(IntensitiesCollection):
         list_of_files : list of str
             A list of the files to "load".
             
-        reader : odin.parse.SingleShotBase
-            An object from odin.parse that can
+        reader : thor.parse.SingleShotBase
+            An object from thor.parse that can
         """
         
         if not issubclass(reader, parse.SingleShotBase):
@@ -3796,7 +3796,7 @@ def _q_grid_as_xyz(q_values, num_phi, k):
 def load(filename):
     """
     Load a file from disk, into a format corresponding to an object in 
-    odin.xray. Includes readers for {.dtc, .shot, .ring}.
+    thor.xray. Includes readers for {.dtc, .shot, .ring}.
     
     Parameters
     ----------
@@ -3806,7 +3806,7 @@ def load(filename):
     Returns
     -------
     obj : generic
-        An odin object, whos type depends on the file extension.
+        An thor object, whos type depends on the file extension.
     """
     
     if filename.endswith('.dtc'):

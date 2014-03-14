@@ -12,21 +12,21 @@ from nose import SkipTest
 import numpy as np
 from scipy import stats
 
-from odin import utils
-from odin import math2
-from odin import utils
-from odin import xray
-from odin import _cpuscatter
-from odin.xray import parse
-from odin.xray import structure
-from odin.testing import (skip, ref_file, expected_failure, 
+from thor import utils
+from thor import math2
+from thor import utils
+from thor import xray
+from thor import _cpuscatter
+from thor import parse
+from thor import structure
+from thor.testing import (skip, ref_file, expected_failure, 
                           brute_force_masked_correlation)
-from odin.refdata import cromer_mann_params
+from thor.refdata import cromer_mann_params
 
 from mdtraj import trajectory, io
 
 try:
-    from odin import _gpuscatter
+    from thor import _gpuscatter
     GPU = True
 except ImportError as e:
     GPU = False

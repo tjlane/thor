@@ -11,7 +11,7 @@ import numpy as np
 from mdtraj import io
 
 
-def write_cxidb(filename, shotset, sample_name='odinshotset'):
+def write_cxidb(filename, shotset, sample_name='thorshotset'):
     """
     Write a shotset to disk in CXIdb format.
     
@@ -20,7 +20,7 @@ def write_cxidb(filename, shotset, sample_name='odinshotset'):
     filename : str
         The name of the file!
         
-    shotset : odin.xray.ShotSet
+    shotset : thor.xray.ShotSet
         The shotset object to save
         
     Optional Parameters

@@ -57,17 +57,17 @@ def ref_file(filename):
     """
     Returns the egg-ed path to the reference data `filename`.
     """
-    fn = resource_filename('odin', os.path.join('../reference', filename))
+    fn = resource_filename('thor', os.path.join('../reference', filename))
     
     # if that doesn't work, try to find the refdata in the git repo
     # this is mostly for Travis CI
     if not os.path.exists(fn):
         
-        # check if we're in the base odin dir of the repo
+        # check if we're in the base thor dir of the repo
         if os.path.exists('reference'):
             fn = os.path.join(os.path.abspath(os.curdir), 'reference', filename)
             
-        # else if we're in  the odin/test directory in the repo
+        # else if we're in  the thor/test directory in the repo
         elif os.path.exists('../reference'):
             fn = os.path.join(os.path.abspath(os.curdir), '../reference', filename)
             

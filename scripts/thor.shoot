@@ -7,8 +7,8 @@ Simulate the scattering experiment (SAXS, WAXS).
 import multiprocessing as mp
 
 from mdtraj import trajectory
-from odin import xray, structure
-from odin.utils import odinparser
+from thor import xray, structure
+from thor.utils import Parser
 
 import numpy as np
 
@@ -27,7 +27,7 @@ def save(output_file, shotset):
     
 if __name__ == '__main__':
     
-    parser = odinparser('Simulate a scattering experiment, generating a `shot`.')
+    parser = Parser('Simulate a scattering experiment, generating a `shot`.')
 
     parser.add_argument('-s', '--structures', type=str,
                         help='''A a PDB, coor, or trajectory file (.lh5 only 

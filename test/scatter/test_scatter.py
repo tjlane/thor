@@ -15,18 +15,18 @@ from numpy.testing import assert_almost_equal, assert_allclose
 from nose import SkipTest
 
 try:
-    from odin import _gpuscatter
+    from thor import _gpuscatter
     GPU = True
 except ImportError:
     GPU = False
 
-from odin.refdata import cromer_mann_params
-from odin import xray
-from odin import _cpuscatter
-from odin.testing import skip, ref_file, gputest
-from odin.xray import scatter
-from odin.xray import structure
-from odin.xray.structure import rand_rotate_molecule
+from thor.refdata import cromer_mann_params
+from thor import xray
+from thor import _cpuscatter
+from thor import scatter
+from thor import structure
+from thor.testing import skip, ref_file, gputest
+from thor.structure import rand_rotate_molecule
 
 from mdtraj import trajectory
 
@@ -378,7 +378,7 @@ class TestSphHrm(object):
         
 def test_atomic_formfactor():
     
-    # this is a function in odin.xray, but the reference implementation
+    # this is a function in thor.xray, but the reference implementation
     # is in this file, so testing it here
     
     for q_mag in np.arange(2.0, 6.0, 1.0):

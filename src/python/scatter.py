@@ -13,13 +13,13 @@ from scipy import misc
 from scipy import special
 from threading import Thread
 
-from odin import _cpuscatter
-from odin.math2 import arctan3
-from odin.exptdata import EnsembleExpt
-from odin.refdata import cromer_mann_params
+from thor import _cpuscatter
+from thor.math2 import arctan3
+from thor.exptdata import EnsembleExpt
+from thor.refdata import cromer_mann_params
 
 try:
-    from odin import _gpuscatter
+    from thor import _gpuscatter
     GPU = True
 except ImportError as e:
     GPU = False
@@ -47,7 +47,7 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
         the sample consists of a single homogenous structure, replecated 
         `num_molecules` times.
         
-    detector : odin.xray.Detector OR ndarray, float
+    detector : thor.xray.Detector OR ndarray, float
         A detector object the shot will be projected onto. Can alternatively be
         just an n x 3 array of q-vectors to project onto.
         
@@ -80,7 +80,7 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
         
     See Also
     --------
-    odin.xray.Shotset.simulate()
+    thor.xray.Shotset.simulate()
         These are factory functions that call this function, and wrap the
         results into the Shotset class.
     """
@@ -103,7 +103,7 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
     elif isinstance(detector, np.ndarray):
         qxyz = detector
     else:
-        raise ValueError('`detector` must be {odin.xray.Detector, np.ndarray}')
+        raise ValueError('`detector` must be {thor.xray.Detector, np.ndarray}')
     num_q = qxyz.shape[0]
     
     
@@ -285,7 +285,7 @@ def sph_hrm_coefficients(trajectory, weights=None, q_magnitudes=None,
                      dtype=np.complex128 )
     
     # get the quadrature vectors we'll use, a 900 x 4 array : [q_x, q_y, q_z, w]
-    from odin.refdata import sph_quad_900
+    from thor.refdata import sph_quad_900
     q_phi = arctan3(sph_quad_900[:,1], sph_quad_900[:,0])
         
     # iterate over all snapshots in the trajectory

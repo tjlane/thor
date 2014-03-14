@@ -9,7 +9,7 @@ cimport numpy as np
 from time import time
 import os
 
-from odin.refdata import get_cromermann_parameters
+from thor.refdata import get_cromermann_parameters
 
 def output_sanity_check(intensities):
     """
