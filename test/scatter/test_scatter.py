@@ -28,7 +28,7 @@ from thor import structure
 from thor.testing import skip, ref_file, gputest
 from thor.structure import rand_rotate_molecule
 
-from mdtraj import trajectory
+from mdtraj import Trajectory
 
 
 # ------------------------------------------------------------------------------
@@ -299,7 +299,7 @@ class TestScatter(object):
         if not GPU: raise SkipTest
         print "testing python wrapper fxn..."
         
-        traj = trajectory.load(ref_file('ala2.pdb'))
+        traj = Trajectory.load(ref_file('ala2.pdb'))
         num_molecules = 512
         detector = xray.Detector.generic()
 
@@ -350,7 +350,7 @@ class TestFinitePhoton(object):
         
     def test_py_cpu_smoke(self):
 
-        traj = trajectory.load(ref_file('ala2.pdb'))
+        traj = Trajectory.load(ref_file('ala2.pdb'))
         
         num_molecules = 1
         detector = xray.Detector.generic()

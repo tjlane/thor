@@ -23,7 +23,7 @@ from thor.testing import (skip, ref_file, expected_failure,
                           brute_force_masked_correlation)
 from thor.refdata import cromer_mann_params
 
-from mdtraj import trajectory, io
+from mdtraj import Trajectory, io
 
 try:
     from thor import _gpuscatter
@@ -50,7 +50,7 @@ class TestShotsetFromDisk(test_xray.TestShotset):
         self.num_phi  = 360
         self.l = 50.0
         self.d = xray.Detector.generic(spacing=0.4, l=self.l)
-        self.t = trajectory.load(ref_file('ala2.pdb'))
+        self.t = Trajectory.load(ref_file('ala2.pdb'))
         
         self.num_shots = 2
         intensities = np.abs(np.random.randn(self.num_shots, self.d.num_pixels))
@@ -80,7 +80,7 @@ class TestRingsFromDisk(test_xray.TestRings):
 
         self.q_values  = np.array([1.0, 2.0])
         self.num_phi   = 360
-        self.traj      = trajectory.load(ref_file('ala2.pdb'))
+        self.traj      = Trajectory.load(ref_file('ala2.pdb'))
         self.num_shots = 2
 
         # generate the tables file on disk, then re-open it
@@ -143,10 +143,10 @@ class TestRingsFFTPack(test_xray.TestRings):
     """
 
     def setup(self):
-        xray.xray.FORCE_NO_FFTW = True
+        xray.FORCE_NO_FFTW = True
         super(TestRingsFFTPack, self).setup()
         return
         
     def teardow(self):
-        xray.xray.FORCE_NO_FFTW = False
+        xray.FORCE_NO_FFTW = False
         return

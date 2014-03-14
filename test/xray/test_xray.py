@@ -23,7 +23,7 @@ from thor.testing import (skip, ref_file, expected_failure,
                           brute_force_masked_correlation)
 from thor.refdata import cromer_mann_params
 
-from mdtraj import trajectory, io
+from mdtraj import Trajectory, io
 
 try:
     from thor import _gpuscatter
@@ -254,7 +254,7 @@ class TestShotset(object):
         self.d = xray.Detector.generic(spacing=0.4, l=self.l)
         self.num_shots = 2
         self.i = np.abs( np.random.randn(self.num_shots, self.d.num_pixels) )
-        self.t = trajectory.load(ref_file('ala2.pdb'))
+        self.t = Trajectory.load(ref_file('ala2.pdb'))
         self.shot = xray.Shotset(self.i, self.d)
 
     def test_mask_argument(self):
@@ -389,7 +389,7 @@ class TestShotset(object):
         rfloats = np.random.rand(num_molecules, 3)
 
         # --- first, scatter onto a perfect ring
-        q_grid = xray.xray._q_grid_as_xyz(q_values, num_phi, multi_d.k)
+        q_grid = xray._q_grid_as_xyz(q_values, num_phi, multi_d.k)
 
         ring_i = _cpuscatter.simulate(num_molecules, q_grid, xyzlist,
                                       atomic_numbers, rfloats=rfloats)
@@ -571,7 +571,7 @@ class TestRings(object):
     def setup(self):
         self.q_values  = np.array([1.0, 2.0])
         self.num_phi   = 360
-        self.traj      = trajectory.load(ref_file('ala2.pdb'))
+        self.traj      = Trajectory.load(ref_file('ala2.pdb'))
         self.num_shots = 2
         self.rings     = xray.Rings.simulate(self.traj, 1, self.q_values,
                                              self.num_phi, self.num_shots) # 1 molec
@@ -927,7 +927,7 @@ class TestMisc(object):
         num_phi = 360
         k = 2.0 * np.pi / 1.4
 
-        qxyz = xray.xray._q_grid_as_xyz(q_values, num_phi, k)
+        qxyz = xray._q_grid_as_xyz(q_values, num_phi, k)
 
         # assert that the above vectors are the correct length
         assert np.all( np.abs( np.sqrt( np.sum( np.power(qxyz,2), axis=1 ) ) - \

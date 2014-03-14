@@ -9,9 +9,8 @@ Functions/classes for manipulating structures.
 import numpy as np
 from scipy.special import cbrt
 
-from mdtraj import trajectory
-from mdtraj.topology import Topology
-from mdtraj.pdb.element import Element
+from mdtraj import Trajectory, Topology
+from mdtraj.core.element import Element
 
 from thor.math2 import rand_rot
 from thor.refdata import periodic_table
@@ -396,7 +395,7 @@ def multiply_conformations(traj, num_replicas, density, traj_weights=None):
         logger.debug('Placed molecule, took %d attempts' % attempt)
     
     # store & return the results
-    out_traj = trajectory.Trajectory( xyz, traj.topology )
+    out_traj = Trajectory(xyz, traj.topology)
 
     return out_traj
 
@@ -462,7 +461,7 @@ def _traj_from_xyza(xyz, atomic_numbers, units='nm'):
         name = '%s' % element_symb
         top.add_atom(name, element, residue)
     
-    structure = trajectory.Trajectory(xyz=xyz, topology=top)
+    structure = Trajectory(xyz=xyz, topology=top)
 
     return structure
 
