@@ -19,7 +19,7 @@ before_install:
   - pip install --use-mirrors -qq pyyaml
   - pip install --use-mirrors -qq mdtraj
   - pip install --use-mirrors -qq simtk.unit
-  - pip insatll --use-mirrors -qq fabio
+  - pip install --use-mirrors -qq fabio
   - git clone --depth 5 https://github.com/hgomersall/pyFFTW.git; cd pyFFTW; python setup.py build_ext --inplace ; sudo python setup.py install ; cd ..
 install:
   - python setup.py install

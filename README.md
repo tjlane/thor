@@ -1,6 +1,6 @@
 Thor
 ====
 
-[![Build Status](https://travis-ci.org/tjlane/thor.png?branch=master)](https://travis-ci.org/tjlane/odin)
+[![Build Status](https://travis-ci.org/tjlane/thor.png?branch=master)](https://travis-ci.org/tjlane/thor)
 
 Thor is a package for analyzing x-ray scattering experiments.
