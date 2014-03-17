@@ -6,7 +6,7 @@ Library for performing simulations of x-ray scattering experiments.
 import logging
 logging.basicConfig()
 logger = logging.getLogger(__name__)
-# logger.setLevel('DEBUG')
+logger.setLevel('DEBUG')
 
 import numpy as np
 from scipy import misc
@@ -222,7 +222,7 @@ def atomic_formfactor(atomic_Z, q_mag):
     return fi
 
 
-def sph_hrm_coefficients(trajectory, weights=None, q_magnitudes=None, 
+def sph_hrm_coefficients(trajectory, q_values, weights=None,
                          num_coefficients=10):
     """
     Numerically evaluates the coefficients of the projection of a structure's
@@ -235,14 +235,14 @@ def sph_hrm_coefficients(trajectory, weights=None, q_magnitudes=None,
     trajectory : mdtraj.trajectory
         A trajectory object representing a Boltzmann ensemble.
         
-    weights : ndarray, float
-        A list of weights, for how to weight each snapshot in the trajectory.
-        If not provided, treats each snapshot with equal weight.
-        
-    q_magnitudes : ndarray, float
+    q_values : ndarray, float
         A list of the reciprocal space magnitudes at which to evaluate 
         coefficients.
         
+    weights : ndarray, float
+        A list of weights, for how to weight each snapshot in the trajectory.
+        If not provided, treats each snapshot with equal weight.
+
     num_coefficients : int
         The order at which to truncate the spherical harmonic expansion
     
@@ -251,7 +251,7 @@ def sph_hrm_coefficients(trajectory, weights=None, q_magnitudes=None,
     sph_coefficients : ndarray, float
         A 3-dimensional array of coefficients. The first dimension indexes the
         order of the spherical harmonic. The second two dimensions index the
-        array `q_magnitudes`.
+        array `q_values`.
         
     References
     ----------
@@ -271,16 +271,16 @@ def sph_hrm_coefficients(trajectory, weights=None, q_magnitudes=None,
                              'number of snapshots in `trajectory`')
         weights /= weights.sum()
     
-    # initialize the q_magnitudes array
-    if q_magnitudes == None:
-        q_magnitudes = np.arange(1.0, 6.0, 0.02)
-    num_q_mags = len(q_magnitudes)
+    # initialize the q_values array
+    q_values = np.array(q_values).flatten()
+    num_q_mags = len(q_values)
     
     # don't do odd values of ell
     l_vals = range(0, 2*num_coefficients, 2)
     
     # initialize spherical harmonic coefficient array
-    Slm = np.zeros(( num_coefficients, 2*num_coefficients+1, num_q_mags), 
+    # note that it's 4* num_coeff - 3 b/c we're skipping odd l's -- (2l+1)
+    Slm = np.zeros(( num_coefficients, 4*num_coefficients-3, num_q_mags), 
                      dtype=np.complex128 )
     
     # get the quadrature vectors we'll use, a 900 x 4 array : [q_x, q_y, q_z, w]
@@ -290,7 +290,7 @@ def sph_hrm_coefficients(trajectory, weights=None, q_magnitudes=None,
     # iterate over all snapshots in the trajectory
     for i in range(trajectory.n_frames):
 
-        for iq,q in enumerate(q_magnitudes):
+        for iq,q in enumerate(q_values):
             logger.info('Computing coefficients for q=%f\t(%d/%d)' % (q, iq+1, num_q_mags))
             
             # compute S, the single molecule scattering intensity
@@ -306,17 +306,24 @@ def sph_hrm_coefficients(trajectory, weights=None, q_magnitudes=None,
                     Plm = special.lpmv(m, l, sph_quad_900[:,2])
                     Ylm = N * np.exp( 1j * m * q_phi ) * Plm
 
-                    # TJL note to self: isnt the m index for Slm wrong? can be negative...
+                    # NOTE: we're going to use the fact that negative array
+                    #       indices wrap around here -- the value of m can be
+                    #       negative, but those values just end up at the *end*
+                    #       of the array 
                     Slm[il, m, iq] = np.sum( S_q * Ylm * sph_quad_900[:,3] )
-    
+
         # now, reduce the Slm solution to C_l(q1, q2)
         sph_coefficients = np.zeros((num_coefficients, num_q_mags, num_q_mags))
-        for iq1, q1 in enumerate(q_magnitudes):
-            for iq2, q2 in enumerate(q_magnitudes):
+        for iq1, q1 in enumerate(q_values):
+            for iq2, q2 in enumerate(q_values):
                 for il, l in enumerate(l_vals):
-                    sph_coefficients[il, iq1, iq2] += weights[i] * \
-                                                      np.real( np.sum( Slm[il,:,iq1] *\
-                                                      np.conjugate(Slm[il,:,iq2]) ) )
+                    ip = np.sum( Slm[il,:,iq1] * np.conjugate(Slm[il,:,iq2]) )
+                    if not np.imag(ip) < 1e-6: 
+                        logger.warning('C_l coefficient has non-zero imaginary'
+                                       ' component (%f) -- this is theoretically'
+                                       ' forbidden and usually a sign something '
+                                       'went wrong numerically' % np.imag(ip))
+                    sph_coefficients[il, iq1, iq2] += weights[i] * np.real(ip)
     
     return sph_coefficients
 
