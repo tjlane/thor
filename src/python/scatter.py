@@ -256,7 +256,7 @@ def sph_hrm_coefficients(trajectory, q_values, weights=None,
     References
     ----------
     .[1] Kam, Z. Determination of macromolecular structure in solution by 
-    spatial correlation of scattering fluctuations. Macromolecules 10, 927–934 
+    spatial correlation of scattering fluctuations. Macromolecules 10, 927-934 
     (1977).
     """
     
