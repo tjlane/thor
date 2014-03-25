@@ -303,7 +303,7 @@ def sph_hrm_coefficients(trajectory, q_values, weights=None,
                     
                     N = np.sqrt( 2. * l * misc.factorial(l-m) / \
                                 ( 4. * np.pi * misc.factorial(l+m) ) )
-                    Plm = special.lpmv(m, l, sph_quad_900[:,2])
+                    Plm = special.lpmv(l, m, sph_quad_900[:,2]) # z = cos(theta)
                     Ylm = N * np.exp( 1j * m * q_phi ) * Plm
 
                     # NOTE: we're going to use the fact that negative array
