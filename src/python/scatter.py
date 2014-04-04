@@ -16,6 +16,7 @@ from threading import Thread
 from thor import _cpuscatter
 from thor.math2 import arctan3
 from thor.refdata import cromer_mann_params
+from thor.refdata import sph_quad_900
 
 try:
     from thor import _gpuscatter
@@ -221,7 +222,7 @@ def atomic_formfactor(atomic_Z, q_mag):
         
     return fi
 
-
+    
 def sph_hrm_coefficients(trajectory, q_values, weights=None,
                          num_coefficients=10):
     """
@@ -284,7 +285,7 @@ def sph_hrm_coefficients(trajectory, q_values, weights=None,
                      dtype=np.complex128 )
     
     # get the quadrature vectors we'll use, a 900 x 4 array : [q_x, q_y, q_z, w]
-    from thor.refdata import sph_quad_900
+    # from thor.refdata import sph_quad_900
     q_phi = arctan3(sph_quad_900[:,1], sph_quad_900[:,0])
         
     # iterate over all snapshots in the trajectory
@@ -305,7 +306,7 @@ def sph_hrm_coefficients(trajectory, q_values, weights=None,
                                 ( 4. * np.pi * misc.factorial(l+m) ) )
                     Plm = special.lpmv(l, m, sph_quad_900[:,2]) # z = cos(theta)
                     Ylm = N * np.exp( 1j * m * q_phi ) * Plm
-
+                    
                     # NOTE: we're going to use the fact that negative array
                     #       indices wrap around here -- the value of m can be
                     #       negative, but those values just end up at the *end*
