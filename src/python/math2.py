@@ -334,3 +334,44 @@ def Wigner3j(j1, j2, j3, m1, m2, m3):
           factorial(j2-m2) * factorial(j3+m3) * factorial(j3-m3) )
     
     return w3j
+
+
+def LDA_direction(positives, negatives):
+    """
+    Compute the maximally discriminating direction between two sets
+    of points in a common vector space.
+
+    Parameters
+    ----------
+    positives/negatives : np.ndarray
+        The two sets. Will find the linear direction that best
+        describes their differences.
+
+    Returns
+    -------
+    w : np.ndarray
+        A vector representing the discriminatory direction.
+
+    Notes
+    -----
+    The boundary for a binary classifier, as usually employed
+    in LDA, will be the hyperplane perpendicular to w.
+    """
+    
+    if not positives.shape[1] == negatives.shape[1]:
+        raise ValueError('`positives` and `negatives` should have the same dimensionality!')
+    
+    S1 = np.cov(positives.T)
+    S0 = np.cov(negatives.T)
+    
+    mu1 = positives.mean(axis=0)
+    mu0 = negatives.mean(axis=0)
+    
+    assert S0.shape[0] == mu0.shape[0]
+    assert S1.shape[0] == mu1.shape[0]
+    
+    w = np.dot(np.linalg.inv(S0 + S1), (mu1 - mu0)) 
+    
+    return w
+
+
