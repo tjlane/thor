@@ -13,7 +13,11 @@ logger = logging.getLogger(__name__)
 import numpy as np
 from random import randrange, seed
 
-from scipy import ndimage, stats, optimize, spatial
+from scipy import ndimage
+from scipy import stats
+from scipy import optimize
+from scipy import spatial
+from scipy import special
 from scipy.misc import factorial
 from scipy.ndimage import filters, interpolation
 from scipy.signal import fftconvolve
@@ -334,3 +338,104 @@ def Wigner3j(j1, j2, j3, m1, m2, m3):
           factorial(j2-m2) * factorial(j3+m3) * factorial(j3-m3) )
     
     return w3j
+
+
+def assoc_legendre(l, m, x):
+    """
+    Compute and return the associated Legendre polynomial of degree l and order
+    m, evaluated at each point x. This is commonly written
+    
+        P_l^m (x)
+        l = 0, 1, 2, ...
+        m = -1, -l+1, ..., l
+        x in (-1, 1)
+        
+    Parameters
+    ----------
+    l : int
+        The polynomial degree
+        
+    m : int
+        The polynomial order
+        
+    x : np.ndarray, float
+        The points to evaluate the function at
+        
+    Returns
+    -------
+    P : np.ndarray, float
+        The polynomial evaluted at the appropriate values.
+    """
+    
+    if np.abs(m) > l:
+        raise ValueError('The associated Legendre polynomial is only defined'
+                         'for |m| < l')
+    
+    if m > 0:
+        prefix = np.power(-1, m) * np.product(np.arange(l-m+1, l+m+1))
+        m = -1 * m
+    else:
+        prefix = 1
+        
+    t1 = 1.0 / special.gamma(1.0-m)
+    
+    if m == 0:
+        t2 = np.ones_like(x)
+    else:
+        t2 = np.power((1.0+x) / (1.0-x), m/2.0)
+        t2[ np.abs(t2) < (t2.max() * 1e-50) ] = 0.0 # avoid underflow
+    
+    t3 = special.hyp2f1(-l, l+1.0, 1.0-m, (1.0-x)/2.0)
+    # t3[ np.abs(t3) < (t3.max() * 1e-50) ] = 0.0
+    
+    return prefix * t1 * t2 * t3
+
+
+def kabsch(P, Q):
+    """ 
+    Employ the Kabsch algorithm to compute the rotation matrix U that when
+    applied to solid object P, minimizes the RMSD to Q. I.E. choose rotation U
+    such that RMSD(PU, Q) is as small as possible.
+    
+    Parameters
+    ----------
+    P : np.ndarray, float
+        N x D array representing an object in space, where N is the number of 
+        points in the object and D is the dimension.
+    
+    Q : np.ndarray, float
+        A second N x D array representing a second object in the same space,
+        with an equal number of points.
+    
+    
+    Returns
+    -------
+    U : np.ndarray, float
+        A D x D rotation matrix, that minimizes RMSD(PU, Q)
+    
+    References
+    ----------
+    ..[1] https://github.com/charnley/rmsd
+    ..[2] http://en.wikipedia.org/wiki/Kabsch_algorithm
+    ..[3] Kabsch, Wolfgang, (1976) "A solution for the best rotation to relate
+          two sets of vectors", Acta Crystallographica 32:922
+    
+    Example
+    -------
+    >>> U = kabsch(P, Q)
+    >>> rotated = numpy.dot(P, U)
+    >>> print (rotated - Q)
+    """
+    
+    C = numpy.dot(numpy.transpose(P), Q)
+    V, S, W = numpy.linalg.svd(C)
+    
+    # ensure right-handed coordinate system (see wikipedia)
+    if ((numpy.linalg.det(V) * numpy.linalg.det(W)) < 0.0):
+        S[-1] = -S[-1]
+        V[:,-1] = -V[:,-1]
+        
+    U = numpy.dot(V, W)
+    
+    return U
+    

@@ -9,12 +9,14 @@ logger = logging.getLogger(__name__)
 #logger.setLevel('DEBUG')
 
 import numpy as np
+#np.seterr(all='raise')
+
 from scipy import misc
 from scipy import special
 from threading import Thread
 
 from thor import _cpuscatter
-from thor.math2 import arctan3
+from thor.math2 import arctan3, assoc_legendre
 from thor.refdata import cromer_mann_params
 from thor.refdata import sph_quad_900
 
@@ -148,7 +150,7 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
                 num_cpu = num % 512
                 num_gpu = num - num_cpu
             
-            logger.info('Running %d molc, snapshot %d, dev %d: %d CPU / %d GPU.' % (num, i, device_id, num_cpu, num_gpu))  
+            logger.debug('Running %d molc, snapshot %d, dev %d: %d CPU / %d GPU.' % (num, i, device_id, num_cpu, num_gpu))  
 
             # multiprocessing cannot return values, so generate a helper function
             # that will dump returned values into a shared array
@@ -286,7 +288,8 @@ def sph_hrm_coefficients(trajectory, q_values, weights=None,
     
     # get the quadrature vectors we'll use, a 900 x 4 array : [q_x, q_y, q_z, w]
     # from thor.refdata import sph_quad_900
-    q_phi = arctan3(sph_quad_900[:,1], sph_quad_900[:,0])
+    q_phi   = arctan3(sph_quad_900[:,1], sph_quad_900[:,0])
+    q_theta = np.arccos(sph_quad_900[:,2])
         
     # iterate over all snapshots in the trajectory
     for i in range(trajectory.n_frames):
@@ -300,18 +303,40 @@ def sph_hrm_coefficients(trajectory, q_values, weights=None,
 
             # project S onto the spherical harmonics using spherical quadrature
             for il,l in enumerate(l_vals):                
-                for m in range(-l, l+1):
+                for m in range(0, l+1):
                     
-                    N = np.sqrt( 2. * l * misc.factorial(l-m) / \
-                                ( 4. * np.pi * misc.factorial(l+m) ) )
-                    Plm = special.lpmv(l, m, sph_quad_900[:,2]) # z = cos(theta)
+                    logger.debug('Projecting onto Ylm, l=%d/m=%d' % (l, m))
+
+                    # compute a spherical harmonic, turns out this is 
+                    # unexpectedly annoying...
+                    # -----------
+                    # option (1) : scipy (slow & incorrect?)
+                    # scipy switched the convention for theta/phi in this fxn
+                    #Ylm = special.sph_harm(m, l, q_phi, q_theta)
+                    
+                    # -----------
+                    # option (2) : roll your own
+                    
+                    N = np.sqrt( 2. * l * special.gamma(l-m+1) / \
+                                ( 4. * np.pi * special.gamma(l+m+1) ) )
+                    
+                    # # z = cos(theta)
+                    # subtract 1e-15 to avoid P_lm(1.0) = inf
+                    Plm = assoc_legendre(l, m, sph_quad_900[:,2] - 1e-15) 
+                    
                     Ylm = N * np.exp( 1j * m * q_phi ) * Plm
+                    
+                    if (np.any(np.isnan(Ylm)) or (np.any(np.isinf(Ylm)))):
+                        raise RuntimeError('Could not compute Ylm, l=%d/m=%d' % (l, m))
+                    # -----------
                     
                     # NOTE: we're going to use the fact that negative array
                     #       indices wrap around here -- the value of m can be
                     #       negative, but those values just end up at the *end*
                     #       of the array 
-                    Slm[il, m, iq] = np.sum( S_q * Ylm * sph_quad_900[:,3] )
+                    r = np.sum( S_q * Ylm * sph_quad_900[:,3] )
+                    Slm[il,  m, iq] = r
+                    Slm[il, -m, iq] = ((-1) ** m) * np.conjugate(r)
 
         # now, reduce the Slm solution to C_l(q1, q2)
         sph_coefficients = np.zeros((num_coefficients, num_q_mags, num_q_mags))

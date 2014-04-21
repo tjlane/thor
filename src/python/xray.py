@@ -1733,6 +1733,9 @@ class Shotset(object):
                                            finite_photon=finite_photon,
                                            force_no_gpu=force_no_gpu,
                                            device_id=device_id)
+                                           
+            logger.info(utils.logger_return + 'Finished simulating shot %d/%d'
+                       ' on device %d' % (i+1, num_shots, device_id) )
 
         ss = cls(I, detector)
 
@@ -3490,7 +3493,8 @@ class Rings(object):
                                       device_id=device_id)
             polar_intensities[i,:,:] = I.reshape(len(q_values), num_phi)
 
-            logger.info('Finished polar shot %d/%d on device %d' % (i+1, num_shots, device_id) )
+            logger.info(utils.logger_return + 'Finished polar shot %d/%d on '
+                        'device %d' % (i+1, num_shots, device_id) )
 
         return cls(q_values, polar_intensities, k, polar_mask=None)
 

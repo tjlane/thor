@@ -364,17 +364,48 @@ class TestFinitePhoton(object):
                            np.sqrt(detector.beam.photons_scattered_per_shot)*6.0
         
 
-class TestSphHrm(object):
-   
-    @skip
-    def test_vs_reference(self):
-        qs = np.arange(2, 3.52, 0.02)
-        silver = structure.load_coor(ref_file('SilverSphere.coor'))
-        cl = scatter.sph_hrm_coefficients(silver, q_magnitudes=qs, 
-                                          num_coefficients=2)[1,:,:]
-        ref = np.loadtxt(ref_file('ag_kam.dat')) # computed in matlab
-        assert_allclose(cl, ref)
+def test_sph_hrm():
     
+    # -----------------------
+    traj = Trajectory.load(ref_file('pentagon.pdb'))
+    
+    q_magnitudes     = [1.6]
+    num_coefficients = 44
+
+    num_molecules = 1
+    num_shots     = 20000
+    num_phi       = 2048
+    # -----------------------
+        
+    q = q_magnitudes[0]
+
+
+    # compute the Kam-theoretic values of the Legendre coefficients C_ell, which
+    # we will call "coeffsh"
+    coeffsh_even = scatter.sph_hrm_coefficients(traj, q_magnitudes,
+                                                num_coefficients=num_coefficients/2)
+    coeffsh_even = np.nan_to_num(coeffsh_even)
+    coeffsh_even /= coeffsh_even[1]
+
+    coeffsh = np.zeros(num_coefficients)
+    coeffsh[0::2] = coeffsh_even.flatten()
+
+
+    # next, preform a simulation of the scattering and empirically compute the
+    # correlation function
+    rings = xray.Rings.simulate(traj, num_molecules, q_magnitudes, 
+                                num_phi, num_shots)
+    
+    c = rings.correlate_intra(q, q, mean_only=True)
+
+    # it seems best to compare the solutions in the expanded basis
+    c_sh = np.polynomial.legendre.legval(rings.cospsi(q, q), coeffsh.flatten())
+    
+    # if these are more than 10% different, fail the test
+    error = (np.sum(np.abs( (c_sh / c_sh[0]) - (c / c[0]) )) / float(num_phi))
+    assert error < 0.1, 'simulation and analytical computation >10%% different (%f %%)' % error
+    
+    return
         
 def test_atomic_formfactor():
     
