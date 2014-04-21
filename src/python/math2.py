@@ -340,7 +340,6 @@ def Wigner3j(j1, j2, j3, m1, m2, m3):
     return w3j
 
 
-<<<<<<< HEAD
 def assoc_legendre(l, m, x):
     """
     Compute and return the associated Legendre polynomial of degree l and order
@@ -424,19 +423,22 @@ def kabsch(P, Q):
     Example
     -------
     >>> U = kabsch(P, Q)
-    >>> rotated = numpy.dot(P, U)
+    >>> rotated = np.dot(P, U)
     >>> print (rotated - Q)
     """
     
-    C = numpy.dot(numpy.transpose(P), Q)
-    V, S, W = numpy.linalg.svd(C)
+    if not P.shape == Q.shape:
+        raise ValueError('`P` and `Q` must be the same shape')
+    
+    A = np.dot(np.transpose(P), Q)
+    V, S, W = np.linalg.svd(A)
     
     # ensure right-handed coordinate system (see wikipedia)
-    if ((numpy.linalg.det(V) * numpy.linalg.det(W)) < 0.0):
+    if ((np.linalg.det(V) * np.linalg.det(W)) < 0.0):
         S[-1] = -S[-1]
         V[:,-1] = -V[:,-1]
         
-    U = numpy.dot(V, W)
+    U = np.dot(V, W)
     
     return U
     
