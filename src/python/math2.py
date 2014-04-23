@@ -385,10 +385,36 @@ def assoc_legendre(l, m, x):
         t2 = np.power((1.0+x) / (1.0-x), m/2.0)
         t2[ np.abs(t2) < (t2.max() * 1e-50) ] = 0.0 # avoid underflow
     
-    t3 = special.hyp2f1(-l, l+1.0, 1.0-m, (1.0-x)/2.0)
-    # t3[ np.abs(t3) < (t3.max() * 1e-50) ] = 0.0
+    t3 = special.hyp2f1(-l, l+1.0, 1.0-m, (1.0-x)/2.0)    
     
     return prefix * t1 * t2 * t3
+
+
+def sph_hrm(l, m, theta, phi):
+    """
+    Compute the spherical harmonic Y_lm(theta, phi).
+    """
+    
+    if np.any( np.isnan(theta) + np.isinf(theta) ):
+        raise ValueError('NaN or inf in theta -- must be floats in [0, pi]')
+    if np.any( np.isnan(phi) + np.isinf(phi) ):
+        raise ValueError('NaN or inf in phi -- must be floats in [0, 2pi]')
+    
+    # avoid P_lm(1.0) = inf
+    cos_theta = np.cos(theta)
+    cos_theta[(cos_theta >= 1.0)] = 1.0 - 1e-8
+    
+    N = np.sqrt( 2. * l * special.gamma(l-m+1) / \
+                ( 4. * np.pi * special.gamma(l+m+1) ) )
+    
+    Plm = assoc_legendre(l, m, cos_theta) 
+    
+    Ylm = N * np.exp( 1j * m * phi ) * Plm
+    
+    if (np.any(np.isnan(Ylm)) or (np.any(np.isinf(Ylm)))):
+        raise RuntimeError('Could not compute Ylm, l=%d/m=%d' % (l, m))
+    
+    return Ylm
 
 
 def kabsch(P, Q):

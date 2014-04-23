@@ -16,7 +16,7 @@ from scipy import special
 from threading import Thread
 
 from thor import _cpuscatter
-from thor.math2 import arctan3, assoc_legendre
+from thor.math2 import arctan3, sph_hrm
 from thor.refdata import cromer_mann_params
 from thor.refdata import sph_quad_900
 
@@ -316,18 +316,7 @@ def sph_hrm_coefficients(trajectory, q_values, weights=None,
                     
                     # -----------
                     # option (2) : roll your own
-                    
-                    N = np.sqrt( 2. * l * special.gamma(l-m+1) / \
-                                ( 4. * np.pi * special.gamma(l+m+1) ) )
-                    
-                    # # z = cos(theta)
-                    # subtract 1e-15 to avoid P_lm(1.0) = inf
-                    Plm = assoc_legendre(l, m, sph_quad_900[:,2] - 1e-15) 
-                    
-                    Ylm = N * np.exp( 1j * m * q_phi ) * Plm
-                    
-                    if (np.any(np.isnan(Ylm)) or (np.any(np.isinf(Ylm)))):
-                        raise RuntimeError('Could not compute Ylm, l=%d/m=%d' % (l, m))
+                    Ylm = sph_hrm(l, m, q_theta, q_phi)
                     # -----------
                     
                     # NOTE: we're going to use the fact that negative array
