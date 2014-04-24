@@ -16,7 +16,7 @@ from scipy import special
 from threading import Thread
 
 from thor import _cpuscatter
-from thor.math2 import arctan3, sph_hrm
+from thor.math2 import arctan3, sph_harm
 from thor.refdata import cromer_mann_params
 from thor.refdata import sph_quad_900
 
@@ -225,8 +225,8 @@ def atomic_formfactor(atomic_Z, q_mag):
     return fi
 
     
-def sph_hrm_coefficients(trajectory, q_values, weights=None,
-                         num_coefficients=10):
+def sph_harm_coefficients(trajectory, q_values, weights=None,
+                          num_coefficients=10):
     """
     Numerically evaluates the coefficients of the projection of a structure's
     fourier transform onto the three-dimensional spherical harmonic basis. Can
@@ -316,7 +316,7 @@ def sph_hrm_coefficients(trajectory, q_values, weights=None,
                     
                     # -----------
                     # option (2) : roll your own
-                    Ylm = sph_hrm(l, m, q_theta, q_phi)
+                    Ylm = sph_harm(l, m, q_theta, q_phi)
                     # -----------
                     
                     # NOTE: we're going to use the fact that negative array

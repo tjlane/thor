@@ -381,19 +381,24 @@ def assoc_legendre(l, m, x):
     
     if m == 0:
         t2 = np.ones_like(x)
+    elif m < 0:
+        t2 = 1.0 / (np.power((1.0+x) / (1.0-x), np.abs(m)/2.0) + 1e-16)
     else:
         t2 = np.power((1.0+x) / (1.0-x), m/2.0)
-        t2[ np.abs(t2) < (t2.max() * 1e-50) ] = 0.0 # avoid underflow
+    t2[ np.abs(t2) < (t2.max() * 1e-50) ] = 0.0 # avoid underflow
     
-    t3 = special.hyp2f1(-l, l+1.0, 1.0-m, (1.0-x)/2.0)    
+    t3 = special.hyp2f1(-l, l+1.0, 1.0-m, (1.0-x)/2.0)
     
     return prefix * t1 * t2 * t3
 
 
-def sph_hrm(l, m, theta, phi):
+def sph_harm(l, m, theta, phi):
     """
     Compute the spherical harmonic Y_lm(theta, phi).
     """
+    
+    theta = np.array(theta)
+    phi   = np.array(phi)
     
     if np.any( np.isnan(theta) + np.isinf(theta) ):
         raise ValueError('NaN or inf in theta -- must be floats in [0, pi]')
@@ -404,8 +409,11 @@ def sph_hrm(l, m, theta, phi):
     cos_theta = np.cos(theta)
     cos_theta[(cos_theta >= 1.0)] = 1.0 - 1e-8
     
-    N = np.sqrt( 2. * l * special.gamma(l-m+1) / \
-                ( 4. * np.pi * special.gamma(l+m+1) ) )
+    if l==0:
+        N = 1.0
+    else:
+        N = np.sqrt( 2. * l * special.gamma(l-m+1) / \
+                    ( 4. * np.pi * special.gamma(l+m+1) ) )
     
     Plm = assoc_legendre(l, m, cos_theta) 
     
