@@ -36,8 +36,8 @@ def test_sph_hrm():
             ref = special.sph_harm(m, l, phi, theta)
             Ylm = math2.sph_harm(l, m, theta, phi)
             
-            ref /= ref[0]
-            Ylm /= Ylm[0]
+            #ref /= ref[0]
+            #Ylm /= Ylm[0]
             
             # print l, m, (ref-Ylm) / ref
             
