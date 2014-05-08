@@ -409,11 +409,8 @@ def sph_harm(l, m, theta, phi):
     cos_theta = np.cos(theta)
     cos_theta[(cos_theta >= 1.0)] = 1.0 - 1e-8
     
-    if l==0:
-        N = 1.0
-    else:
-        N = np.sqrt( (2. * l + 1) * special.gamma(l-m+1) / \
-                    ( 4. * np.pi * special.gamma(l+m+1) ) )
+    N = np.sqrt( (2. * l + 1) * special.gamma(l-m+1) /
+                 ( 4. * np.pi * special.gamma(l+m+1) ) )
     
     Plm = assoc_legendre(l, m, cos_theta) 
     
