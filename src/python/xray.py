@@ -7,7 +7,7 @@ Classes, methods, functions for use with xray scattering experiments.
 import logging
 logging.basicConfig()
 logger = logging.getLogger(__name__)
-# logger.setLevel('DEBUG')
+#logger.setLevel('DEBUG')
 
 import os
 import abc
@@ -2889,13 +2889,15 @@ class Rings(object):
                 var1 += np.var( rings1[:trunc,mask1] )
                 var2 += np.var( rings2[:trunc,mask2] )
                 
-            if i >= num_shots - 1:
+            if stop_i > num_shots:
+                logger.debug('requested shots reached, breaking loop')
                 break
                 
         if mean_only:
             intra /= float(num_shots)
             
         if normed:
+            print var1, var2, float(num_shots)
             intra /= np.sqrt( var1 * var2 / np.square(float(num_shots)) )
             #assert intra.max() <=  1.1
             #assert intra.min() >= -1.1

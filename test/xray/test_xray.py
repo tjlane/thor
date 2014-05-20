@@ -782,8 +782,8 @@ class TestRings(object):
         assert not np.abs(intra_unnorm[0] - 1.0) < 1e-8 # x-corr normed when it shouldnt be
         
         # test the limit on 
-        intra = self.rings.correlate_intra(1.0, 1.0, num_shots=1)
-        assert intra.shape == (self.rings.num_phi,) # num_shots flag broken
+        intra = self.rings.correlate_intra(1.0, 1.0, num_shots=1, mean_only=False)
+        assert intra.shape == (1, self.rings.num_phi)
 
     def test_correlate_inter(self, rtol=1e-6, atol=0.0):
         
