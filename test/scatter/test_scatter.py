@@ -364,7 +364,7 @@ class TestFinitePhoton(object):
                            np.sqrt(detector.beam.photons_scattered_per_shot)*6.0
         
 
-def test_sph_hrm():
+def test_sph_harm():
     
     # -----------------------
     traj = Trajectory.load(ref_file('pentagon.pdb'))
@@ -382,8 +382,8 @@ def test_sph_hrm():
 
     # compute the Kam-theoretic values of the Legendre coefficients C_ell, which
     # we will call "coeffsh"
-    coeffsh_even = scatter.sph_hrm_coefficients(traj, q_magnitudes,
-                                                num_coefficients=num_coefficients/2)
+    coeffsh_even = scatter.sph_harm_coefficients(traj, q_magnitudes,
+                                                 num_coefficients=num_coefficients/2)
     coeffsh_even = np.nan_to_num(coeffsh_even)
     coeffsh_even /= coeffsh_even[1]
 
