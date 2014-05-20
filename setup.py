@@ -128,29 +128,49 @@ def locate_cuda():
     is based on finding 'nvcc' in the PATH.
     """
 
-    # first check if the CUDA_HOME env variable is in use
-    if 'CUDA_HOME' in os.environ:
-        home = os.environ['CUDA_HOME']
-        nvcc = pjoin(home, 'bin', 'nvcc')
-    else:
-        # otherwise, search the PATH for NVCC
-        nvcc = find_in_path('nvcc', os.environ['PATH'])
-        if nvcc is None:
-            print_warning('The nvcc binary could not be located in your $PATH. '
-                          'add it to your path, or set $CUDA_HOME.')
-            return False
-            
-        home = os.path.dirname(os.path.dirname(nvcc))
+    # first check if the CUDA_HOME or CUDA_ROOT env variable is in use
+    
+    CUDA_ENV_ = ['CUDA_HOME','CUDA_ROOT']
+    
+    found_config = False
+    for CUDA_ENV in CUDA_ENV_:
+        if CUDA_ENV in os.environ:
+            home = os.environ[CUDA_ENV].split(':')
+            nvcc = map( lambda x:pjoin(x, 'bin', 'nvcc'), home)
+        else:
+            # otherwise, search the PATH for NVCC
+            nvcc = find_in_path('nvcc', os.environ['PATH'])
+            if nvcc is None:
+                print_warning('The nvcc binary could not be located in your $PATH. '
+                              'add it to your path, or set $CUDA_HOME.')
+                return False
+                
+            home = os.path.dirname(os.path.dirname(nvcc))
 
-    cudaconfig = {'home':home, 'nvcc':nvcc,
-                  'include': pjoin(home, 'include'),
-                  'lib64': pjoin(home, 'lib64')}
-    print "CUDA config:", cudaconfig
-    for k, v in cudaconfig.iteritems():
-        if not os.path.exists(v):
-            print_warning('The CUDA %s path could not be located in %s' % (k, v))
-            return False
-    return cudaconfig
+
+        cudaconfig_list=[{'home'   : home[x], 
+                          'nvcc'   : nvcc[x],
+                          'include': pjoin(home[x], 'include'),
+                          'lib64'  : pjoin(home[x], 'lib64')} \
+                          for x in xrange(len(home)) ]
+        
+        for cudaconfig in cudaconfig_list:
+            found_items = 0
+            for k, v in cudaconfig.iteritems():
+                if not os.path.exists(v):
+                    print_warning('The CUDA %s path could not be located in %s' % (k, v))
+                elif os.path.exists(v):
+                    found_items += 1
+            if found_items == len(cudaconfig):
+                found_config = True
+                break
+        if found_config:
+            break
+    if not found_config:
+        return False
+    else:
+        print "Found CUDA config:", cudaconfig
+        return cudaconfig
     
 CUDA = locate_cuda()
 if CUDA == False:
