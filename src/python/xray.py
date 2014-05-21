@@ -3599,7 +3599,7 @@ class Rings(object):
         return rings
         
         
-    def append(self, other_rings):
+    def append(self, other_rings, allow_disk_modification=False):
         """
         Combine a two rings objects. We keep the mask from the current Rings.
         
@@ -3607,6 +3607,13 @@ class Rings(object):
         ----------
         other_rings : xray.Rings
             A different rings object, but with the same q_values, num_phi.
+            
+        allow_disk_modification : bool
+            A safety flag that protects datasets living on disk from
+            unintentional modification. If this instance of Rings is currently
+            on disk, the only way to append to it is for 
+            `allow_disk_modification` to be set to `True` -- in this case, the
+            data you append will be written to disk.
             
         Returns
         -------
@@ -3623,6 +3630,17 @@ class Rings(object):
             self._polar_intensities = combined_pi
             
         elif self._polar_intensities_type == 'tables':
+            
+            if not allow_disk_modification:
+                logger.warning('Attempting to modify Rings data on disk!'
+                               ' If you wish to append data to the Rings object '
+                               'on disk, then re-run the append method with '
+                               'allow_disk_modification=True. If you wish to '
+                               'load and modify the data in memory, re-load '
+                               'your Rings object with force_into_memory=True. '
+                               'NO ACTION WILL BE TAKEN AT THIS TIME (This '
+                               'instance of Rings is currenly unmodified).')
+                return
             
             if not type(self._polar_intensities) == tables.earray.EArray:
                 raise TypeError('Malformed Rings object : internal tables type'
