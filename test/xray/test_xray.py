@@ -913,7 +913,7 @@ class TestRings(object):
         self.rings.save('test.ring')
         r = xray.Rings.load('test.ring', force_into_memory=True)
 
-        self.rings.append(r)
+        self.rings.append(r, allow_disk_modification=True)
         assert self.rings.num_shots == 2 * self.num_shots
         
         if os.path.exists('test.ring'): os.remove('test.ring')
