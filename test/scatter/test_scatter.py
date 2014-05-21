@@ -30,6 +30,8 @@ from thor.structure import rand_rotate_molecule
 
 from mdtraj import Trajectory
 
+import matplotlib.pyplot as plt
+
 
 # ------------------------------------------------------------------------------
 #                        BEGIN REFERENCE IMPLEMENTATIONS
@@ -400,6 +402,14 @@ def test_sph_harm():
 
     # it seems best to compare the solutions in the expanded basis
     c_sh = np.polynomial.legendre.legval(rings.cospsi(q, q), coeffsh.flatten())
+    
+    c    = c - c.mean()
+    c_sh = c_sh - c_sh.mean()
+    
+    # plt.figure()
+    # plt.plot(c_sh / c_sh[0])
+    # plt.plot(c / c[0])
+    # plt.show()
     
     # if these are more than 10% different, fail the test
     error = (np.sum(np.abs( (c_sh / c_sh[0]) - (c / c[0]) )) / float(num_phi))
