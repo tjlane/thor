@@ -139,7 +139,7 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
             rxyz = traj.xyz[i,:,:] * 10.0 # convert nm -> ang.
 
             # choose the number of molecules & divide work between CPU & GPU
-            # GPU is fast but can only do multiples of 512 molecules - run
+            # GPU is fast but can only do multiples of 32 molecules - run
             # the remainder on the CPU
             if force_no_gpu or (not GPU):
                 num_cpu = num
@@ -147,7 +147,7 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
                 bpg = 0
                 logger.debug('Forced "no GPU": running CPU-only computation')
             else:
-                num_cpu = num % 512
+                num_cpu = num % 32
                 num_gpu = num - num_cpu
             
             logger.debug('Running %d molc, snapshot %d, dev %d: %d CPU / %d GPU.' % (num, i, device_id, num_cpu, num_gpu))  

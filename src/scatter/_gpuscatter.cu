@@ -272,7 +272,7 @@ GPUScatter::GPUScatter (int device_id_,
      */
 
 
-    assert( bpg_ * 512 == nRot_ );
+    assert( bpg_ * 32 == nRot_ );
     
     // unpack arguments
     device_id = device_id_;
@@ -315,7 +315,7 @@ GPUScatter::GPUScatter (int device_id_,
     }
     
     // set some size parameters
-    static const int tpb = 512;
+    static const int tpb = 32;
     unsigned int nRotations = tpb*bpg;
     
     // compute the memory necessary to hold input/output

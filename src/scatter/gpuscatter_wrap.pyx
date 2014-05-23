@@ -90,9 +90,9 @@ def simulate(n_molecules, qxyz, rxyz, atomic_numbers, device_id=0, rfloats=None)
     if not type(device_id) == int:
         raise TypeError('`device_id` must be type int')
         
-    if not n_molecules % 512 == 0:
-        raise ValueError('`n_rotations` must be a multiple of 512')
-    bpg = int(n_molecules) / 512 # blocks-per-grid
+    if not n_molecules % 32 == 0:
+        raise ValueError('`n_rotations` must be a multiple of 32')
+    bpg = int(n_molecules) / 32 # blocks-per-grid
 
     if bpg <= 0:
         print "Error, bpg = %d" % bpg 
