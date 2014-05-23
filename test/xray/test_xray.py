@@ -564,6 +564,17 @@ class TestShotset(object):
         # smoke test for now
         self.shot.save_as_cxi('testx.cxi')
         if os.path.exists('testx.cxi'): os.remove('testx.cxi')
+        
+    def test_append(self):
+        if os.path.exists('test.shot'): os.remove('test.shot')
+
+        self.shot.save('test.shot')
+        ss = xray.Shotset.load('test.shot', force_into_memory=True)
+
+        self.shot.append(ss, allow_disk_modification=True)
+        assert self.shot.num_shots == 2 * self.num_shots
+
+        if os.path.exists('test.shot'): os.remove('test.shot')
     
         
 class TestRings(object):

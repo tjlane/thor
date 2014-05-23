@@ -1161,21 +1161,7 @@ class Shotset(object):
 
     def __len__(self):
         return self.num_shots
-
-
-    def __add__(self, other):
-        
-        raise NotImplementedError('addition not implemented')
-        
-        if not isinstance(other, Shotset):
-            raise TypeError('Cannot add types: %s and Shotset' % type(other))
-        if not self.detector == other.detector:
-            raise RuntimeError('shotset objects must share the same detector to add')
-        if not np.all(self.mask == other.mask):
-            raise RuntimeError('shotset objects must share the same mask to add')
-        new_i = np.vstack(( self.intensities, other.intensities ))
-        return Shotset(new_i, self.detector, self.mask)
-
+    
 
     @property
     def average_intensity(self):
@@ -2313,6 +2299,70 @@ class Shotset(object):
                           ' read: %s' % (extension, str(understood_extensions)))
         
         return cls(fiter, detector, mask)
+    
+        
+    def append(self, other_shotset, allow_disk_modification=False):
+        """
+        Combine a two shotset objects. We keep the mask from the current shotset.
+        
+        Parameters
+        ----------
+        other_shotset : xray.Shotset
+            A different shotset object, but with the same q_values, num_phi.
+            
+        allow_disk_modification : bool
+            A safety flag that protects datasets living on disk from
+            unintentional modification. If this instance of shotset is currently
+            on disk, the only way to append to it is for 
+            `allow_disk_modification` to be set to `True` -- in this case, the
+            data you append will be written to disk.
+            
+        Returns
+        -------
+        None
+        """
+        
+        other = other_shotset # shorthand reference
+        
+        if not isinstance(other, Shotset):
+            raise TypeError('Cannot add types: %s and Shotset' % type(other))
+        if not self.detector.q_max == other.detector.q_max:
+            raise RuntimeError('shotset objects must share the same detector to add')
+        if not np.all(self.mask == other.mask):
+            raise RuntimeError('shotset objects must share the same mask to add')
+        new_i = np.vstack(( self.intensities, other.intensities ))
+            
+        if self._intensities_type == 'array':            
+            combined_itx = np.vstack( (self.intensities, other.intensities) )
+            self._intensities = combined_itx
+            
+        elif self._intensities_type == 'tables':
+            
+            if not allow_disk_modification:
+                logger.warning('Attempting to modify shotset data on disk!'
+                               ' If you wish to append data to the shotset object '
+                               'on disk, then re-run the append method with '
+                               'allow_disk_modification=True. If you wish to '
+                               'load and modify the data in memory, re-load '
+                               'your Rings object with force_into_memory=True. '
+                               'NO ACTION WILL BE TAKEN AT THIS TIME (This '
+                               'instance of shotset is currenly unmodified).')
+                return
+            
+            if not type(self._intensities) == tables.earray.EArray:
+                raise TypeError('Malformed shotset object : internal tables type'
+                                ' for `polar_intensities` is non-extensible '
+                                'CArray. EArrays are necessary to append data.'
+                                ' This may be solved by first saving the shotset'
+                                ' to disk, loading them back into memory with'
+                                ' `force_into_memory` set to true, and then '
+                                'saving/loading once more. The result *should*'
+                                ' be an EArray version of the shotset object.')
+            
+            for itx in other.intensities_iter:
+                self._intensities.append(itx[None,:,:])
+            
+        return
 
 
 class Rings(object):
