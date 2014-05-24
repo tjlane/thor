@@ -63,6 +63,14 @@ class TestShotsetFromDisk(test_xray.TestShotset):
         
         return
         
+    def test_append(self):
+        # we have to make the shotset use an EArray type instead of a CArray
+        if os.path.exists('tmp.shot'): os.remove('tmp.shot')
+        self.shot.save('tmp.shot')
+        self.shot = xray.Shotset.load('tmp.shot')
+        super(TestShotsetFromDisk, self).test_append()
+        if os.path.exists('tmp.shot'): os.remove('tmp.shot')
+        
     def test_average_intensity(self):
         assert_array_almost_equal(self.i.read().mean(0), self.shot.average_intensity)
         
