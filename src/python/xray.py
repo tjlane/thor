@@ -2360,7 +2360,7 @@ class Shotset(object):
                                 ' be an EArray version of the shotset object.')
             
             for itx in other.intensities_iter:
-                self._intensities.append(itx[None,:,:])
+                self._intensities.append(itx[None,:])
             
         return
 
