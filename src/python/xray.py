@@ -3230,8 +3230,9 @@ class Rings(object):
             N_delta = N_delta[None,:]
             
         # use these for mean subtracting, not normalizing
-        x_bar = x.mean(axis=1)[:,None]
-        y_bar = y.mean(axis=1)[:,None]
+        # compute the averages without the masked values
+        x_bar = np.average(x,weights=xm[0],axis=1)[:,None]
+        y_bar = np.average(y,weights=ym[0],axis=1)[:,None]
         
         if use_fft: # use d-FFT + convolution thm
             corr = self._fft_correlate((x - x_bar) * xm, (y - y_bar) * ym)
