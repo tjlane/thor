@@ -30,7 +30,7 @@ from thor import write
 from thor.corr import correlate as brute_correlate
 
 from mdtraj import io
-from mdtraj.utils.arrays import ensure_type
+from mdtraj.utils import ensure_type
 
 # ------------------------------------------------------------------------------
 # SPECIAL IMPORT FOR PYFFTW
