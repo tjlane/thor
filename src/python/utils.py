@@ -53,7 +53,42 @@ def unique_rows(a):
     """
     unique_a = np.unique(a.view([('', a.dtype)]*a.shape[1]))
     return unique_a.view(a.dtype).reshape((unique_a.shape[0], a.shape[1]))
+
+def make_square_detector(waveLength,detDist,pixSz,detX,detY,a,b):
+    """
+    Return the qvector object for a square detector perpendicular to the
+    forward beam. This object then be passed to e.g. scattering.simulate_shot
     
+    Parameters:
+    waveLength - float, wavelength of the x-ray beam (angstroms)
+    detDist    - float, shortest distance from detector to sample position (meters)
+    pixSz      - float, size of pixels, assumed here to be square (meters) 
+    detX,detY  - int  , number of pixels in the x,y directions (pixel units)
+    a,b        - float, position on detector where forward beam intersects (pixel units)
+
+    Returns:
+    qvec       - (N x 3) float array, qx,qy,qz for each pixel on the detector (inverse angstroms) 
+                         To assemble the image use
+                         >> shot = simulate_shot( traj, numMols, qvec  ). reshape ( (detX, detY ) ) 
+    """
+
+    X,Y = np.meshgrid ( np.arange( detX) , np.arange( detY) )
+    PR = np.sqrt ( (X-a)**2 + (Y-b)**2 )
+    PHI = np.arctan2( Y - b, X - a)
+    THETA = 0.5* np.arctan( PR * pixSz / detDist )
+
+    Q  = 4*np.pi*np.sin(THETA)/waveLength
+    qx = (Q*np.cos(THETA)*np.cos(PHI) ).flatten()
+    qy = (Q*np.cos(THETA)*np.sin(PHI) ).flatten()
+    qz = (Q*np.sin(THETA) ).flatten()
+
+    qvec = np.zeros ((qx.shape[0], 3 ) )
+    qvec[:,0] = qx
+    qvec[:,1] = qy
+    qvec[:,2] = qz
+
+    return qvec
+
 
 def random_pairs(total_elements, num_pairs): #, extra=10):
     """
