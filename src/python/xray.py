@@ -3178,7 +3178,7 @@ class Rings(object):
             the first dimension.
         """
         
-        # do a shitload of typechecking -.-
+        # --> do a shitload of typechecking -.-
         if len(x.shape) == 1:
             x = x[None,:]
             flatten = True
@@ -3206,10 +3206,10 @@ class Rings(object):
             assert len(y_mask) == n_col
             y_mask = y_mask.astype(np.bool)
             
-        # actually compute some correlators
+        # --> set up masking & normalization
         if ((x_mask == None) and (y_mask == None)):
-            xm = 1.0
-            ym = 1.0
+            xm = np.array([1.0])
+            ym = np.array([1.0])
             N_delta = float(n_col) # normalization factor
             
         else:
@@ -3228,12 +3228,11 @@ class Rings(object):
             for delta in range(n_col):
                 N_delta[delta] = np.sum( xm * np.roll(ym, delta) )
             N_delta = N_delta[None,:]
-            
-        # use these for mean subtracting, not normalizing
-        x_bar = np.average( x, weights=xm[0], axis=1)[:,None]
-        y_bar = np.average( y, weights=ym[0], axis=1)[:,None]
-        
+
+        # --> actually compute some correlators
         if use_fft: # use d-FFT + convolution thm
+            x_bar = np.average(x, weights=xm[0], axis=1)[:,None]
+            y_bar = np.average(y, weights=ym[0], axis=1)[:,None]
             corr = self._fft_correlate((x - x_bar) * xm, (y - y_bar) * ym)
             
         else:       # use C++ brute force implementation
@@ -3243,7 +3242,7 @@ class Rings(object):
             
         assert corr.shape == (n_row, n_col)
                     
-        # normalize by the number of pairs
+        # --> normalize by the number of pairs
         corr = np.select([corr != 0.0, corr == 0.0], [corr / N_delta, 0.0])
         
         if flatten:
