@@ -3208,8 +3208,8 @@ class Rings(object):
             
         # --> set up masking & normalization
         if ((x_mask == None) and (y_mask == None)):
-            xm = np.array([1.0])
-            ym = np.array([1.0])
+            xm = None
+            ym = None
             N_delta = float(n_col) # normalization factor
             
         else:
@@ -3231,9 +3231,14 @@ class Rings(object):
 
         # --> actually compute some correlators
         if use_fft: # use d-FFT + convolution thm
-            x_bar = np.average(x, weights=xm[0], axis=1)[:,None]
-            y_bar = np.average(y, weights=ym[0], axis=1)[:,None]
-            corr = self._fft_correlate((x - x_bar) * xm, (y - y_bar) * ym)
+            if (xm == None) and (ym == None): # no mask
+                x_bar = np.average(x, axis=1)[:,None]
+                y_bar = np.average(y, axis=1)[:,None]
+                corr = self._fft_correlate((x - x_bar), (y - y_bar))
+            else:                             # mask
+                x_bar = np.average(x, weights=xm[0], axis=1)[:,None]
+                y_bar = np.average(y, weights=ym[0], axis=1)[:,None]
+                corr = self._fft_correlate((x - x_bar) * xm, (y - y_bar) * ym)
             
         else:       # use C++ brute force implementation
             corr = np.zeros((n_row, n_col))
