@@ -218,11 +218,69 @@ def atomic_formfactor(atomic_Z, q_mag):
     qo = np.power( q_mag / (4. * np.pi), 2)
     cromermann = cromer_mann_params[(atomic_Z,0)]
         
-    fi = cromermann[8]
+    fi = np.ones_like(q_mag) * cromermann[8]
     for i in range(4):
         fi += cromermann[i] * np.exp( - cromermann[i+4] * qo)
         
     return fi
+    
+    
+def atomic_electrondens(atomic_Z, r_mag):
+    """
+    Evaluate the contribution of the electron density due to a particular atom
+    at distance `r_mag`. This function employs an isotropic sum-of-Gaussians
+    model, specifically the inverse Fourier transform of the Cromer-Mann
+    atomic form factors.
+    
+    Parameters
+    ----------
+    atomic_Z : int
+        The atomic number of the atom to compute the density for.
+    
+    r_mag : float
+        The distance from the atomic center to the point at which the
+        density is being evaluated
+
+    Returns
+    -------
+    fi : float
+        The real part of the atomic form factor.
+
+    See Also
+    --------
+    atomic_formfactor : function
+        A direct interface to the Cromer-Mann form factors
+
+    atomic_to_density : function
+        Employs this function to construct a model of the electron density on
+        a grid.
+
+    Notes
+    -----
+    The Cromer-Mann model for the atomic form factors reads
+
+         f0[k] = c + [SUM a_i*EXP(-b_i*(k^2)) ]
+                     i=1,4
+
+    This function employs the numerical inverse FT of a Gaussian to compute
+    the atomic contribution to the electron density. Let x = |r - r_0|,
+
+        phi[x] = [SUM 4*a_i*SQRT{pi^3/b_i} * EXP{-16/b_i * x^2}]
+                 i=1,4
+    """
+
+    xo = np.power(4.0 * r_mag, 2)
+    cromermann = cromer_mann_params[(atomic_Z,0)]
+
+    # retain constant term (?)
+    phi = cromermann[8] * np.ones_like(r_mag) # retain
+    #phi = np.zeros_like(r_mag)               # discard
+    
+    for i in range(4):
+        phi = 4.0 * cromermann[i] * np.sqrt(np.power(np.pi,3) / cromermann[i+4]) *\
+              np.exp( - xo / cromermann[i+4])
+
+    return phi
 
     
 def sph_harm_coefficients(trajectory, q_values, weights=None,

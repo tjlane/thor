@@ -12,6 +12,7 @@ from scipy.special import cbrt
 from mdtraj import Trajectory, Topology
 from mdtraj.core.element import Element
 
+from thor.scatter import atomic_electrondens
 from thor.math2 import rand_rot
 from thor.refdata import periodic_table
 
@@ -205,7 +206,7 @@ def rand_rotate_molecule(xyzlist, rfloat=None):
     rotated_xyzlist : ndarray, float, 3D
         A rotated version of the input `xyzlist`.
     """
-
+    
     # get a random quaternion vector
     q = quaternion.random(rfloat)
     
@@ -223,6 +224,7 @@ def rand_rotate_molecule(xyzlist, rfloat=None):
         rotated_xyzlist[i,:] = q_prime[1:].copy() # want the last 3 elements...
     
     return rotated_xyzlist
+
 
 def rand_rotate_molecule2(xyzlist, rfloat=None):
     """
@@ -424,6 +426,46 @@ def load_coor(filename):
     atomic_numbers = data[:,3]
     structure = _traj_from_xyza(xyz, atomic_numbers)
     return structure
+    
+    
+def atomic_to_density(traj, grid_dimensions, grid_spacing):
+    """
+    Evaluate the electron density on a rectangular grid given an atomic model.
+    
+    Parameters
+    ----------
+    traj : mdtraj.trajectory
+        An atomic structure.
+        
+    grid_dimensions : tuple
+        A 3-tuple indicating how many grid points to employ in each dimension 
+        (xyz).
+
+    grid_spacing : float
+        The distance between grid points, in Angstroms.
+
+    Returns
+    -------
+    grid : np.ndarray, float
+        A 3-dimensional array, representing the electron density (scalar field)
+        sampled at each point on the grid.
+    """
+    
+    traj = remove_COM(traj)
+
+    grid = np.zeros(grid_dimensions)
+    center = grid_spacing * np.array(grid_dimensions) / 2.0
+    nxyz = grid_spacing * np.mgrid[:grid_dimensions[0],:grid_dimensions[1],:grid_dimensions[2]]
+
+    atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
+
+    for i in range(traj.n_atoms):
+        r = traj.xyz[0,i,:] * 10.0 + center
+        r_mag = np.sqrt(np.sum( np.square(nxyz - r[:,None,None,None]), axis=0 ))
+        assert r_mag.shape == grid_dimensions
+        grid += atomic_electrondens(atomic_numbers[i], r_mag)
+
+    return grid
 
     
 def _traj_from_xyza(xyz, atomic_numbers, units='nm'):
