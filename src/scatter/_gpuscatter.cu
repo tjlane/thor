@@ -35,8 +35,27 @@ This class will get translated into python via a cython wrapper.
  ******************************************************************************/
 
 void __device__ generate_random_quaternion(float r1, float r2, float r3,
-                float &q1, float &q2, float &q3, float &q4) {
-    
+                                           float &q1, float &q2, float &q3, 
+                                           float &q4) {
+                    
+    /* Generate a quaterion randomly, drawn from a distribution such that
+     * quaternion multiplication by that quaternion represents a random rotation
+     * draw uniformly from SO(3).
+     *
+     * More simply, this function will give you a quaterion that represesnts a
+     * random rotation in 3D.
+     *
+     * Arguments:
+     * r1/r2/r3    : three random floats in the range [0,1)
+     * q1/q2/q3/q4 : four floats representing the xijk compontents of the 
+     *               quaternion (quaternions are "4D", just like complex numbers 
+     *               are "2D")
+     *
+     * Citations:
+     * http://en.wikipedia.org/wiki/Rotation_formalisms_in_three_dimensions#Quaternions
+     * http://www.cprogramming.com/tutorial/3d/quaternions.html
+     */
+     
     float s, sig1, sig2, theta1, theta2, w, x, y, z;
     
     s = r1;
