@@ -53,8 +53,6 @@ void __device__ generate_random_quaternion(float r1, float r2, float r3,
      *
      * Citations:
      * http://planning.cs.uiuc.edu/node198.html
-     * http://en.wikipedia.org/wiki/Rotation_formalisms_in_three_dimensions#Quaternions
-     * http://www.cprogramming.com/tutorial/3d/quaternions.html
      */
      
     float s, sig1, sig2, theta1, theta2, w, x, y, z;
