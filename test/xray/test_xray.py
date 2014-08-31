@@ -855,9 +855,7 @@ class TestRings(object):
         assert_allclose(d, ref, rtol=rtol, atol=atol, 
                         err_msg='normalized difference correlator doesnt match')
                         
-        
-                        
-                        
+        # todo : more tests
         
     @skip # skip until convention is set
     def test_convert_to_kam(self):
