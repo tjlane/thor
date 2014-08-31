@@ -3146,6 +3146,147 @@ class Rings(object):
 
         return inter
         
+    
+    def correlate_difference(self, q1, q2, num_previous=1, normed=False,
+                             intensity_normed=True, use_fft=True):
+        """
+        Compute the ``difference`` correlator for a series of shots. In thor,
+        this is defined as the inter-correlator between a current shot of
+        interest and `num_previous` previous shots.
+        
+        This method is useful when there is some slowly varying systematic
+        source of error in your experiment or sample.
+        
+        Mathematically, the difference correlator for shot "0" and 
+        `num_previous`=N is defined as 
+        
+                         N
+            D-k = 1/2N \sum dI_k(q_1) dI_{k+i}(q_2) + dI_k(q_2) dI_{k+i}(q_1)
+                        i=1
+        
+        where dI_k is the centered/normalized intensities for shot k.
+        
+        NOTE: to get the difference correlator "signal", you must compute
+        the intra correlator as well and subtract the value computed here! This
+        method just computes the *correction* to the raw correlation signal.
+
+        Parameters
+        ----------
+        q1 : float
+            The |q| value of the first ring
+        q2 : float
+            The |q| value of the second ring
+        
+        Optional Parameters
+        -------------------
+        num_previous : int
+            number of previous (consecutive) shots to include in the difference
+            correlator
+        normed : bool
+            return the (std-)normalized correlation or un-normalized correlation
+        use_fft : bool
+            Whether or not to use a dFFT + convolution theorem to compute the
+            correlator (order: N log N). If False, use a brute force
+            implemenation that is slower but more robust to noise.
+
+        Returns
+        -------
+        diff : ndarray, float
+            Either the average difference correlation, or every correlation as
+            a 2d array
+            
+        See Also
+        --------
+        correlate_inter : method
+            The difference correlator.
+        """
+
+        logger.info("Correlating rings at %f / %f" % (q1, q2))
+
+        q_ind1 = self.q_index(q1)
+        q_ind2 = self.q_index(q2)
+        
+        # allocate an output space
+        if mean_only:
+            diff = np.zeros(self.num_phi)
+        else:
+            diff = np.zeros((num_shots, self.num_phi))
+        
+        # Check if mask exists
+        if self.polar_mask != None:
+            mask1 = self.polar_mask[q_ind1,:]
+            mask2 = self.polar_mask[q_ind2,:]
+        else:
+            mask1 = None
+            mask2 = None     
+
+        # if we request normalization, avg variances along the way
+        if normed:
+            var1 = 0.0
+            var2 = 0.0
+            
+        # to compute difference correlations, we loop through all shots with
+        # a rolling buffer containing the last `num_previous` shots that we
+        # will correlate w/the current shot
+        
+        logger.info('Correlating difference...')
+        previous_shots_ring1 = np.zeros((num_previous, self.num_phi))
+        previous_shots_ring2 = np.zeros((num_previous, self.num_phi))        
+            
+        if normed:
+            ring1_var = np.zeros(self.num_shots)
+            ring2_var = np.zeros(self.num_shots)
+        
+        # first loop -- compute mean
+        for n,itx in enumerate(self.polar_intensities_iter):
+
+            # rip out the relevant rings
+            rings1 = itx[q_ind1,:]
+            rings2 = itx[q_ind2,:]
+            
+            if intensity_normed:
+                rings1 /= rings1.mean()
+                rings1 /= rings2.mean()
+            
+            # comp
+            x1 = rings1 - np.mean(previous_shots_ring1, axis=1)
+            x2 = rings2 - np.mean(previous_shots_ring2, axis=1)
+            
+            # actually do the correlations
+            if mean_only:
+                diff += self._correlate_rows(x1, x2, mask1, mask2,
+                                             use_fft=use_fft)
+            else:
+                diff[n,:] = self._correlate_rows(x1, x2, mask1, mask2,
+                                                 use_fft=use_fft)
+                                          
+            
+            # roll the `previous_shots` buffer over
+            previous_shots_ring1 = np.roll(previous_shots_ring1, 1, axis=0)
+            previous_shots_ring1[0,:] = rings1
+            
+            previous_shots_ring2 = np.roll(previous_shots_ring2, 1, axis=0)
+            previous_shots_ring2[0,:] = rings2
+            
+            if normed:
+                #var1 += np.sum( ring1_var[start_i+1:stop_i+1] )
+                var1 += np.var( rings1[:,mask1] )
+                var2 += np.var( rings2[:,mask2] )
+                
+        # normalize -- dont touch this! -- TJL -----------------------------
+        diff /= float(np.sum([(self.num_shots-k) for k in range(1,break_n+1)])) 
+        diff /= float(self.num_shots) / 4.0
+        
+        
+        if normed:
+            diff /= np.sqrt( var1 * var2 / np.square(float(num_pairs)) )
+            diff /= np.sqrt( (self.num_shots - 1.0) )
+        # ------------------------------------------------------------------
+        
+        logger.info('... complete')
+
+        return diff
+        
         
     def _correlate_rows(self, x, y, x_mask=None, y_mask=None, use_fft=True):
         """
