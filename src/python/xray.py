@@ -2947,7 +2947,6 @@ class Rings(object):
             intra /= float(num_shots)
             
         if normed:
-            print var1, var2, float(num_shots)
             intra /= np.sqrt( var1 * var2 / np.square(float(num_shots)) )
             #assert intra.max() <=  1.1
             #assert intra.min() >= -1.1
@@ -3147,8 +3146,9 @@ class Rings(object):
         return inter
         
     
-    def correlate_difference(self, q1, q2, num_previous=1, normed=False,
-                             intensity_normed=True, use_fft=True):
+    def correlate_difference(self, q1, q2, num_previous=1, normed=False, 
+                             intensity_normed=True, mean_only=True, 
+                             use_fft=True):
         """
         Compute the ``difference`` correlator for a series of shots. In thor,
         this is defined as the inter-correlator between a current shot of
@@ -3184,6 +3184,10 @@ class Rings(object):
             correlator
         normed : bool
             return the (std-)normalized correlation or un-normalized correlation
+        intensity_normed : bool
+            normalize the intensities before computing the difference correlator
+        mean_only : bool
+            whether or not to return every correlation, or the average
         use_fft : bool
             Whether or not to use a dFFT + convolution theorem to compute the
             correlator (order: N log N). If False, use a brute force
@@ -3210,7 +3214,7 @@ class Rings(object):
         if mean_only:
             diff = np.zeros(self.num_phi)
         else:
-            diff = np.zeros((num_shots, self.num_phi))
+            diff = np.zeros((self.num_shots, self.num_phi))
         
         # Check if mask exists
         if self.polar_mask != None:
@@ -3273,15 +3277,13 @@ class Rings(object):
                 var1 += np.var( rings1[:,mask1] )
                 var2 += np.var( rings2[:,mask2] )
                 
-        # normalize -- dont touch this! -- TJL -----------------------------
-        diff /= float(np.sum([(self.num_shots-k) for k in range(1,break_n+1)])) 
-        diff /= float(self.num_shots) / 4.0
-        
-        
+        if mean_only:
+            diff /= float(self.num_shots)
+
         if normed:
-            diff /= np.sqrt( var1 * var2 / np.square(float(num_pairs)) )
-            diff /= np.sqrt( (self.num_shots - 1.0) )
-        # ------------------------------------------------------------------
+            diff /= np.sqrt( var1 * var2 / np.square(float(self.num_shots)) )
+            #assert intra.max() <=  1.1
+            #assert intra.min() >= -1.1
         
         logger.info('... complete')
 

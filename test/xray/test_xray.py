@@ -839,6 +839,25 @@ class TestRings(object):
         inter2_mean = inter2.mean(axis=0)
         assert_allclose(inter1, inter2_mean, rtol=rtol, atol=atol, 
                         err_msg='mean_only and rand pairs std normalization doesnt match')
+                        
+    def test_correlate_difference(self, rtol=1e-4, atol=0.0):
+        # compute diff corr for 2 shots
+        q = 1.0
+        
+        r = xray.Rings.simulate(self.traj, 1, self.q_values, self.num_phi, 2)
+        assert r.num_shots == 2, 'this test will only work w/a 2 shot Rings'
+        d = r.correlate_difference(q, q, normed=True)
+        
+        iq = r.q_index(q)
+        minus = r.polar_intensities[0,iq,:] - self.rings.polar_intensities[1,iq,:]
+        ref = brute_force_masked_correlation(minus, np.ones(len(minus), dtype=np.bool), normed=True)
+        
+        assert_allclose(d, ref, rtol=rtol, atol=atol, 
+                        err_msg='normalized difference correlator doesnt match')
+                        
+        
+                        
+                        
         
     @skip # skip until convention is set
     def test_convert_to_kam(self):
