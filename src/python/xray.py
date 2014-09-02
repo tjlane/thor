@@ -3250,11 +3250,13 @@ class Rings(object):
             
             if intensity_normed:
                 rings1 /= rings1.mean()
-                rings1 /= rings2.mean()
+                rings2 /= rings2.mean()
             
             # comp
-            x1 = rings1 - np.mean(previous_shots_ring1, axis=1)
-            x2 = rings2 - np.mean(previous_shots_ring2, axis=1)
+            #denom = float(min(n+1, num_previous)) # for the first few shots
+            denom = float(num_previous)
+            x1 = rings1 - np.sum(previous_shots_ring1, axis=0) / denom
+            x2 = rings2 - np.sum(previous_shots_ring2, axis=0) / denom
             
             # actually do the correlations
             if mean_only:
@@ -3267,13 +3269,12 @@ class Rings(object):
             
             # roll the `previous_shots` buffer over
             previous_shots_ring1 = np.roll(previous_shots_ring1, 1, axis=0)
-            previous_shots_ring1[0,:] = rings1
+            previous_shots_ring1[0,:] = rings1[:]
             
             previous_shots_ring2 = np.roll(previous_shots_ring2, 1, axis=0)
-            previous_shots_ring2[0,:] = rings2
+            previous_shots_ring2[0,:] = rings2[:]
             
             if normed:
-                #var1 += np.sum( ring1_var[start_i+1:stop_i+1] )
                 var1 += np.var( rings1[:,mask1] )
                 var2 += np.var( rings2[:,mask2] )
                 
