@@ -3846,6 +3846,9 @@ def _q_grid_as_xyz(q_values, num_phi, k):
     num_phi : int
         The number of equally spaced points around the azimuth to
         interpolate onto (e.g. `num_phi`=360 means 1 deg spacing).
+        
+    k : float
+        The wavenumber of the indicent beam.
 
     Returns
     -------
