@@ -3252,11 +3252,10 @@ class Rings(object):
                 rings1 /= rings1.mean()
                 rings2 /= rings2.mean()
             
-            # comp
-            #denom = float(min(n+1, num_previous)) # for the first few shots
+            # compute difference "shots"
             denom = float(num_previous)
-            x1 = rings1 - np.sum(previous_shots_ring1, axis=0) / denom
-            x2 = rings2 - np.sum(previous_shots_ring2, axis=0) / denom
+            x1 = rings1 - np.sum(previous_shots_ring1, axis=1) / denom
+            x2 = rings2 - np.sum(previous_shots_ring2, axis=1) / denom
             
             # actually do the correlations
             if mean_only:
