@@ -13,13 +13,13 @@ before_install:
   - sudo apt-get install -qq python-matplotlib
   - sudo apt-get install -qq libhdf5-serial-dev
   - sudo apt-get install -qq libfftw3-dev libfftw3-doc 
-  - pip install --use-mirrors -qq nose
-  - pip install --use-mirrors -qq cython
-  - pip install --use-mirrors -qq tables
-  - pip install --use-mirrors -qq pyyaml
-  - pip install --use-mirrors -qq mdtraj
-  - pip install --use-mirrors -qq simtk.unit
-  - pip install --use-mirrors -qq fabio
+  - pip install nose
+  - pip install cython
+  - pip install tables
+  - pip install pyyaml
+  - pip install mdtraj
+  - pip install simtk.unit
+  - pip install fabio
   - git clone --depth 5 https://github.com/hgomersall/pyFFTW.git; cd pyFFTW; python setup.py build_ext --inplace ; sudo python setup.py install ; cd ..
 install:
   - python setup.py install
