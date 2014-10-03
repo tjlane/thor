@@ -3147,7 +3147,7 @@ class Rings(object):
         
     
     def correlate_difference(self, q1, q2, num_previous=1, normed=False, 
-                             intensity_normed=True, mean_only=True, 
+                             intensity_normed=False, mean_only=True, 
                              use_fft=True):
         """
         Compute the ``difference`` correlator for a series of shots. In thor,
@@ -3204,6 +3204,8 @@ class Rings(object):
         correlate_inter : method
             The difference correlator.
         """
+        
+        effective_num_shots = self.num_shots - num_previous
 
         logger.info("Correlating rings at %f / %f" % (q1, q2))
 
@@ -3214,7 +3216,7 @@ class Rings(object):
         if mean_only:
             diff = np.zeros(self.num_phi)
         else:
-            diff = np.zeros((self.num_shots, self.num_phi))
+            diff = np.zeros((effective_num_shots, self.num_phi))
         
         # Check if mask exists
         if self.polar_mask != None:
@@ -3245,25 +3247,32 @@ class Rings(object):
         for n,itx in enumerate(self.polar_intensities_iter):
 
             # rip out the relevant rings
-            rings1 = itx[q_ind1,:]
-            rings2 = itx[q_ind2,:]
+            rings1 = itx[q_ind1,:].copy()
+            rings2 = itx[q_ind2,:].copy()
             
             if intensity_normed:
                 rings1 /= rings1.mean()
                 rings2 /= rings2.mean()
             
-            # compute difference "shots"
-            denom = float(num_previous)
-            x1 = rings1 - np.sum(previous_shots_ring1, axis=1) / denom
-            x2 = rings2 - np.sum(previous_shots_ring2, axis=1) / denom
+            # if we have enough previous shots to subtract to compute a "diff"
+            if n >= num_previous:
             
-            # actually do the correlations
-            if mean_only:
-                diff += self._correlate_rows(x1, x2, mask1, mask2,
-                                             use_fft=use_fft)
-            else:
-                diff[n,:] = self._correlate_rows(x1, x2, mask1, mask2,
+                # compute difference "shots"
+                denom = float(num_previous)
+                x1 = rings1 - np.sum(previous_shots_ring1, axis=0) / denom
+                x2 = rings2 - np.sum(previous_shots_ring2, axis=0) / denom
+            
+                # actually do the correlations
+                if mean_only:
+                    diff += self._correlate_rows(x1, x2, mask1, mask2,
                                                  use_fft=use_fft)
+                else:
+                    diff[n,:] = self._correlate_rows(x1, x2, mask1, mask2,
+                                                     use_fft=use_fft)
+                                                     
+                if normed:
+                    var1 += np.var( x1[:,mask1] )
+                    var2 += np.var( x2[:,mask2] )
                                           
             
             # roll the `previous_shots` buffer over
@@ -3272,16 +3281,13 @@ class Rings(object):
             
             previous_shots_ring2 = np.roll(previous_shots_ring2, 1, axis=0)
             previous_shots_ring2[0,:] = rings2[:]
-            
-            if normed:
-                var1 += np.var( rings1[:,mask1] )
-                var2 += np.var( rings2[:,mask2] )
+
                 
         if mean_only:
-            diff /= float(self.num_shots)
+            diff /= float(effective_num_shots)
 
         if normed:
-            diff /= np.sqrt( var1 * var2 / np.square(float(self.num_shots)) )
+            diff /= np.sqrt( var1 * var2 / np.square(float(effective_num_shots)) )
             #assert intra.max() <=  1.1
             #assert intra.min() >= -1.1
         
