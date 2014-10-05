@@ -15,6 +15,7 @@ before_install:
   - sudo apt-get install -qq libfftw3-dev libfftw3-doc 
   - pip install nose
   - pip install cython
+  - pip install -U cython
   - pip install tables
   - pip install pyyaml
   - pip install mdtraj
