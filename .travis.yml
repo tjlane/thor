@@ -14,8 +14,8 @@ before_install:
   - sudo apt-get install -qq libhdf5-serial-dev
   - sudo apt-get install -qq libfftw3-dev libfftw3-doc 
   - pip install nose
-  - pip install cython
-  - pip install -U cython
+  #- pip install cython
+  - pip install --upgrade git+git://github.com/cython/cython@master
   - pip install tables
   - pip install pyyaml
   - pip install mdtraj
