@@ -21,6 +21,7 @@ from scipy import special
 from scipy.misc import factorial
 from scipy.ndimage import filters, interpolation
 from scipy.signal import fftconvolve
+from scipy.interpolate import interpn
  
 from matplotlib.path import Path
         
@@ -512,4 +513,73 @@ def LDA_direction(positives, negatives):
     
     return w
 
+
+def interp_grid_to_spherical(grid, radii, num_phi, num_theta, 
+                             grid_origin=(0,0,0), return_spherical_coords=False):
+    """
+    Compute interpolated values in 3D spherical coordinates from a 3D square 
+    grid. The interpolated values lie equally spaced along the azumithal and
+    polar directions for a series of concentric spheres.
+    
+    Interpolation used is linear.
+    
+    Parameters
+    ----------
+    grid : np.ndarray, float
+        The 3D square grid of values definiting a scalar field
+    radii : np.ndarray, float
+        The radial values of the interpolant grid
+    num_theta : int
+        The number of points along the polar angle to interpolate
+    num_phi : int
+        The number of points along the azmuthal angle to interpolate
+    grid_origin : 3-tuple, floats
+        The origin of the grid, which forms the center of the interpolant 
+        spheres
+        
+    Optional Parameters
+    -------------------
+    return_spherical_coords : bool
+        If true, the spherical coordiantes used are also returned as an N x 3
+        array.
+        
+    Returns
+    -------
+    interpolated : np.ndarray
+        A 3D array of the interpolated values. The dimensions are 
+        (radial, polar [theta], azmuthal [phi]).
+    """
+    
+    # find the cartesian x,y,z values for each interpolant
+    xi = np.zeros( (len(radii) * num_theta * num_phi, 3), dtype=grid.dtype )
+    
+    thetas = np.arange(0.0, 2.0*np.pi, 2.0*np.pi / num_theta)
+    phis = np.arange(0.0, np.pi, np.pi / num_phi)
+    assert len(thetas) == num_theta, 'thetas len mistmatch %d %d' % (len(thetas), num_theta)
+    assert len(phis) == num_phi, 'phi len mistmatch %d %d' % (len(phis), num_phi)
+    
+    # the repeat rate will be important for the reshape, below
+    r = np.repeat(radii, num_theta * num_phi)            # radius, slowest
+    t = np.repeat( np.tile(thetas, num_phi), len(radii)) # theta
+    p = np.tile(phis, len(radii) * num_theta)            # phi, fastest
+    
+    xi[:,0] = r * np.sin(t) * np.cos(p) # x
+    xi[:,1] = r * np.sin(t) * np.sin(p) # y
+    xi[:,2] = r * np.cos(t)             # z
+    
+    xi += np.array(grid_origin)[None,:]
+    
+    # compute an interpolator for the rectangular grid
+    gi = [ np.arange(l) for l in grid.shape ]
+    interpolated = interpn(gi, grid, xi, bounds_error=False)
+    
+    res = interpolated.reshape(len(radii), num_theta, num_phi)
+    
+    if return_spherical_coords:
+        rtp = np.array([r, t, p])
+        return res, rtp
+    else:
+        return res
+        
+        
 
