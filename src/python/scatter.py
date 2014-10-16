@@ -6,7 +6,7 @@ Library for performing simulations of x-ray scattering experiments.
 import logging
 logging.basicConfig()
 logger = logging.getLogger(__name__)
-#logger.setLevel('DEBUG')
+logger.setLevel('DEBUG')
 
 import numpy as np
 #np.seterr(all='raise')
@@ -28,7 +28,8 @@ except ImportError as e:
 
 
 def simulate_shot(traj, num_molecules, detector, traj_weights=None,
-                  finite_photon=False, force_no_gpu=False, device_id=0):
+                  finite_photon=False, ignore_hydrogens=False,
+                  force_no_gpu=False, device_id=0):
     """
     Simulate a scattering 'shot', i.e. one exposure of x-rays to a sample.
     
@@ -68,6 +69,10 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
         this is "False", run a continuous simulation (infinite photons). If
         "True", use the finite photon parameters from a xray.Detector object. If
         a float, then that float specifies the mean photons scattered per shot.
+        
+    ignore_hydrogens : bool
+        Ignore hydrogens in calculation. Hydrogens are often costly to compute
+        and don't change the scattering appreciably.
         
     force_no_gpu : bool
         Run the (slow) CPU version of this function.
@@ -129,6 +134,17 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
     atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
     
     
+    # if we're getting a speedup by ignoring hydrogens, find em and slice em
+    n_atoms = len(atomic_numbers)
+    if ignore_hydrogens == True:
+        atoms_to_keep = (atomic_numbers != 1)
+        atomic_numbers = atomic_numbers[atoms_to_keep]
+        n_H = n_atoms - np.sum(atoms_to_keep)
+        logger.debug('Ignoring %d hydrogens (of %d atoms)' % (n_H, n_atoms))
+    else:
+        atoms_to_keep = np.ones(n_atoms, dtype=np.bool)
+        
+    
     # iterate over snapshots in the trajectory
     intensities = np.zeros(num_q)
     for i,num in enumerate(num_per_shapshot):
@@ -136,7 +152,7 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
         if num > 0: # else, we can just skip...
         
             # pull xyz coords
-            rxyz = traj.xyz[i,:,:] * 10.0 # convert nm -> ang.
+            rxyz = traj.xyz[i,atoms_to_keep,:] * 10.0 # convert nm -> ang.
 
             # choose the number of molecules & divide work between CPU & GPU
             # GPU is fast but can only do multiples of 512 molecules - run
