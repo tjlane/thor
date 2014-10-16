@@ -364,6 +364,28 @@ class TestFinitePhoton(object):
         # simple statistical sanity check
         assert np.abs(I.sum() - detector.beam.photons_scattered_per_shot) < \
                            np.sqrt(detector.beam.photons_scattered_per_shot)*6.0
+                           
+def test_no_hydrogens():
+    
+    traj = Trajectory.load(ref_file('ala2.pdb'))
+    
+    num_molecules = 250
+    detector = xray.Detector.generic()
+    detector.beam.photons_scattered_per_shot = 1e3
+
+    I_noH = scatter.simulate_shot(traj, num_molecules, detector, 
+                                  ignore_hydrogens=True)
+    I_wH  = scatter.simulate_shot(traj, num_molecules, detector, 
+                                  ignore_hydrogens=False)
+                                  
+    assert not np.all(I_noH == I_wH)
+    
+    # compute the differece -- we're not setting random numbers here so just
+    # looking at radially averaged stuff...
+    diff = np.sum(np.abs(I_noH - I_wH) / I_wH) / float(len(I_wH))
+    print diff
+    assert diff < 1.0, 'ignoring hydrogens makes too big of a difference...'
+    
         
 
 def test_sph_harm():
