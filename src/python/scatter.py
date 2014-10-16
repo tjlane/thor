@@ -6,7 +6,7 @@ Library for performing simulations of x-ray scattering experiments.
 import logging
 logging.basicConfig()
 logger = logging.getLogger(__name__)
-logger.setLevel('DEBUG')
+#logger.setLevel('DEBUG')
 
 import numpy as np
 #np.seterr(all='raise')
