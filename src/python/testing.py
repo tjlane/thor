@@ -166,6 +166,9 @@ def brute_force_masked_correlation(x, mask, normed=True):
             ref_corr[delta] = 1e-300 # zero that can be divided
 
     if normed:
+        if ref_corr[0] == 0.0:
+            print 'ref_corr:', ref_corr
+            raise RuntimeError('zero in first element of reference correlator')
         ref_corr /= ref_corr[0]
             
     return ref_corr

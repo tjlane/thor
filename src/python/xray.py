@@ -2947,7 +2947,6 @@ class Rings(object):
             intra /= float(num_shots)
             
         if normed:
-            print var1, var2, float(num_shots)
             intra /= np.sqrt( var1 * var2 / np.square(float(num_shots)) )
             #assert intra.max() <=  1.1
             #assert intra.min() >= -1.1
@@ -3145,6 +3144,156 @@ class Rings(object):
         #assert inter.min() >= -1.0
 
         return inter
+        
+    
+    def correlate_difference(self, q1, q2, num_previous=1, normed=False, 
+                             intensity_normed=False, mean_only=True, 
+                             use_fft=True):
+        """
+        Compute the ``difference`` correlator for a series of shots. In thor,
+        this is defined as the inter-correlator between a current shot of
+        interest and `num_previous` previous shots.
+        
+        This method is useful when there is some slowly varying systematic
+        source of error in your experiment or sample.
+        
+        Mathematically, the difference correlator for shot "0" and 
+        `num_previous`=N is defined as 
+        
+                         N
+            D-k = 1/2N \sum dI_k(q_1) dI_{k+i}(q_2) + dI_k(q_2) dI_{k+i}(q_1)
+                        i=1
+        
+        where dI_k is the centered/normalized intensities for shot k.
+        
+        NOTE: to get the difference correlator "signal", you must compute
+        the intra correlator as well and subtract the value computed here! This
+        method just computes the *correction* to the raw correlation signal.
+
+        Parameters
+        ----------
+        q1 : float
+            The |q| value of the first ring
+        q2 : float
+            The |q| value of the second ring
+        
+        Optional Parameters
+        -------------------
+        num_previous : int
+            number of previous (consecutive) shots to include in the difference
+            correlator
+        normed : bool
+            return the (std-)normalized correlation or un-normalized correlation
+        intensity_normed : bool
+            normalize the intensities before computing the difference correlator
+        mean_only : bool
+            whether or not to return every correlation, or the average
+        use_fft : bool
+            Whether or not to use a dFFT + convolution theorem to compute the
+            correlator (order: N log N). If False, use a brute force
+            implemenation that is slower but more robust to noise.
+
+        Returns
+        -------
+        diff : ndarray, float
+            Either the average difference correlation, or every correlation as
+            a 2d array
+            
+        See Also
+        --------
+        correlate_inter : method
+            The difference correlator.
+        """
+        
+        effective_num_shots = self.num_shots - num_previous
+
+        logger.info("Correlating rings at %f / %f" % (q1, q2))
+
+        q_ind1 = self.q_index(q1)
+        q_ind2 = self.q_index(q2)
+        
+        # allocate an output space
+        if mean_only:
+            diff = np.zeros(self.num_phi)
+        else:
+            diff = np.zeros((effective_num_shots, self.num_phi))
+        
+        # Check if mask exists
+        if self.polar_mask != None:
+            mask1 = self.polar_mask[q_ind1,:]
+            mask2 = self.polar_mask[q_ind2,:]
+        else:
+            mask1 = None
+            mask2 = None     
+
+        # if we request normalization, avg variances along the way
+        if normed:
+            var1 = 0.0
+            var2 = 0.0
+            
+        # to compute difference correlations, we loop through all shots with
+        # a rolling buffer containing the last `num_previous` shots that we
+        # will correlate w/the current shot
+        
+        logger.info('Correlating difference...')
+        previous_shots_ring1 = np.zeros((num_previous, self.num_phi))
+        previous_shots_ring2 = np.zeros((num_previous, self.num_phi))        
+            
+        if normed:
+            ring1_var = np.zeros(self.num_shots)
+            ring2_var = np.zeros(self.num_shots)
+        
+        # first loop -- compute mean
+        for n,itx in enumerate(self.polar_intensities_iter):
+
+            # rip out the relevant rings
+            rings1 = itx[q_ind1,:].copy()
+            rings2 = itx[q_ind2,:].copy()
+            
+            if intensity_normed:
+                rings1 /= rings1.mean()
+                rings2 /= rings2.mean()
+            
+            # if we have enough previous shots to subtract to compute a "diff"
+            if n >= num_previous:
+            
+                # compute difference "shots"
+                denom = float(num_previous)
+                x1 = rings1 - np.sum(previous_shots_ring1, axis=0) / denom
+                x2 = rings2 - np.sum(previous_shots_ring2, axis=0) / denom
+            
+                # actually do the correlations
+                if mean_only:
+                    diff += self._correlate_rows(x1, x2, mask1, mask2,
+                                                 use_fft=use_fft)
+                else:
+                    diff[n,:] = self._correlate_rows(x1, x2, mask1, mask2,
+                                                     use_fft=use_fft)
+                                                     
+                if normed:
+                    var1 += np.var( x1[:,mask1] )
+                    var2 += np.var( x2[:,mask2] )
+                                          
+            
+            # roll the `previous_shots` buffer over
+            previous_shots_ring1 = np.roll(previous_shots_ring1, 1, axis=0)
+            previous_shots_ring1[0,:] = rings1[:]
+            
+            previous_shots_ring2 = np.roll(previous_shots_ring2, 1, axis=0)
+            previous_shots_ring2[0,:] = rings2[:]
+
+                
+        if mean_only:
+            diff /= float(effective_num_shots)
+
+        if normed:
+            diff /= np.sqrt( var1 * var2 / np.square(float(effective_num_shots)) )
+            #assert intra.max() <=  1.1
+            #assert intra.min() >= -1.1
+        
+        logger.info('... complete')
+
+        return diff
         
         
     def _correlate_rows(self, x, y, x_mask=None, y_mask=None, use_fft=True):

@@ -605,6 +605,13 @@ class TestRings(object):
         print "n / num_shots", n, self.num_shots
         assert n == self.num_shots
         
+    def test_polar_intensities_consistency(self):
+        pi = self.rings.polar_intensities.copy()
+        n = 0
+        for x in self.rings.polar_intensities_iter:
+            assert np.all(pi[n,:,:] == x[:,:])
+            n += 1
+        
     def test_filters(self):
         # to do : work out a better test
         
@@ -839,6 +846,41 @@ class TestRings(object):
         inter2_mean = inter2.mean(axis=0)
         assert_allclose(inter1, inter2_mean, rtol=rtol, atol=atol, 
                         err_msg='mean_only and rand pairs std normalization doesnt match')
+                        
+    def test_correlate_difference(self, rtol=1e-4, atol=0.0):
+        # compute diff corr for 2 shots
+        q = 1.0
+        
+        r = xray.Rings.simulate(self.traj, 1, self.q_values, self.num_phi, 2)
+        assert r.num_shots == 2, 'this test will only work w/a 2 shot Rings'
+        
+        iq = r.q_index(q)
+        pi = r.polar_intensities.copy()
+        d = r.correlate_difference(q, q, normed=True)
+        nd = d / d[0]
+        d2 = r.correlate_difference(q, q, normed=False)
+        
+        # regression test for in-place modification
+        pi2 = r.polar_intensities.copy()
+        assert np.all(pi == pi2), 'inappropriate in-place modification of intensities'
+        
+        # compute the reference
+        minus = pi[0,iq,:] - pi[1,iq,:]
+        normed_ref = brute_force_masked_correlation(minus, np.ones(len(minus), dtype=np.bool), normed=True)
+        ref = brute_force_masked_correlation(minus, np.ones(len(minus), dtype=np.bool), normed=False)
+        
+        
+        # make sure the results are close
+        assert_allclose(nd, normed_ref, rtol=rtol, atol=atol, 
+                        err_msg='shapes of norm difference correlator dont match')
+        assert_allclose(d, normed_ref, rtol=rtol, atol=atol, 
+                        err_msg='normalization constant doesnt match')
+        assert_allclose(d2, ref, rtol=rtol, atol=atol, 
+                        err_msg='non-normalized results mismatch')
+                        
+        # regression test for nans when intensity_normed=True
+        d2 = r.correlate_difference(q, q, normed=True, intensity_normed=True)
+        assert not np.any( np.isnan(d2) ), 'nans found when intensity_normed=True'
         
     @skip # skip until convention is set
     def test_convert_to_kam(self):
