@@ -369,14 +369,16 @@ def test_no_hydrogens():
     
     traj = Trajectory.load(ref_file('ala2.pdb'))
     
-    num_molecules = 250
+    num_molecules = 1
     detector = xray.Detector.generic()
     detector.beam.photons_scattered_per_shot = 1e3
 
     I_noH = scatter.simulate_shot(traj, num_molecules, detector, 
-                                  ignore_hydrogens=True)
+                                  ignore_hydrogens=True,
+                                  dont_rotate=True)
     I_wH  = scatter.simulate_shot(traj, num_molecules, detector, 
-                                  ignore_hydrogens=False)
+                                  ignore_hydrogens=False,
+                                  dont_rotate=True)
                                   
     assert not np.all(I_noH == I_wH)
     

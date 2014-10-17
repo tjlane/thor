@@ -29,7 +29,7 @@ except ImportError as e:
 
 def simulate_shot(traj, num_molecules, detector, traj_weights=None,
                   finite_photon=False, ignore_hydrogens=False,
-                  force_no_gpu=False, device_id=0):
+                  dont_rotate=False, force_no_gpu=False, device_id=0):
     """
     Simulate a scattering 'shot', i.e. one exposure of x-rays to a sample.
     
@@ -73,6 +73,10 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
     ignore_hydrogens : bool
         Ignore hydrogens in calculation. Hydrogens are often costly to compute
         and don't change the scattering appreciably.
+        
+    dont_rotate : bool
+        Don't apply a random rotation to the molecule before computing the
+        scattering. Good for debugging and the like.
         
     force_no_gpu : bool
         Run the (slow) CPU version of this function.
@@ -144,6 +148,12 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
     else:
         atoms_to_keep = np.ones(n_atoms, dtype=np.bool)
         
+        
+    # if we dont want to randomly rotate, pass an array of floats full of zeros
+    if dont_rotate:
+        rands = np.zeros((num_per_shapshot, 3))
+    else:
+        rands = None # says make randoms to downstream code
     
     # iterate over snapshots in the trajectory
     intensities = np.zeros(num_q)
@@ -186,14 +196,14 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
             # run dat shit
             if num_cpu > 0:
                 logger.debug('Running CPU scattering code (%d/%d)...' % (num_cpu, num))
-                cpu_args = (num_cpu, qxyz, rxyz, atomic_numbers, None)
+                cpu_args = (num_cpu, qxyz, rxyz, atomic_numbers, rands)
                 t_cpu = Thread(target=multi_helper, args=('cpu', cpu_args))
                 t_cpu.start()
                 threads.append(t_cpu)                
 
             if num_gpu > 0:
                 logger.debug('Sending calc to GPU dev: %d' % device_id)
-                gpu_args = (num_gpu, qxyz, rxyz, atomic_numbers, device_id, None)
+                gpu_args = (num_gpu, qxyz, rxyz, atomic_numbers, device_id, rands)
                 t_gpu = Thread(target=multi_helper, args=('gpu', gpu_args))
                 t_gpu.start()
                 threads.append(t_gpu)
