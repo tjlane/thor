@@ -147,18 +147,20 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
         logger.debug('Ignoring %d hydrogens (of %d atoms)' % (n_H, n_atoms))
     else:
         atoms_to_keep = np.ones(n_atoms, dtype=np.bool)
-        
-        
-    # if we dont want to randomly rotate, pass an array of floats full of zeros
-    if dont_rotate:
-        rands = np.zeros((num_per_shapshot, 3))
-    else:
-        rands = None # says make randoms to downstream code
+
     
     # iterate over snapshots in the trajectory
     intensities = np.zeros(num_q)
     for i,num in enumerate(num_per_shapshot):
+        
         num = int(num)
+        
+        # if we dont want to randomly rotate, pass an array of floats full of zeros
+        if dont_rotate:
+            rands = np.zeros((num, 3))
+        else:
+            rands = None # says make randoms to downstream code
+        
         if num > 0: # else, we can just skip...
         
             # pull xyz coords
