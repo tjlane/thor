@@ -1,32 +1,42 @@
+# instructions for the Travis CI build system
+# this file modified from https://gist.github.com/dan-blanchard/7045057
+
 language: python
 python:
   - 2.7
-virtualenv:
-  system_site_packages: true
+  - 3.3
+notifications:
+  email: true
+
+# Setup anaconda
 before_install:
-  - sudo apt-get install -qq libatlas3gf-base libatlas-dev
-  - pip install --use-mirrors -qq numexpr
-  - pip install --use-mirrors -qq pyparsing
-  - sudo apt-get update
-  - sudo apt-get install -qq python-numpy
-  - sudo apt-get install -qq python-scipy
-  - sudo apt-get install -qq python-matplotlib
-  - sudo apt-get install -qq libhdf5-serial-dev
-  - sudo apt-get install -qq libfftw3-dev libfftw3-doc 
-  - pip install nose
-  #- pip install cython
-  - pip install --upgrade git+git://github.com/cython/cython@master
-  - pip install --upgrade git+git://github.com/scipy/scipy@master
-  - pip install tables
-  - pip install pyyaml
-  - pip install mdtraj
+  - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
+  - chmod +x miniconda.sh
+  - ./miniconda.sh -b
+  - export PATH=/home/travis/miniconda/bin:$PATH
+  - conda update --yes conda
+  # The next couple lines fix a crash with multiprocessing 
+  # on Travis and are not specific to using Miniconda
+  - sudo rm -rf /dev/shm
+  - sudo ln -s /run/shm /dev/shm
+  # install python dependencies
+  - conda install --yes python=$TRAVIS_PYTHON_VERSION atlas numexpr numpy scipy matplotlib nose tables pyyaml mdtraj
   - pip install simtk.unit
   - pip install fabio
-  - git clone --depth 5 https://github.com/hgomersall/pyFFTW.git; cd pyFFTW; python setup.py build_ext --inplace ; sudo python setup.py install ; cd ..
+
 install:
   - python setup.py install
+
 env:
   - TESTFOLDER=test/scatter
   - TESTFOLDER=test/xray/test_xray.py
   - TESTFOLDER=test/xray/test_xray2.py
-script: nosetests -v "$TESTFOLDER"
+
+# Run tests
+script:
+  - nosetests -v "$TESTFOLDER"
+# --with-cov --cov YOUR_PACKAGE_NAME_HERE --cov-config .coveragerc --logging-level=INFO
+
+# Calculate coverage
+#after_success:
+#  - coveralls --config_file .coveragerc
