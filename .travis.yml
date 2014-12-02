@@ -4,9 +4,7 @@
 language: python
 python:
   - 2.7
-  - 3.3
-notifications:
-  email: true
+  #- 3.3
 
 # Setup anaconda
 before_install:
@@ -20,7 +18,7 @@ before_install:
   - sudo rm -rf /dev/shm
   - sudo ln -s /run/shm /dev/shm
   # install python dependencies
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION atlas numexpr numpy scipy matplotlib nose tables pyyaml mdtraj
+  - conda install --yes python=$TRAVIS_PYTHON_VERSION atlas numexpr numpy scipy matplotlib nose pytables pyyaml mdtraj
   - pip install simtk.unit
   - pip install fabio
 
