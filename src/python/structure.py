@@ -186,8 +186,8 @@ def remove_COM(traj):
         traj.xyz[i,:,:] -= np.average(traj.xyz[i,:,:], axis=0, weights=masses)
         
     return traj
-    
 
+    
 def rand_rotate_molecule(xyzlist, rfloat=None):
     """
     Randomly rotate the molecule defined by xyzlist.
@@ -207,46 +207,7 @@ def rand_rotate_molecule(xyzlist, rfloat=None):
         A rotated version of the input `xyzlist`.
     """
     
-    # get a random quaternion vector
-    q = quaternion.random(rfloat)
-    
-    # take the quaternion conjugate
-    qconj = quaternion.conjugate(q)
-    
-    # prepare data structures
-    rotated_xyzlist = np.zeros(xyzlist.shape)
-    qv = np.zeros(4)
-    
-    # put each atom through the same rotation
-    for i in range(xyzlist.shape[0]):
-        qv[1:] = xyzlist[i,:].copy()
-        q_prime = quaternion.prod( quaternion.prod(q, qv), qconj )
-        rotated_xyzlist[i,:] = q_prime[1:].copy() # want the last 3 elements...
-    
-    return rotated_xyzlist
-
-
-def rand_rotate_molecule2(xyzlist, rfloat=None):
-    """
-    Randomly rotate the molecule defined by xyzlist.
-    
-    Parameters
-    ----------
-    xyzlist : ndarray, float, 3D
-        An n x 3 array representing the x,y,z positions of n atoms.
-        
-    rfloat : ndarray, float, len 3
-        A 3-vector of random numbers in [0,1) that acts as a random seed. If
-        not passed, generates new random numbers.
-        
-    Returns
-    -------
-    rotated_xyzlist : ndarray, float, 3D
-        A rotated version of the input `xyzlist`.
-    """
-    
     rotated_xyzlist = rand_rot(rfloat) * xyzlist.T
-    
     rotated_xyzlist = np.array( rotated_xyzlist.T )
     
     return rotated_xyzlist
