@@ -18,7 +18,8 @@ before_install:
   - sudo rm -rf /dev/shm
   - sudo ln -s /run/shm /dev/shm
   # install python dependencies
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION atlas numexpr numpy scipy matplotlib nose pytables pyyaml mdtraj
+  - conda install --yes python=$TRAVIS_PYTHON_VERSION atlas numexpr numpy scipy matplotlib nose pytables pyyaml
+  - pip install mdtraj
   - pip install simtk.unit
   - pip install fabio
 
