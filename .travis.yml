@@ -16,6 +16,7 @@ before_install:
   - pip install nose
   #- pip install cython
   - pip install --upgrade git+git://github.com/cython/cython@master
+  - pip install --upgrade git+git://github.com/scipy/scipy@master
   - pip install tables
   - pip install pyyaml
   - pip install mdtraj
