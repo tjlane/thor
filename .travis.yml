@@ -18,10 +18,9 @@ before_install:
   - sudo rm -rf /dev/shm
   - sudo ln -s /run/shm /dev/shm
   # install python dependencies
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION atlas numexpr numpy scipy matplotlib nose pytables pyyaml
-  - pip install mdtraj
-  - pip install simtk.unit
-  - pip install fabio
+  - conda install --yes python=$TRAVIS_PYTHON_VERSION binstar atlas numexpr numpy scipy matplotlib nose pytables pyyaml
+  - conda install --channel https://conda.binstar.org/omnia mdtraj --yes
+  - conda install --channel https://conda.binstar.org/praxes fabio --yes
 
 install:
   - python setup.py install
