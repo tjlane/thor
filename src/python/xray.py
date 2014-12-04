@@ -1788,10 +1788,10 @@ class Shotset(object):
             
             # we want `polar_intensities` to be an EArray so we can add to it
             a = tables.Atom.from_dtype(np.dtype(np.float64))
-            pi_node = h5_handle.createEArray(where='/', name='polar_intensities',
-                                             shape=(0, len(q_values), num_phi), 
-                                             atom=a, filters=io.COMPRESSION,
-                                             expectedrows=self.num_shots)
+            pi_node = h5_handle.create_earray(where='/', name='polar_intensities',
+                                              shape=(0, len(q_values), num_phi), 
+                                              atom=a, filters=io.COMPRESSION,
+                                              expectedrows=self.num_shots)
                                             
             # populate the array on disk with the interpolated values
             pi, pm = self.interpolate_to_polar(q_values, num_phi, 
@@ -1858,10 +1858,10 @@ class Shotset(object):
                           
         # add the intensity data bit by bit so we dont bloat memory
         a = tables.Atom.from_dtype(np.dtype(np.float64))
-        pi_node = hdf.createEArray(where='/', name='intensities',
-                                   shape=(0, self.num_pixels), 
-                                   atom=a, filters=io.COMPRESSION,
-                                   expectedrows=self.num_shots)
+        pi_node = hdf.create_earray(where='/', name='intensities',
+                                    shape=(0, self.num_pixels), 
+                                    atom=a, filters=io.COMPRESSION,
+                                    expectedrows=self.num_shots)
                                         
         for intx in self.intensities_iter:
             pi_node.append(intx[None,:])
@@ -3740,9 +3740,9 @@ class Rings(object):
                   
         # but we want `polar_intensities` to be an EArray
         a = tables.Atom.from_dtype(np.dtype(np.float64))
-        pi_node = hdf.createEArray(where='/', name='polar_intensities',
-                                   shape=(0, self.num_q, self.num_phi), 
-                                   atom=a, filters=io.COMPRESSION)
+        pi_node = hdf.create_earray(where='/', name='polar_intensities',
+                                    shape=(0, self.num_q, self.num_phi), 
+                                    atom=a, filters=io.COMPRESSION)
                                         
         for intx in self.polar_intensities_iter:
             pi_node.append(intx[None,:,:])

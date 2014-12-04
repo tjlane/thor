@@ -113,7 +113,8 @@ def simulate(n_molecules, qxyz, rxyz, atomic_numbers, device_id=0, rfloats=None)
     # generate random numbers
     cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_rfloats
     if rfloats == None:
-        np.random.seed( int(time() * 100000.0 + os.getpid()) )
+        s = int(time() * 100000.0 + os.getpid())
+        np.random.seed( s % (2**32-1) )
         c_rfloats = np.ascontiguousarray( np.random.rand(3, n_molecules), dtype=np.float32)
     else:
         c_rfloats = np.ascontiguousarray(rfloats.T, dtype=np.float32)

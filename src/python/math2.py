@@ -582,4 +582,44 @@ def interp_grid_to_spherical(grid, radii, num_phi, num_theta,
         return res
         
         
+class IncrementalVariance(object):
+    """
+    http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
+    """
+    
+    def __init__(self, size=1):
+        self._n = 0
+        self._mean = np.zeros(size)
+        self._M2 = np.zeros(size)
 
+    def add(self, x):
+        self._n = self._n + 1
+        delta = x - self._mean
+        self._mean = self._mean + delta/self._n
+        self._M2 = self._M2 + delta*(x - self._mean)
+        return
+
+    def remove(self, x):
+        self._n = self._n - 1
+        delta = x - self._mean
+        self._mean = self._mean - delta/self._n
+        self._M2 = self._M2 - delta*(x - self._mean)
+        return
+
+    @property
+    def mean(self):
+        return self._mean
+
+    @property
+    def variance(self):
+        return self._M2/float(self._n - 1)
+        
+    @property
+    def std(self):
+        return np.sqrt(self.variance)
+        
+    @property
+    def num_samples(self):
+        return self._n
+        
+            
