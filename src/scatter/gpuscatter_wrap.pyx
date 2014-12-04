@@ -117,7 +117,7 @@ def simulate(n_molecules, qxyz, rxyz, atomic_numbers, device_id=0, rfloats=None)
         c_rfloats = np.ascontiguousarray( np.random.rand(3, n_molecules), dtype=np.float32)
     else:
         c_rfloats = np.ascontiguousarray(rfloats.T, dtype=np.float32)
-        print "WARNING: employing fed random numbers -- this should be a test"
+        #print "WARNING: employing fed random numbers -- this should be a test"
     
 
     # get the Cromer-Mann parameters
