@@ -10,6 +10,7 @@ import tables
 from nose import SkipTest
 
 import numpy as np
+
 from scipy import stats
 
 from thor import utils
@@ -770,7 +771,7 @@ class TestRings(object):
         assert_allclose(corr_mask, corr_mask2)
         assert_allclose(corr_mask, corr_nomask)
         
-    def test_correlate_intra(self, rtol=1e-4, atol=0.0):
+    def test_correlate_intra(self, rtol=0.01, atol=0.01):
 
         # test autocorrelator
         intra = self.rings.correlate_intra(1.0, 1.0, normed=True)
@@ -814,8 +815,9 @@ class TestRings(object):
         ref = np.zeros(self.rings.num_phi)
         n = 0.0
         for i,j in utils.all_pairs(self.rings.num_shots):
-            x = self.rings.polar_intensities[0,q_ind,:].flatten()
-            y = self.rings.polar_intensities[1,q_ind,:].flatten()
+            print 'pair:', i,j
+            x = self.rings.polar_intensities[i,q_ind,:].flatten()
+            y = self.rings.polar_intensities[j,q_ind,:].flatten()
             ref += self.rings._correlate_rows(x, y)
             n += 1.0
         ref /= float(n)

@@ -2907,13 +2907,15 @@ class Rings(object):
             
             # compute which shots we're processing
             start_i = i * self._batch_size
-            stop_i  = (i+1) * self._batch_size
+            stop_i  = (i+1) * self._batch_size - 1
             
+            #print('Batch start/stop: %d/%d\n' % (start_i, stop_i))
             logger.debug('Batch start/stop: %d/%d\n' % (start_i, stop_i))
             
             # stop if we have a batch > num_shots (also avoid including zero pads)
             if stop_i > num_shots:
-                trunc = num_shots - start_i
+                trunc = num_shots - start_i # trunc will be a slice below ([:trunc])
+                #print('Truncating batch to %d rows\n' % (trunc,))
                 logger.debug('Truncating batch to %d rows\n' % trunc)
                 assert trunc > 0
             else:
@@ -2940,6 +2942,7 @@ class Rings(object):
                 var2 += np.var( rings2[:trunc,mask2] )
                 
             if stop_i > num_shots:
+                #print('requested shots reached, breaking loop')
                 logger.debug('requested shots reached, breaking loop')
                 break
                 
