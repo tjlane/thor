@@ -60,7 +60,7 @@ def write_cxidb(filename, shotset, sample_name='thorshotset'):
     f.create_carray('/entry_1/sample_1', 'name', obj=[sample_name])
     
     # save data
-    pi_node = f.createEArray(where='/entry_1/image_1', name='intensities',
+    pi_node = f.create_earray(where='/entry_1/image_1', name='intensities',
                              shape=(0, shotset.num_pixels), 
                              atom=fa, filters=io.COMPRESSION,
                              expectedrows=shotset.num_shots)

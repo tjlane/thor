@@ -648,7 +648,7 @@ class CXIdb(object):
             A list of pytables group objects
         """
         groups = []
-        for g in self._fhandle.walkGroups(root):                
+        for g in self._fhandle.walk_groups(root):                
             gname = g.__str__().split('/')[-1].split()[0]
             if gname.find(name) == 0:
                 groups.append(g)
@@ -666,7 +666,7 @@ class CXIdb(object):
             A list of pytables nodes objects
         """
         nodes = []
-        for n in self._fhandle.walkNodes(root):                
+        for n in self._fhandle.walk_nodes(root):                
             nname = n.__str__().split('/')[-1].split()[0]
             if not isinstance(n, tables.link.SoftLink):
                 if strict:
