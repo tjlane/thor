@@ -27,6 +27,155 @@ except ImportError as e:
     GPU = False
 
 
+def _simulate_particle_exposure(num, rxyz, qxyz, atomic_numbers,
+                                atoms_to_keep=None, finite_photon=None, 
+                                force_no_gpu=False,
+                                atomic_numbers_are_densities=False):
+    """
+    Low-level interface to shot simulation. Deals with splitting the job between
+    CPU and GPU.
+    
+    Parameters
+    ----------
+    num : int
+        The number of copies of this particle to simulate
+    
+    rxyz : numpy.ndarray, float
+        2d array of xyz positions of a particle to scatter off of, in 
+        angstroms
+        
+    qxyz : numpy.ndarray, float
+        2d array of xyz positions of each reciprocal space pixel, in inverse
+        angstroms
+        
+        
+    Optional Parameters
+    -------------------
+    atoms_to_keep : ndarray, bool
+        A boolean array indicating which atoms to use in the simulation. If
+        `None`, will use all atoms.
+    
+    finite_photon : bool OR float
+        Whether or not to employ finite photon statistics in the simulation. If
+        this is "False", run a continuous simulation (infinite photons). If
+        "True", use the finite photon parameters from a xray.Detector object. If
+        a float, then that float specifies the mean photons scattered per shot.
+                
+    force_no_gpu : bool
+        Run the (slow) CPU version of this function.
+    """
+    
+    
+    # figure out finite photon statistics
+    if finite_photon in [None, False]:
+        poisson_parameter = 0.0 # flag to downstream code to not use stats
+    elif finite_photon == True:
+        try:
+            poisson_parameter = float(detector.beam.photons_scattered_per_shot)
+        except:
+            raise RuntimeError('`detector` object must have a beam attribute if'
+                               ' finite photon statistics are to be computed')
+    elif type(finite_photon) == float:
+        poisson_parameter = finite_photon
+    else:
+        raise TypeError('Finite photon must be one of {True, False, float},'
+                        ' got: %s' % str(finite_photon))
+       
+    num = int(num)
+    
+    if num <= 0:
+        raise ValueError('`num` must be 1 or greater, got: %d' % num)
+        
+        
+    # if we dont want to randomly rotate, pass an array of floats full of zeros
+    if dont_rotate:
+        rands = np.zeros((num, 3))
+    else:
+        rands = None # says make randoms to downstream code
+    
+    
+    # pull xyz coords
+    if atoms_to_keep != None:
+        rxyz = rxyz[atoms_to_keep,:]
+    
+
+    # choose the number of molecules & divide work between CPU & GPU
+    # GPU is fast but can only do multiples of 512 molecules - run
+    # the remainder on the CPU
+    if force_no_gpu or (not GPU):
+        num_cpu = num
+        num_gpu = 0
+        bpg = 0
+        logger.debug('Forced "no GPU": running CPU-only computation')
+    else:
+        num_cpu = num % 512
+        num_gpu = num - num_cpu
+    
+
+    # multiprocessing cannot return values, so generate a helper function
+    # that will dump returned values into a shared array
+    threads = []
+    def multi_helper(compute_device, fargs):
+        """ a helper function that performs either CPU or GPU calcs """
+        if compute_device == 'cpu':
+            func = _cpuscatter.simulate
+        elif compute_device == 'gpu':
+            func = _gpuscatter.simulate
+        else:
+            raise ValueError('`compute_device` should be one of {"cpu",\
+             "gpu"}, was: %s' % compute_device)
+        intensities[:] += func(*fargs)
+        return
+
+    # run dat shit
+    if num_cpu > 0:
+        logger.debug('Running CPU scattering code (%d/%d)...' % (num_cpu, num))
+        cpu_args = (num_cpu, qxyz, rxyz, atomic_numbers, rands)
+        t_cpu = Thread(target=multi_helper, args=('cpu', cpu_args))
+        t_cpu.start()
+        threads.append(t_cpu)                
+
+    if num_gpu > 0:
+        logger.debug('Sending calc to GPU dev: %d' % device_id)
+        gpu_args = (num_gpu, qxyz, rxyz, atomic_numbers, device_id, rands)
+        t_gpu = Thread(target=multi_helper, args=('gpu', gpu_args))
+        t_gpu.start()
+        threads.append(t_gpu)
+        
+    # ensure child processes have finished
+    for t in threads:
+        t.join()
+        
+        
+    # if we're using finite photons, sample those stats
+    if poisson_parameter > 0.0:
+        n = np.random.poisson(poisson_parameter)
+        p = intensities / intensities.sum()
+        intensities = np.random.multinomial(n, p)
+        
+        
+    return intensities
+    
+    
+def _qxyz_from_detector(detector):
+    """
+    Attempt to interpret many possible detectory geometries & return a
+    2d array of the {xyz} coordinates for each q-vector on the detector
+    (in units of inverse angstroms).
+    """
+    
+    # get the scattering vectors
+    if str(type(detector)).find('Detector') > -1:    
+        qxyz = detector.reciprocal
+        assert detector.num_pixels == qxyz.shape[0]
+    elif isinstance(detector, np.ndarray):
+        qxyz = detector
+    else:
+        raise ValueError('`detector` must be {thor.xray.Detector, np.ndarray}')
+    
+    return qxyz
+    
+
 def simulate_shot(traj, num_molecules, detector, traj_weights=None,
                   finite_photon=False, ignore_hydrogens=False,
                   dont_rotate=False, force_no_gpu=False, device_id=0):
@@ -106,34 +255,6 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
         
     num_per_shapshot = np.random.multinomial(num_molecules, traj_weights)
     
-        
-    # get the scattering vectors
-    if str(type(detector)).find('Detector') > -1:    
-        qxyz = detector.reciprocal
-        assert detector.num_pixels == qxyz.shape[0]
-    elif isinstance(detector, np.ndarray):
-        qxyz = detector
-    else:
-        raise ValueError('`detector` must be {thor.xray.Detector, np.ndarray}')
-    num_q = qxyz.shape[0]
-    
-    
-    # figure out finite photon statistics
-    if finite_photon in [None, False]:
-        poisson_parameter = 0.0 # flag to downstream code to not use stats
-    elif finite_photon == True:
-        try:
-            poisson_parameter = float(detector.beam.photons_scattered_per_shot)
-        except:
-            raise RuntimeError('`detector` object must have a beam attribute if'
-                               ' finite photon statistics are to be computed')
-    elif type(finite_photon) == float:
-        poisson_parameter = finite_photon
-    else:
-        raise TypeError('Finite photon must be one of {True, False, float},'
-                        ' got: %s' % str(finite_photon))
-        
-    
     # extract the atomic numbers
     atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
     
@@ -147,83 +268,107 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
         logger.debug('Ignoring %d hydrogens (of %d atoms)' % (n_H, n_atoms))
     else:
         atoms_to_keep = np.ones(n_atoms, dtype=np.bool)
-
     
-    # iterate over snapshots in the trajectory
-    intensities = np.zeros(num_q)
+    qxyz = _qxyz_from_detector(detector)
+    intensities = np.zeros(qxyz.shape[0]) 
+    
     for i,num in enumerate(num_per_shapshot):
         
-        num = int(num)
-        
-        # if we dont want to randomly rotate, pass an array of floats full of zeros
-        if dont_rotate:
-            rands = np.zeros((num, 3))
-        else:
-            rands = None # says make randoms to downstream code
-        
-        if num > 0: # else, we can just skip...
-        
-            # pull xyz coords
-            rxyz = traj.xyz[i,atoms_to_keep,:] * 10.0 # convert nm -> ang.
-
-            # choose the number of molecules & divide work between CPU & GPU
-            # GPU is fast but can only do multiples of 512 molecules - run
-            # the remainder on the CPU
-            if force_no_gpu or (not GPU):
-                num_cpu = num
-                num_gpu = 0
-                bpg = 0
-                logger.debug('Forced "no GPU": running CPU-only computation')
-            else:
-                num_cpu = num % 512
-                num_gpu = num - num_cpu
-            
-            logger.debug('Running %d molc, snapshot %d, dev %d: %d CPU / %d GPU.' % (num, i, device_id, num_cpu, num_gpu))  
-
-            # multiprocessing cannot return values, so generate a helper function
-            # that will dump returned values into a shared array
-            threads = []
-            def multi_helper(compute_device, fargs):
-                """ a helper function that performs either CPU or GPU calcs """
-                if compute_device == 'cpu':
-                    func = _cpuscatter.simulate
-                elif compute_device == 'gpu':
-                    func = _gpuscatter.simulate
-                else:
-                    raise ValueError('`compute_device` should be one of {"cpu",\
-                     "gpu"}, was: %s' % compute_device)
-                intensities[:] += func(*fargs)
-                return
-
-            # run dat shit
-            if num_cpu > 0:
-                logger.debug('Running CPU scattering code (%d/%d)...' % (num_cpu, num))
-                cpu_args = (num_cpu, qxyz, rxyz, atomic_numbers, rands)
-                t_cpu = Thread(target=multi_helper, args=('cpu', cpu_args))
-                t_cpu.start()
-                threads.append(t_cpu)                
-
-            if num_gpu > 0:
-                logger.debug('Sending calc to GPU dev: %d' % device_id)
-                gpu_args = (num_gpu, qxyz, rxyz, atomic_numbers, device_id, rands)
-                t_gpu = Thread(target=multi_helper, args=('gpu', gpu_args))
-                t_gpu.start()
-                threads.append(t_gpu)
-                
-            # ensure child processes have finished
-            for t in threads:
-                t.join()
-        
-        
-    # if we're using finite photons, sample those stats
-    if poisson_parameter > 0.0:
-        n = np.random.poisson(poisson_parameter)
-        p = intensities / intensities.sum()
-        intensities = np.random.multinomial(n, p)
-        
+        logger.debug('Running %d molc, snapshot %d' % (num, i))
+    
+        rxyz = traj.xyz[i] * 10.0 # convert nm --> Angstroms
+        intensities += _simulate_particle_exposure(num, rxyz, qxyz, 
+                                                   atomic_numbers,
+                                                   atoms_to_keep=atoms_to_keep, 
+                                                   finite_photon=finite_photon, 
+                                                   force_no_gpu=force_no_gpu,
+                                                   atomic_numbers_are_densities=False)
         
     return intensities
-        
+
+    
+def simulate_shot_from_grid(grid, grid_spacing, num_molecules, detector,
+                            finite_photon=False, ignore_hydrogens=False,
+                            dont_rotate=False, force_no_gpu=False, device_id=0):
+    """
+    Simulate a scattering 'shot', i.e. one exposure of x-rays to a sample.
+
+    Assumes we have a Boltzmann distribution of `num_molecules` identical  
+    molecules (`trajectory`), exposed to a beam defined by `beam` and projected
+    onto `detector`.
+
+    Each conformation is randomly rotated before the scattering simulation is
+    performed. Atomic form factors from X, finite photon statistics, and the 
+    dilute-sample (no scattering interference from adjacent molecules) 
+    approximation are employed.
+
+    Parameters
+    ----------
+    traj : mdtraj.trajectory
+        A trajectory object that contains a set of structures, representing
+        the Boltzmann ensemble of the sample. If len(traj) == 1, then we assume
+        the sample consists of a single homogenous structure, replecated 
+        `num_molecules` times.
+
+    detector : thor.xray.Detector OR ndarray, float
+        A detector object the shot will be projected onto. Can alternatively be
+        just an n x 3 array of q-vectors to project onto.
+
+    num_molecules : int
+        The number of molecules estimated to be in the `beam`'s focus.
+
+    Optional Parameters
+    -------------------
+    finite_photon : bool OR float
+        Whether or not to employ finite photon statistics in the simulation. If
+        this is "False", run a continuous simulation (infinite photons). If
+        "True", use the finite photon parameters from a xray.Detector object. If
+        a float, then that float specifies the mean photons scattered per shot.
+
+    ignore_hydrogens : bool
+        Ignore hydrogens in calculation. Hydrogens are often costly to compute
+        and don't change the scattering appreciably.
+
+    dont_rotate : bool
+        Don't apply a random rotation to the molecule before computing the
+        scattering. Good for debugging and the like.
+
+    force_no_gpu : bool
+        Run the (slow) CPU version of this function.
+
+    device_id : int
+        The index of the GPU device to run on.
+
+    Returns
+    -------
+    intensities : ndarray, float
+        An array of the intensities at each pixel of the detector.
+
+    See Also
+    --------
+    thor.xray.Shotset.simulate()
+        These are factory functions that call this function, and wrap the
+        results into the Shotset class.
+    """
+    
+    if len(grid.shape) != 3:
+        raise ValueError('`grid` must be a square 3d grid. Got a %dd grid.'
+                         '' % len(grid.shape))
+    
+    gs = grid.shape
+    rxyz = mgrid[:gs[0],:gs[1],:gs[2]].reshape(3, -1) * grid_spacing
+    qxyz = _qxyz_from_detector(detector) 
+    atomic_numbers = grid.flatten()
+    
+    intensities = _simulate_particle_exposure(num_molecules, rxyz, qxyz, 
+                                              atomic_numbers,
+                                              atoms_to_keep=None, 
+                                              finite_photon=finite_photon, 
+                                              force_no_gpu=force_no_gpu,
+                                              atomic_numbers_are_densities=True)
+    
+    return intensities
+    
         
 def atomic_formfactor(atomic_Z, q_mag):
     """

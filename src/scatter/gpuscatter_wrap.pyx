@@ -53,7 +53,8 @@ cdef extern from "gpuscatter.hh":
 cdef C_GPUScatter * gpu_scatter_obj
 
 
-def simulate(n_molecules, qxyz, rxyz, atomic_numbers, device_id=0, rfloats=None):
+def simulate(n_molecules, qxyz, rxyz, atomic_numbers, device_id=0, rfloats=None,
+             atomic_numbers_are_densities=False):
     """
     Parameters
     ----------
@@ -101,7 +102,7 @@ def simulate(n_molecules, qxyz, rxyz, atomic_numbers, device_id=0, rfloats=None)
     # A NOTE ABOUT ARRAY ORDERING
     # In what follows, for multi-dimensional arrays I often take the transpose
     # somewhat mysteriously. This is because the way C++ will loop over arrays
-    # in c-order, but ODIN's arrays in python land are in "fortran" order
+    # in c-order, but Thor's arrays in python land are in "fortran" order
     
     # extract arrays from input  
     cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_qxyz
@@ -120,12 +121,19 @@ def simulate(n_molecules, qxyz, rxyz, atomic_numbers, device_id=0, rfloats=None)
         c_rfloats = np.ascontiguousarray(rfloats.T, dtype=np.float32)
         #print "WARNING: employing fed random numbers -- this should be a test"
     
-
-    # get the Cromer-Mann parameters
-    py_cromermann, py_aid = get_cromermann_parameters(atomic_numbers)
+    
+    # retrieve atomic form factors
+    if atomic_numbers_are_densities:
+        # each atom is unique, only last Cromer-Mann parameter used
+        py_aid = np.arange( len(atomic_numbers), dtype=np.int32 )
+        py_cromermann = np.zeros(len(atomic_numbers) * 9, dtype=np.float32)
+        py_cromermann[8::9] = atomic_numbers # set c parameters to densitiess
+    else:
+        # get the Cromer-Mann parameters
+        py_cromermann, py_aid = get_cromermann_parameters(atomic_numbers)
+        
     cdef np.ndarray[ndim=1, dtype=np.float32_t] c_cromermann
     c_cromermann = np.ascontiguousarray(py_cromermann, dtype=np.float32)
-    
     cdef int[::1] c_aid = np.ascontiguousarray(py_aid, dtype=np.int32) # memory-view contiguous "C" array
     
     
