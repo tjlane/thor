@@ -26,7 +26,6 @@ from thor import _cpuscatter
 from thor import scatter
 from thor import structure
 from thor.testing import skip, ref_file, gputest
-from thor.structure import rand_rotate_molecule
 
 from mdtraj import Trajectory
 
@@ -36,6 +35,44 @@ import matplotlib.pyplot as plt
 # ------------------------------------------------------------------------------
 #                        BEGIN REFERENCE IMPLEMENTATIONS
 # ------------------------------------------------------------------------------
+
+def rand_rotate_molecule(xyzlist, rfloat=None):
+    """
+    Randomly rotate the molecule defined by xyzlist.
+    
+    Parameters
+    ----------
+    xyzlist : ndarray, float, 3D
+        An n x 3 array representing the x,y,z positions of n atoms.
+        
+    rfloat : ndarray, float, len 3
+        A 3-vector of random numbers in [0,1) that acts as a random seed. If
+        not passed, generates new random numbers.
+        
+    Returns
+    -------
+    rotated_xyzlist : ndarray, float, 3D
+        A rotated version of the input `xyzlist`.
+    """
+    
+    # get a random quaternion vector
+    q = quaternion.random(rfloat)
+    
+    # take the quaternion conjugate
+    qconj = quaternion.conjugate(q)
+    
+    # prepare data structures
+    rotated_xyzlist = np.zeros(xyzlist.shape)
+    qv = np.zeros(4)
+    
+    # put each atom through the same rotation
+    for i in range(xyzlist.shape[0]):
+        qv[1:] = xyzlist[i,:].copy()
+        q_prime = quaternion.prod( quaternion.prod(q, qv), qconj )
+        rotated_xyzlist[i,:] = q_prime[1:].copy() # want the last 3 elements...
+    
+    return rotated_xyzlist
+
 
 def form_factor(qvector, atomz):
     
