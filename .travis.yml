@@ -20,7 +20,7 @@ before_install:
   # install python dependencies
   - conda install --yes python=$TRAVIS_PYTHON_VERSION binstar atlas numexpr numpy scipy matplotlib nose pytables pyyaml cython
   - conda install --channel https://conda.binstar.org/omnia mdtraj --yes
-  - conda install --channel https://conda.binstar.org/jjhelmus pyfftw --yes
+  - conda install --channel https://conda.binstar.org/richli pyfftw --yes
   - conda install --channel https://conda.binstar.org/praxes fabio --yes
 
 install:
