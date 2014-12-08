@@ -7,7 +7,7 @@ Classes, methods, functions for use with xray scattering experiments.
 import logging
 logging.basicConfig()
 logger = logging.getLogger(__name__)
-#logger.setLevel('DEBUG')
+logger.setLevel('DEBUG')
 
 import os
 import abc
@@ -3018,7 +3018,7 @@ class Rings(object):
         # use order N method: correlate vs. mean
         logger.info('Correlating inter...')
         if mean_only:
-            logger.debug('mean only')
+            logger.debug('\nmean only')
             
             inter = np.zeros(self.num_phi)
             total = np.zeros(self.num_phi)
@@ -3054,7 +3054,7 @@ class Rings(object):
 
                 # compute which shots we're processing
                 start_i = n * self._batch_size
-                stop_i  = (n+1) * self._batch_size
+                stop_i  = (n+1) * self._batch_size - 1
 
                 logger.debug('Batch start/stop: %d/%d' % (start_i, stop_i))
 
@@ -3062,6 +3062,7 @@ class Rings(object):
                 if stop_i > break_n:
                     trunc = break_n - start_i
                     logger.debug('Truncating batch to %d rows\n' % trunc)
+                    print('Truncating batch to %d rows\n' % trunc)
                     assert trunc > 0
                 else:
                     trunc = self._batch_size
@@ -3073,11 +3074,12 @@ class Rings(object):
                 rings2 = itx[:trunc,q_ind2,:]
                 
                 # subtract the relevant rings
-                total  = total[-1,:][None,:] * np.ones((trunc, self.num_phi))
-                total -= np.cumsum(rings1, axis=0)
+                # total is the sum of all "rings1"
+                v1 = (total - rings1) / float(break_n - 1)
+                assert v1.shape == rings1.shape
                 
                 # actually do the correlations
-                inter += self._correlate_rows(total, rings2, mask1, mask2,
+                inter += self._correlate_rows(v1, rings2, mask1, mask2,
                                               use_fft=use_fft)[:trunc,:].mean(axis=0)
                 
                 if normed:
@@ -3106,7 +3108,7 @@ class Rings(object):
             
         # draw random pairs
         else:
-            logger.debug('\nmean only')
+            logger.debug('\ndrawing random pairs')
             
             if (num_pairs == 0) or (num_pairs >= max_pairs):
                 inter_pairs = utils.all_pairs(self.num_shots)
@@ -3120,18 +3122,21 @@ class Rings(object):
             for k,(i,j) in enumerate(inter_pairs):
             
                 logger.info(utils.logger_return + 'Correlating inter pair %d/%d' % (k+1, num_pairs))
+                logger.debug('\nShots: %d & %d' % (i,j))
             
                 if self._polar_intensities_type == 'array':
+                    logger.debug('loading shots from in-memory array')
                     rings1 = self._polar_intensities[i,q_ind1,:]
                     rings2 = self._polar_intensities[j,q_ind2,:]
                 
                 elif self._polar_intensities_type == 'tables':
+                    logger.debug('loading shots from disk via pytables')
                     rings1 = self._polar_intensities.read(i)
                     rings2 = self._polar_intensities.read(j)
                     rings1 = rings1[0,q_ind1,:]
                     rings2 = rings2[0,q_ind2,:]
                     
-                inter[i,:] = self._correlate_rows(rings1, rings2, mask1, mask2,
+                inter[k,:] = self._correlate_rows(rings1, rings2, mask1, mask2,
                                                   use_fft=use_fft)
             
                 if normed:
@@ -3395,7 +3400,15 @@ class Rings(object):
         else:       # use C++ brute force implementation
             corr = np.zeros((n_row, n_col))
             for i in range(n_row):
-                corr[i,:] = brute_correlate(x[i,:] * xm, y[i,:] * ym, 2)
+                if xm is not None:
+                    brute_x = x[i,:] * xm
+                else:
+                    brute_x = x[i,:]
+                if ym is not None:
+                    brute_y = y[i,:] * ym
+                else:
+                    brute_y = y[i,:]
+                corr[i,:] = brute_correlate(brute_x, brute_y, 2)
             
         assert corr.shape == (n_row, n_col)
                     
