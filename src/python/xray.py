@@ -3035,6 +3035,7 @@ class Rings(object):
                 actual_pairs = np.sum([(self.num_shots-k) for k in range(break_n)])
                 logger.info('Rounding up number of computed inter correlation'
                             ' pairs for optimal efficiency: %d paris.' % actual_pairs)
+            logger.debug('\n\ncomputing %d pairs\n' % break_n)
             
             if normed:
                 ring1_var = np.zeros(self.num_shots)
@@ -3045,52 +3046,70 @@ class Rings(object):
                 if n == break_n:
                     logger.info('%d shots reached, breaking first loop' % n)
                     break
-                #if normed: ring1_var[n] = np.var(itx[q_ind1,:])
-                total += itx[q_ind1,:]
+                total += itx[q_ind1,:] - np.mean(itx[q_ind1,:])
             
             # second loop -- compute inter correlators
-            total = total[None,:] # expand to 2d (initalization for below)
-            for n,itx in enumerate(self._polar_intensities_batch_iter):
+            for n,itx in enumerate(self.polar_intensities_iter):
 
-                # compute which shots we're processing
-                start_i = n * self._batch_size
-                stop_i  = (n+1) * self._batch_size - 1
+                # ------> BEGIN BATCH CODE
 
-                logger.debug('Batch start/stop: %d/%d' % (start_i, stop_i))
-
-                # stop if we have a batch > num_shots (also avoid including zero pads)
-                if stop_i > break_n:
-                    trunc = break_n - start_i
-                    logger.debug('Truncating batch to %d rows\n' % trunc)
-                    print('Truncating batch to %d rows\n' % trunc)
-                    assert trunc > 0
-                else:
-                    trunc = self._batch_size
-            
-                logger.info(utils.logger_return + 'Correlating shot %d/%d w/all others' % (n+1, break_n))
-
-                # rip out the relevant rings
-                rings1 = itx[:trunc,q_ind1,:]
-                rings2 = itx[:trunc,q_ind2,:]
+                # # compute which shots we're processing
+                # start_i = n * self._batch_size
+                # stop_i  = (n+1) * self._batch_size - 1
+                # 
+                # logger.debug('Batch start/stop: %d/%d' % (start_i, stop_i))
+                # 
+                # # stop if we have a batch > num_shots (also avoid including zero pads)
+                # if stop_i > break_n:
+                #     trunc = break_n - start_i
+                #     logger.debug('Truncating batch to %d rows\n' % trunc)
+                #     print('Truncating batch to %d rows\n' % trunc)
+                #     assert trunc > 0
+                # else:
+                #     trunc = self._batch_size
+                #             
+                # logger.info(utils.logger_return + 'Correlating shot %d/%d w/all others' % (n+1, break_n))
+                # 
+                # # rip out the relevant rings
+                # rings1 = itx[:trunc,q_ind1,:]
+                # rings2 = itx[:trunc,q_ind2,:]
+                #
+                # v1 = (total[None,:] - rings1) / float(break_n)
+                # assert v1.shape == rings1.shape
+                #
+                # inter += self._correlate_rows(v1, rings2, mask1, mask2,
+                #                               use_fft=use_fft).mean(axis=0)
+                # --------< END BATCH CODE
+                # --------> BEGIN ALT CODE
                 
-                # subtract the relevant rings
-                # total is the sum of all "rings1"
-                v1 = (total - rings1) / float(break_n - 1)
-                assert v1.shape == rings1.shape
+                rings1 = itx[q_ind1,:]
+                rings2 = itx[q_ind2,:]
+                
+                Z = float(break_n * (break_n + 1)) / 2.0
+                total -= (rings1 - rings1.mean())
+                Ai2 = Z * total
+                
+                # --------< END ALT CODE
                 
                 # actually do the correlations
-                inter += self._correlate_rows(v1, rings2, mask1, mask2,
-                                              use_fft=use_fft)[:trunc,:].mean(axis=0)
+                inter[None,:] += self._fft_correlate(rings2[None,:] - rings2.mean(), Ai2[None,:])
+                #inter +=  rings1.mean() * rings2.mean()
+                
+                #inter += np.square( rings1.mean() )
+                #
                 
                 if normed:
-                    #var1 += np.sum( ring1_var[start_i+1:stop_i+1] )
-                    var1 += np.var( rings1[:,mask1] )
-                    var2 += np.var( rings2[:,mask2] )
+                    # BATCH CODE
+                    # var1 += np.var( rings1[:,mask1] )
+                    # var2 += np.var( rings2[:,mask2] )
+                    var1 += np.var( rings1[mask1] )
+                    var2 += np.var( rings2[mask2] )
 
-                # decide when to end
-                if stop_i >= break_n:
-                    logger.info('%d shots reached, breaking second loop' % n)
-                    break
+                # BATCH CODE
+                # # decide when to end
+                # if stop_i >= break_n:
+                #     logger.info('%d shots reached, breaking second loop' % min(stop_i, break_n))
+                #     break
                     
             # normalize -- dont touch this! -- TJL -----------------------------
             inter /= float(np.sum([(self.num_shots-k) for k in range(1,break_n+1)])) 

@@ -771,7 +771,6 @@ class TestRings(object):
         assert_allclose(corr_mask, corr_mask2)
         assert_allclose(corr_mask, corr_nomask)
         
-        
     def test_fft_vs_cpp(self):
         
         q1 = 1.0 # chosen arb.
@@ -853,10 +852,10 @@ class TestRings(object):
         inter2 = self.rings.correlate_inter(q, q, mean_only=False, normed=False)
         inter2_mean = inter2.mean(axis=0)
         
-        # import matplotlib.pyplot as plt
-        # plt.plot(inter1)
-        # plt.plot(inter2_mean)
-        # plt.show()
+        import matplotlib.pyplot as plt
+        plt.plot(inter1 / inter1[0])
+        plt.plot(inter2_mean / inter2_mean[0])
+        plt.show()
         
         
         assert_allclose(inter1 / inter1[0], inter2_mean / inter2_mean[0],
