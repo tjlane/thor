@@ -784,7 +784,7 @@ class TestRings(object):
 
         assert_allclose(fft, cpp)
         
-    def test_correlate_intra(self, rtol=0.01, atol=0.01):
+    def test_correlate_intra(self, rtol=0.05, atol=0.05):
 
         # test autocorrelator
         intra = self.rings.correlate_intra(1.0, 1.0, normed=True)
@@ -803,7 +803,7 @@ class TestRings(object):
                         err_msg='doesnt match reference implementation normalization')
         
         # test norming
-        assert np.abs(intra[0] - 1.0) < rtol
+        assert np.abs(intra[0] - 1.0) < rtol, 'first normalized entry not 1, is: %f' % intra[0]
         intra_unnorm = self.rings.correlate_intra(1.0, 1.0, normed=False)
         assert not np.abs(intra_unnorm[0] - 1.0) < rtol
         assert_allclose(intra, intra_unnorm / intra_unnorm[0],
