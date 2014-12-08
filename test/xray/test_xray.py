@@ -852,23 +852,21 @@ class TestRings(object):
         inter2 = self.rings.correlate_inter(q, q, mean_only=False, normed=False)
         inter2_mean = inter2.mean(axis=0)
         
-        import matplotlib.pyplot as plt
-        plt.plot(inter1 / inter1[0])
-        plt.plot(inter2_mean / inter2_mean[0])
-        plt.show()
-        
-        
         assert_allclose(inter1 / inter1[0], inter2_mean / inter2_mean[0],
                         rtol=rtol, atol=atol, 
                         err_msg='mean_only and rand pairs dont match')
+
         assert_allclose(inter1, inter2_mean, rtol=rtol, atol=atol, 
                         err_msg='mean_only and rand pairs non-std normalization doesnt match')
                         
         inter1 = self.rings.correlate_inter(q, q, mean_only=True,  normed=True)
         inter2 = self.rings.correlate_inter(q, q, mean_only=False, normed=True)
         inter2_mean = inter2.mean(axis=0)
-        assert_allclose(inter1, inter2_mean, rtol=rtol, atol=atol, 
+        
+        assert_allclose(inter1 / inter1[0], inter2_mean / inter2_mean[0], rtol=rtol, atol=atol, 
                         err_msg='mean_only and rand pairs std normalization doesnt match')
+        assert np.abs( 1.0 - inter1[0] / inter2_mean[0] ) < 0.05, 'mean_only and rand pairs std normalization doesnt match'
+                        
                         
     def test_correlate_difference(self, rtol=1e-4, atol=0.0):
         # compute diff corr for 2 shots
