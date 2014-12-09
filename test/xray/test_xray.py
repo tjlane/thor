@@ -584,7 +584,7 @@ class TestRings(object):
         self.q_values  = np.array([1.0, 2.0])
         self.num_phi   = 360
         self.traj      = Trajectory.load(ref_file('ala2.pdb'))
-        self.num_shots = 3
+        self.num_shots = 4
         self.rings     = xray.Rings.simulate(self.traj, 1, self.q_values,
                                              self.num_phi, self.num_shots) # 1 molec
 
@@ -784,7 +784,7 @@ class TestRings(object):
 
         assert_allclose(fft, cpp)
         
-    def test_correlate_intra(self, rtol=0.05, atol=0.05):
+    def test_correlate_intra(self, rtol=0.05, atol=0.1):
 
         # test autocorrelator
         intra = self.rings.correlate_intra(1.0, 1.0, normed=True)

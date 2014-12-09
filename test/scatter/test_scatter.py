@@ -56,10 +56,10 @@ def rand_rotate_molecule(xyzlist, rfloat=None):
     """
     
     # get a random quaternion vector
-    q = quaternion.random(rfloat)
+    q = structure.quaternion.random(rfloat)
     
     # take the quaternion conjugate
-    qconj = quaternion.conjugate(q)
+    qconj = structure.quaternion.conjugate(q)
     
     # prepare data structures
     rotated_xyzlist = np.zeros(xyzlist.shape)
@@ -68,7 +68,7 @@ def rand_rotate_molecule(xyzlist, rfloat=None):
     # put each atom through the same rotation
     for i in range(xyzlist.shape[0]):
         qv[1:] = xyzlist[i,:].copy()
-        q_prime = quaternion.prod( quaternion.prod(q, qv), qconj )
+        q_prime = structure.quaternion.prod( structure.quaternion.prod(q, qv), qconj )
         rotated_xyzlist[i,:] = q_prime[1:].copy() # want the last 3 elements...
     
     return rotated_xyzlist

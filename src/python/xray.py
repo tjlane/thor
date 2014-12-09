@@ -2907,7 +2907,7 @@ class Rings(object):
             
             # compute which shots we're processing
             start_i = i * self._batch_size
-            stop_i  = (i+1) * self._batch_size - 1
+            stop_i  = (i+1) * self._batch_size 
             
             #print('Batch start/stop: %d/%d\n' % (start_i, stop_i))
             logger.debug('Batch start/stop: %d/%d\n' % (start_i, stop_i))
