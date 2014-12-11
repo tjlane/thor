@@ -101,7 +101,7 @@ class TestRingsFromDisk(test_xray.TestRings):
             
         hdf = tables.File('tmp_tables.h5', 'w')
         a = tables.Atom.from_dtype(np.dtype(np.float64))
-        node = hdf.createEArray(where='/', name='data',
+        node = hdf.create_earray(where='/', name='data',
                                 shape=(0, len(self.q_values), self.num_phi), 
                                 atom=a, filters=io.COMPRESSION)
         node.append(intensities)

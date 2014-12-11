@@ -497,7 +497,7 @@ class Detector(Beam):
             raise TypeError('`k` must be a float or thor.xray.Beam')
 
         # parse beam_vector -- is guarenteed to be a unit vector
-        if beam_vector != None:
+        if beam_vector is not None:
             if beam_vector.shape == (3,):
                 self.beam_vector = self._unit_vector(beam_vector)
             else:
@@ -1020,7 +1020,7 @@ class Shotset(object):
 
         
         # parse mask
-        if mask != None:
+        if mask is not None:
             mask = mask.flatten()
             if len(mask) != self.detector.num_pixels:
                 raise ValueError('Mask must a len `detector.num_pixels` array')
@@ -1217,7 +1217,7 @@ class Shotset(object):
         means = np.zeros(self.detector.num_pixels)
         for i,itx in enumerate(self.intensities_iter):
             means += itx
-            if shot_cutoff != None:
+            if shot_cutoff is not None:
                 if i-1 == shot_cutoff:
                     break
         means /= float(i+1)
@@ -1226,7 +1226,7 @@ class Shotset(object):
         vrcns = np.zeros(self.detector.num_pixels)
         for i,itx in enumerate(self.intensities_iter):
             vrcns += np.square(itx - means)
-            if shot_cutoff != None:
+            if shot_cutoff is not None:
                 if i-1 == shot_cutoff:
                     break
         vrcns /= float(i+1)
@@ -1243,7 +1243,7 @@ class Shotset(object):
                     ' cutoffs respectively' % (np.sum(mm), np.sum(vm), self.num_pixels))
 
         # if we don't have a mask already make one
-        if self.mask == None:
+        if self.mask is None:
             self.mask = np.logical_not(mm)
         else:
             self.mask *= np.logical_not(mm)
@@ -1279,12 +1279,12 @@ class Shotset(object):
             ...
         """
 
-        if shot_index == None:
+        if shot_index is None:
             inten = self.average_intensity
         else:
             raise NotImplementedError()
 
-        if (num_x == None) or (num_y == None):
+        if (num_x is None) or (num_y is None):
             # todo : better performance if needed (implicit detector)
             num_x = len(self.detector.xyz[:,0])
             num_y = len(self.detector.xyz[:,1])
@@ -1371,7 +1371,7 @@ class Shotset(object):
             pixels correspond to `interpolated_intensities`.
         """
         
-        if polar_intensities_output == None:
+        if polar_intensities_output is None:
             polar_intensities_output = []
         else:
             append = getattr(polar_intensities_output, "append", None)
@@ -1470,7 +1470,7 @@ class Shotset(object):
                 continue
                 
             # next, mask any points that should be masked by the real mask
-            if self.mask == None:
+            if self.mask is None:
                 # unmask points that we have data for
                 polar_mask[intersect] = np.bool(True)
             else:
@@ -1568,7 +1568,7 @@ class Shotset(object):
         xy_add[:,1] += 2.0 * np.pi
         aug_xy = np.concatenate(( xy, xy_add ))
 
-        if self.mask != None:
+        if self.mask is not None:
             aug_mask = np.concatenate(( self.mask, self.mask[add] ))
         else:
             # slice all
@@ -1693,7 +1693,7 @@ class Shotset(object):
         -------------------
         traj_weights : ndarray, float
             If `traj` contains many structures, an array that provides the Boltzmann
-            weight of each structure. Default: if traj_weights == None, weights
+            weight of each structure. Default: if traj_weights is None, weights
             each structure equally.
 
         finite_photon : bool
@@ -1812,13 +1812,13 @@ class Shotset(object):
         else:
             raise ValueError('`rings_filename` must be {None, str}')
 
-        if pm != None:
+        if pm is not None:
             logger.debug('polar mask: %d pixels active' % np.sum(pm))
             logger.debug('            %d pixels masked' % np.sum(1-pm))
             logger.debug(pm)
         else:
             logger.debug('no polar mask')
-            assert self.mask == None
+            assert self.mask is None
             
         return ret_val
 
@@ -1843,7 +1843,7 @@ class Shotset(object):
             raise IOError('File: %s already exists! Aborting...' % filename)
 
         # if we don't have a mask, just save a single zero
-        if self.mask == None:
+        if self.mask is None:
             mask = np.array([0])
         else:
             mask = self.mask
@@ -1925,7 +1925,7 @@ class Shotset(object):
         """
         
         # figure out which shots to load
-        if not to_load == None:
+        if not to_load is None:
             try:
                 to_load = np.array(to_load)
                 assert to_load.dtype == np.int
@@ -1948,7 +1948,7 @@ class Shotset(object):
         if np.all(mask == np.array([0])):
             mask = None
 
-        if to_load == None: # load all
+        if to_load is None: # load all
             if force_into_memory:
                 intensities_handle = hdf.root.intensities.read()
                 hdf.close()
@@ -2022,7 +2022,7 @@ class Shotset(object):
             m = parse.CheetahCXI.cheetah_instensities_to_thor(padmask.mask2d)
         elif type(mask) == np.ndarray:
             m = mask.astype(np.bool)
-        elif mask == None:
+        elif mask is None:
             m = None
         else:
             raise TypeError('`mask` must be type {str, np.ndarray}, '
@@ -2269,7 +2269,7 @@ class Shotset(object):
             # convert one file to get access to metadata: detector, mask
             # seed_shot = reader(list_of_files[0])
             
-            if detector == None:
+            if detector is None:
                 try:
                     detector = fiter.seed_shot.detector
                 except Exception as e:
@@ -2282,7 +2282,7 @@ class Shotset(object):
                                          ' an argument to `fromfiles`.'
                                          '' % (list_of_files[0], str(reader)) )
                      
-            if (hasattr(fiter.seed_shot, 'mask') and mask != None):
+            if (hasattr(fiter.seed_shot, 'mask') and mask is not None):
                 mask = np.logical_and(mask, fiter.seed_shot.mask)
                 logger.debug('mask object taken from combo of kwarg and fiter')
             elif hasattr(fiter.seed_shot, 'mask'):
@@ -2431,7 +2431,7 @@ class Rings(object):
             raise ValueError('`polar_intensities` must have same len as '
                              '`q_values` in its second dimension.')
 
-        if polar_mask == None:
+        if polar_mask is None:
             self.polar_mask = None
         elif type(polar_mask) == np.ndarray:
             if not polar_mask.shape == polar_intensities.shape[1:]:
@@ -2835,7 +2835,7 @@ class Rings(object):
 
         # average over shots, phi
         for pi_x in self.polar_intensities_iter:
-            if self.polar_mask != None:
+            if self.polar_mask is not None:
                 pi_x *= self.polar_mask.astype(np.float)
             intensity_profile[:,1] += np.mean(pi_x, axis=1)
             
@@ -2890,7 +2890,7 @@ class Rings(object):
             intra = np.zeros((num_shots, self.num_phi))
 
         # check if mask exists
-        if self.polar_mask != None:
+        if self.polar_mask is not None:
             mask1 = self.polar_mask[q_ind1,:]
             mask2 = self.polar_mask[q_ind2,:]
         else:
@@ -2907,13 +2907,15 @@ class Rings(object):
             
             # compute which shots we're processing
             start_i = i * self._batch_size
-            stop_i  = (i+1) * self._batch_size
+            stop_i  = (i+1) * self._batch_size 
             
+            #print('Batch start/stop: %d/%d\n' % (start_i, stop_i))
             logger.debug('Batch start/stop: %d/%d\n' % (start_i, stop_i))
             
             # stop if we have a batch > num_shots (also avoid including zero pads)
             if stop_i > num_shots:
-                trunc = num_shots - start_i
+                trunc = num_shots - start_i # trunc will be a slice below ([:trunc])
+                #print('Truncating batch to %d rows\n' % (trunc,))
                 logger.debug('Truncating batch to %d rows\n' % trunc)
                 assert trunc > 0
             else:
@@ -2940,6 +2942,7 @@ class Rings(object):
                 var2 += np.var( rings2[:trunc,mask2] )
                 
             if stop_i > num_shots:
+                #print('requested shots reached, breaking loop')
                 logger.debug('requested shots reached, breaking loop')
                 break
                 
@@ -2995,7 +2998,7 @@ class Rings(object):
         max_pairs = self.num_shots * (self.num_shots - 1) / 2
         
         # Check if mask exists
-        if self.polar_mask != None:
+        if self.polar_mask is not None:
             mask1 = self.polar_mask[q_ind1,:]
             mask2 = self.polar_mask[q_ind2,:]
         else:
@@ -3015,7 +3018,7 @@ class Rings(object):
         # use order N method: correlate vs. mean
         logger.info('Correlating inter...')
         if mean_only:
-            logger.debug('mean only')
+            logger.debug('\nmean only')
             
             inter = np.zeros(self.num_phi)
             total = np.zeros(self.num_phi)
@@ -3032,6 +3035,7 @@ class Rings(object):
                 actual_pairs = np.sum([(self.num_shots-k) for k in range(break_n)])
                 logger.info('Rounding up number of computed inter correlation'
                             ' pairs for optimal efficiency: %d paris.' % actual_pairs)
+            logger.debug('\n\ncomputing %d pairs\n' % break_n)
             
             if normed:
                 ring1_var = np.zeros(self.num_shots)
@@ -3042,68 +3046,38 @@ class Rings(object):
                 if n == break_n:
                     logger.info('%d shots reached, breaking first loop' % n)
                     break
-                #if normed: ring1_var[n] = np.var(itx[q_ind1,:])
-                total += itx[q_ind1,:]
+                total += itx[q_ind1,:] - np.mean(itx[q_ind1,:])
             
             # second loop -- compute inter correlators
-            total = total[None,:] # expand to 2d (initalization for below)
-            for n,itx in enumerate(self._polar_intensities_batch_iter):
-
-                # compute which shots we're processing
-                start_i = n * self._batch_size
-                stop_i  = (n+1) * self._batch_size
-
-                logger.debug('Batch start/stop: %d/%d' % (start_i, stop_i))
-
-                # stop if we have a batch > num_shots (also avoid including zero pads)
-                if stop_i > break_n:
-                    trunc = break_n - start_i
-                    logger.debug('Truncating batch to %d rows\n' % trunc)
-                    assert trunc > 0
-                else:
-                    trunc = self._batch_size
-            
-                logger.info(utils.logger_return + 'Correlating shot %d/%d w/all others' % (n+1, break_n))
-
-                # rip out the relevant rings
-                rings1 = itx[:trunc,q_ind1,:]
-                rings2 = itx[:trunc,q_ind2,:]
+            for n,itx in enumerate(self.polar_intensities_iter):
                 
-                # subtract the relevant rings
-                total  = total[-1,:][None,:] * np.ones((trunc, self.num_phi))
-                total -= np.cumsum(rings1, axis=0)
+                rings1 = itx[q_ind1,:]
+                rings2 = itx[q_ind2,:]
+                
+                # this is the quantity to correlate against the n-th rings1
+                # it is the sum of the n+1 through Nth rings2
+                total -= (rings1 - rings1.mean())
                 
                 # actually do the correlations
-                inter += self._correlate_rows(total, rings2, mask1, mask2,
-                                              use_fft=use_fft)[:trunc,:].mean(axis=0)
+                # rings2/1 are in backwards order to match pairs implementation below
+                inter[None,:] += self._fft_correlate(rings2[None,:] - rings2.mean(), total[None,:])
                 
                 if normed:
-                    #var1 += np.sum( ring1_var[start_i+1:stop_i+1] )
-                    var1 += np.var( rings1[:,mask1] )
-                    var2 += np.var( rings2[:,mask2] )
-
-                # decide when to end
-                if stop_i >= break_n:
-                    logger.info('%d shots reached, breaking second loop' % n)
-                    break
+                    var1 += np.var( rings1[mask1] )
+                    var2 += np.var( rings2[mask2] )
                     
             # normalize -- dont touch this! -- TJL -----------------------------
             inter /= float(np.sum([(self.num_shots-k) for k in range(1,break_n+1)])) 
-            inter /= float(self.num_shots) / 4.0
-            
+            inter /= self.num_phi
             
             if normed:
-                inter /= np.sqrt( var1 * var2 / np.square(float(num_pairs)) )
-                inter /= np.sqrt( (self.num_shots - 1.0) )
-                
-                # n_pairs = factorial(self.num_shots - 1) / factorial(self.num_shots - break_n - 2)
-                # inter /= (n_pairs - 1) * np.sqrt(var1 * var2)
+                inter /= np.sqrt( var1 * var2 / np.square(float(break_n)) )
             # ------------------------------------------------------------------
 
             
         # draw random pairs
         else:
-            logger.debug('\nmean only')
+            logger.debug('\ndrawing random pairs')
             
             if (num_pairs == 0) or (num_pairs >= max_pairs):
                 inter_pairs = utils.all_pairs(self.num_shots)
@@ -3117,18 +3091,21 @@ class Rings(object):
             for k,(i,j) in enumerate(inter_pairs):
             
                 logger.info(utils.logger_return + 'Correlating inter pair %d/%d' % (k+1, num_pairs))
+                logger.debug('\nShots: %d & %d' % (i,j))
             
                 if self._polar_intensities_type == 'array':
+                    logger.debug('loading shots from in-memory array')
                     rings1 = self._polar_intensities[i,q_ind1,:]
                     rings2 = self._polar_intensities[j,q_ind2,:]
                 
                 elif self._polar_intensities_type == 'tables':
+                    logger.debug('loading shots from disk via pytables')
                     rings1 = self._polar_intensities.read(i)
                     rings2 = self._polar_intensities.read(j)
                     rings1 = rings1[0,q_ind1,:]
                     rings2 = rings2[0,q_ind2,:]
                     
-                inter[i,:] = self._correlate_rows(rings1, rings2, mask1, mask2,
+                inter[k,:] = self._correlate_rows(rings1, rings2, mask1, mask2,
                                                   use_fft=use_fft)
             
                 if normed:
@@ -3219,7 +3196,7 @@ class Rings(object):
             diff = np.zeros((effective_num_shots, self.num_phi))
         
         # Check if mask exists
-        if self.polar_mask != None:
+        if self.polar_mask is not None:
             mask1 = self.polar_mask[q_ind1,:]
             mask2 = self.polar_mask[q_ind2,:]
         else:
@@ -3347,16 +3324,16 @@ class Rings(object):
         n_row = x.shape[0]
         n_col = x.shape[1]
 
-        if x_mask != None: 
+        if x_mask is not None: 
             assert len(x_mask) == n_col
             x_mask = x_mask.astype(np.bool)
 
-        if y_mask != None:
+        if y_mask is not None:
             assert len(y_mask) == n_col
             y_mask = y_mask.astype(np.bool)
             
         # --> set up masking & normalization
-        if ((x_mask == None) and (y_mask == None)):
+        if ((x_mask is None) and (y_mask is None)):
             xm = None
             ym = None
             N_delta = float(n_col) # normalization factor
@@ -3364,9 +3341,9 @@ class Rings(object):
         else:
             
             # if we only supply one mask...
-            if x_mask == None:
+            if x_mask is None:
                 x_mask = np.ones_like(y_mask)
-            elif y_mask == None:
+            elif y_mask is None:
                 y_mask = np.ones_like(x_mask)
             
             xm = x_mask[None,:]
@@ -3380,7 +3357,7 @@ class Rings(object):
 
         # --> actually compute some correlators
         if use_fft: # use d-FFT + convolution thm
-            if (xm == None) and (ym == None): # no mask
+            if (xm is None) and (ym is None): # no mask
                 x_bar = np.average(x, axis=1)[:,None]
                 y_bar = np.average(y, axis=1)[:,None]
                 corr = self._fft_correlate((x - x_bar), (y - y_bar))
@@ -3392,7 +3369,15 @@ class Rings(object):
         else:       # use C++ brute force implementation
             corr = np.zeros((n_row, n_col))
             for i in range(n_row):
-                corr[i,:] = brute_correlate(x[i,:] * xm, y[i,:] * ym, 2)
+                if xm is not None:
+                    brute_x = x[i,:] * xm
+                else:
+                    brute_x = x[i,:]
+                if ym is not None:
+                    brute_y = y[i,:] * ym
+                else:
+                    brute_y = y[i,:]
+                corr[i,:] = brute_correlate(brute_x, brute_y, 2)
             
         assert corr.shape == (n_row, n_col)
                     
@@ -3538,13 +3523,13 @@ class Rings(object):
         ..[2] https://en.wikipedia.org/wiki/Student's_t-test
         """
         
-        if max_samples == None:
+        if max_samples is None:
             max_samples = self.num_shots
 
         # if not already computed, get the correlators
-        if intra == None:
+        if intra is None:
             intra = self.correlate_intra(q1, q2, mean_only=False, num_shots=max_samples)
-        if inter == None:
+        if inter is None:
             inter = self.correlate_inter(q1, q2, mean_only=False, num_pairs=max_samples)
         
         # trim the edges off -- these often result in too-large pvals
@@ -3662,7 +3647,7 @@ class Rings(object):
 
         traj_weights : ndarray, float
             If `traj` contains many structures, an array that provides the
-            Boltzmann weight of each structure. Default: if traj_weights == None
+            Boltzmann weight of each structure. Default: if traj_weights is None
             weights each structure equally.
 
         force_no_gpu : bool
@@ -3724,8 +3709,8 @@ class Rings(object):
         if os.path.exists(filename) and (not overwrite):
             raise IOError('File: %s already exists! Aborting...' % filename)
 
-        # if self.polar_mask == None, then save a single 0
-        if self.polar_mask == None:
+        # if self.polar_mask is None, then save a single 0
+        if self.polar_mask is None:
             pm = np.array([0])
         else:
             pm = self.polar_mask

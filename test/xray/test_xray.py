@@ -10,6 +10,7 @@ import tables
 from nose import SkipTest
 
 import numpy as np
+
 from scipy import stats
 
 from thor import utils
@@ -583,7 +584,7 @@ class TestRings(object):
         self.q_values  = np.array([1.0, 2.0])
         self.num_phi   = 360
         self.traj      = Trajectory.load(ref_file('ala2.pdb'))
-        self.num_shots = 2
+        self.num_shots = 4
         self.rings     = xray.Rings.simulate(self.traj, 1, self.q_values,
                                              self.num_phi, self.num_shots) # 1 molec
 
@@ -770,7 +771,20 @@ class TestRings(object):
         assert_allclose(corr_mask, corr_mask2)
         assert_allclose(corr_mask, corr_nomask)
         
-    def test_correlate_intra(self, rtol=1e-4, atol=0.0):
+    def test_fft_vs_cpp(self):
+        
+        q1 = 1.0 # chosen arb.
+        q_ind = self.rings.q_index(q1)
+        
+        x = self.rings.polar_intensities[0,q_ind,:].flatten().copy()
+        mask = np.random.binomial(1, 0.9, size=len(x)).astype(np.bool)
+        
+        fft = self.rings._correlate_rows(x, x, mask, use_fft=True)
+        cpp = self.rings._correlate_rows(x, x, mask, use_fft=True)
+
+        assert_allclose(fft, cpp)
+        
+    def test_correlate_intra(self, rtol=0.05, atol=0.1):
 
         # test autocorrelator
         intra = self.rings.correlate_intra(1.0, 1.0, normed=True)
@@ -789,7 +803,7 @@ class TestRings(object):
                         err_msg='doesnt match reference implementation normalization')
         
         # test norming
-        assert np.abs(intra[0] - 1.0) < rtol
+        assert np.abs(intra[0] - 1.0) < rtol, 'first normalized entry not 1, is: %f' % intra[0]
         intra_unnorm = self.rings.correlate_intra(1.0, 1.0, normed=False)
         assert not np.abs(intra_unnorm[0] - 1.0) < rtol
         assert_allclose(intra, intra_unnorm / intra_unnorm[0],
@@ -803,19 +817,21 @@ class TestRings(object):
         intra = self.rings.correlate_intra(1.0, 1.0, num_shots=1, mean_only=False)
         assert intra.shape == (1, self.rings.num_phi)
 
-    def test_correlate_inter(self, rtol=1e-6, atol=0.0):
+    def test_correlate_inter(self, rtol=0.01, atol=0.01):
         
         q = 1.0
         q_ind = self.rings.q_index(q)
         
-        inter = self.rings.correlate_inter(q, q, mean_only=True, normed=False)
+        inter = self.rings.correlate_inter(q, q, mean_only=False, normed=False).mean(0)
+        #inter = self.rings.correlate_inter(q, q, mean_only=True, normed=False)
 
         # reference
         ref = np.zeros(self.rings.num_phi)
         n = 0.0
         for i,j in utils.all_pairs(self.rings.num_shots):
-            x = self.rings.polar_intensities[0,q_ind,:].flatten()
-            y = self.rings.polar_intensities[1,q_ind,:].flatten()
+            print 'pair:', i,j
+            x = self.rings.polar_intensities[i,q_ind,:].flatten()
+            y = self.rings.polar_intensities[j,q_ind,:].flatten()
             ref += self.rings._correlate_rows(x, y)
             n += 1.0
         ref /= float(n)
@@ -830,22 +846,27 @@ class TestRings(object):
         rings2 = xray.Rings.simulate(self.traj, 1, self.q_values, self.num_phi, 3) # 1 molec, 3 shots
         inter = rings2.correlate_inter(q, q, mean_only=True, num_pairs=1)
         
-    def test_correlate_inter_mean_only(self, rtol=1e-4, atol=0.0):
+    def test_correlate_inter_mean_only(self, rtol=0.001, atol=0.001):
         q = 1.0
         inter1 = self.rings.correlate_inter(q, q, mean_only=True,  normed=False)
         inter2 = self.rings.correlate_inter(q, q, mean_only=False, normed=False)
         inter2_mean = inter2.mean(axis=0)
+        
         assert_allclose(inter1 / inter1[0], inter2_mean / inter2_mean[0],
                         rtol=rtol, atol=atol, 
                         err_msg='mean_only and rand pairs dont match')
+
         assert_allclose(inter1, inter2_mean, rtol=rtol, atol=atol, 
                         err_msg='mean_only and rand pairs non-std normalization doesnt match')
                         
         inter1 = self.rings.correlate_inter(q, q, mean_only=True,  normed=True)
         inter2 = self.rings.correlate_inter(q, q, mean_only=False, normed=True)
         inter2_mean = inter2.mean(axis=0)
-        assert_allclose(inter1, inter2_mean, rtol=rtol, atol=atol, 
+        
+        assert_allclose(inter1 / inter1[0], inter2_mean / inter2_mean[0], rtol=rtol, atol=atol, 
                         err_msg='mean_only and rand pairs std normalization doesnt match')
+        assert np.abs( 1.0 - inter1[0] / inter2_mean[0] ) < 0.05, 'mean_only and rand pairs std normalization doesnt match'
+                        
                         
     def test_correlate_difference(self, rtol=1e-4, atol=0.0):
         # compute diff corr for 2 shots
