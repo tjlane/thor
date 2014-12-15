@@ -28,8 +28,8 @@ except ImportError as e:
 
 
 def _simulate_particle_exposure(num, rxyz, qxyz, atomic_numbers,
-                                atoms_to_keep=None, finite_photon=None, 
-                                force_no_gpu=False,
+                                atoms_to_keep=None, finite_photon=False, 
+                                force_no_gpu=False, dont_rotate=False,
                                 atomic_numbers_are_densities=False):
     """
     Low-level interface to shot simulation. Deals with splitting the job between
@@ -65,20 +65,15 @@ def _simulate_particle_exposure(num, rxyz, qxyz, atomic_numbers,
         Run the (slow) CPU version of this function.
     """
     
+    intensities = np.zeros(qxyz.shape[0]) 
     
     # figure out finite photon statistics
     if finite_photon in [None, False]:
         poisson_parameter = 0.0 # flag to downstream code to not use stats
-    elif finite_photon == True:
-        try:
-            poisson_parameter = float(detector.beam.photons_scattered_per_shot)
-        except:
-            raise RuntimeError('`detector` object must have a beam attribute if'
-                               ' finite photon statistics are to be computed')
     elif type(finite_photon) == float:
         poisson_parameter = finite_photon
     else:
-        raise TypeError('Finite photon must be one of {True, False, float},'
+        raise TypeError('Finite photon must be one of {False, float},'
                         ' got: %s' % str(finite_photon))
        
     num = int(num)
@@ -258,6 +253,14 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
     # extract the atomic numbers
     atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
     
+    # decide what the poisson parameter is
+    if finite_photon is True:
+        try:
+            finite_photon = float(detector.beam.photons_scattered_per_shot)
+        except:
+            raise RuntimeError('`detector` object must have a beam attribute if'
+                               ' finite photon statistics are to be computed')
+    
     
     # if we're getting a speedup by ignoring hydrogens, find em and slice em
     n_atoms = len(atomic_numbers)
@@ -282,6 +285,7 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
                                                    atoms_to_keep=atoms_to_keep, 
                                                    finite_photon=finite_photon, 
                                                    force_no_gpu=force_no_gpu,
+                                                   dont_rotate=dont_rotate,
                                                    atomic_numbers_are_densities=False)
         
     return intensities
