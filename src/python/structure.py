@@ -412,6 +412,8 @@ def atomic_to_density(traj, grid_dimensions, grid_spacing):
         sampled at each point on the grid.
     """
     
+    grid_dimensions = tuple(grid_dimensions)
+    
     traj = remove_COM(traj)
 
     grid = np.zeros(grid_dimensions)
@@ -423,7 +425,7 @@ def atomic_to_density(traj, grid_dimensions, grid_spacing):
     for i in range(traj.n_atoms):
         r = traj.xyz[0,i,:] * 10.0 + center
         r_mag = np.sqrt(np.sum( np.square(nxyz - r[:,None,None,None]), axis=0 ))
-        assert r_mag.shape == grid_dimensions
+        assert r_mag.shape == grid_dimensions, '%s / %s' % (str(r_mag.shape), str(grid_dimensions))
         grid += atomic_electrondens(atomic_numbers[i], r_mag)
 
     return grid

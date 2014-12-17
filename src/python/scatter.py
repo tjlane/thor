@@ -125,14 +125,16 @@ def _simulate_particle_exposure(num, rxyz, qxyz, atomic_numbers,
     # run dat shit
     if num_cpu > 0:
         logger.debug('Running CPU scattering code (%d/%d)...' % (num_cpu, num))
-        cpu_args = (num_cpu, qxyz, rxyz, atomic_numbers, rands)
+        cpu_args = (num_cpu, qxyz, rxyz, atomic_numbers, rands,
+                    atomic_numbers_are_densities)
         t_cpu = Thread(target=multi_helper, args=('cpu', cpu_args))
         t_cpu.start()
         threads.append(t_cpu)                
 
     if num_gpu > 0:
         logger.debug('Sending calc to GPU dev: %d' % device_id)
-        gpu_args = (num_gpu, qxyz, rxyz, atomic_numbers, device_id, rands)
+        gpu_args = (num_gpu, qxyz, rxyz, atomic_numbers, device_id, rands,
+                    atomic_numbers_are_densities)
         t_gpu = Thread(target=multi_helper, args=('gpu', gpu_args))
         t_gpu.start()
         threads.append(t_gpu)
@@ -360,7 +362,7 @@ def simulate_shot_from_grid(grid, grid_spacing, num_molecules, detector,
                          '' % len(grid.shape))
     
     gs = grid.shape
-    rxyz = mgrid[:gs[0],:gs[1],:gs[2]].reshape(3, -1) * grid_spacing
+    rxyz = np.mgrid[:gs[0],:gs[1],:gs[2]].reshape(3, -1) * grid_spacing
     qxyz = _qxyz_from_detector(detector) 
     atomic_numbers = grid.flatten()
     

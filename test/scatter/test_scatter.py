@@ -402,6 +402,27 @@ class TestFinitePhoton(object):
         assert np.abs(I.sum() - detector.beam.photons_scattered_per_shot) < \
                            np.sqrt(detector.beam.photons_scattered_per_shot)*6.0
                            
+
+def test_simulate_shot_from_grid():
+    # tests both construction of density from atomic model and simulation
+    # of density
+    
+    traj = Trajectory.load(ref_file('ala2.pdb'))
+    
+    num_molecules = 1
+    grid_dimensions = [25,] * 3
+    grid_spacing = 1.0 # A?
+    detector = xray.Detector.generic()
+    
+    grid = structure.atomic_to_density(traj, grid_dimensions, grid_spacing)
+    test = scatter.simulate_shot_from_grid(grid, grid_spacing, num_molecules, 
+                                           detector, dont_rotate=True)
+    ref = scatter.simulate_shot(traj, num_molecules, detector,
+                                dont_rotate=True)
+    
+    assert_allclose(test, ref)
+
+
 def test_no_hydrogens():
     
     traj = Trajectory.load(ref_file('ala2.pdb'))
