@@ -1,1 +1,1 @@
-g++ --fast-math -O3 -lm -fopenmp -lgomp run_test.cpp -o run_test
+g++ -O3 -lm -Wall cpp_scatter.cpp run_test.cpp -o test

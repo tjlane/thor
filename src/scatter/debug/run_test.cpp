@@ -2,7 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <math.h>
-#include "cpuscatter.cpp"
+#include "cpp_scatter.hh"
 
 using namespace std;
 
@@ -35,7 +35,7 @@ int main() {
     float * h_cm_ = new float[9];
     
     
-    CPUScatter sc ( nQ_,
+    CPUScatter    ( nQ_,
                     h_qx_,
                     h_qy_,
                     h_qz_,
