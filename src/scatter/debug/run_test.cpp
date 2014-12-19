@@ -23,16 +23,13 @@ int main() {
     float * h_rx_ = new float[nAtoms_];
     float * h_ry_ = new float[nAtoms_];
     float * h_rz_ = new float[nAtoms_];
-    int * h_id_ = new int[nAtoms_];
+    float * h_ff_ = new float[nAtoms_];
     
     float * h_rand1_ = new float[nRot_];
     float * h_rand2_ = new float[nRot_];
     float * h_rand3_ = new float[nRot_];
     
     float * h_outQ_ = new float[nQ_];
-    
-    int nCM_ = 1;
-    float * h_cm_ = new float[9];
     
     
     CPUScatter    ( nQ_,
@@ -45,11 +42,7 @@ int main() {
                     h_rx_,
                     h_ry_,
                     h_rz_,
-                    h_id_,
-
-                    // cromer-mann parameters
-                    nCM_,
-                    h_cm_,
+                    h_ff_,
 
                     // random numbers for rotations
                     nRot_,

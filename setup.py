@@ -240,26 +240,26 @@ else:
     omp_link    = ['-lgomp']
 
 
-if CUDA:
-    print "Attempting to install GPU functionality"
-    gpuscatter = Extension('thor._gpuscatter',
-                        sources=['src/scatter/gpuscatter_wrap.pyx', 'src/scatter/_gpuscatter.cu'],
-                        extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
-                                            'g++': ['-O3', '-fPIC', '-Wall'] + omp_compile,
-                                            'nvcc': ['-use_fast_math', '-arch=sm_20', '--ptxas-options=-v', 
-                                                     '-c', '--compiler-options', "'-fPIC'"]},
-                        library_dirs=[CUDA['lib64']],
-                        libraries=['cudart'],
-                        runtime_library_dirs=['/usr/lib', '/usr/local/lib', CUDA['lib64']],
-                        extra_link_args = ['-lstdc++', '-lm'] + omp_link,
-                        include_dirs = [numpy_include, 'src/scatter', CUDA['include']],
-                        language='c++')
+# if CUDA:
+#     print "Attempting to install GPU functionality"
+#     gpuscatter = Extension('thor._gpuscatter',
+#                         sources=['src/scatter/gpuscatter_wrap.pyx', 'src/scatter/_gpuscatter.cu'],
+#                         extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
+#                                             'g++': ['-O3', '-fPIC', '-Wall'] + omp_compile,
+#                                             'nvcc': ['-use_fast_math', '-arch=sm_20', '--ptxas-options=-v', 
+#                                                      '-c', '--compiler-options', "'-fPIC'"]},
+#                         library_dirs=[CUDA['lib64']],
+#                         libraries=['cudart'],
+#                         runtime_library_dirs=['/usr/lib', '/usr/local/lib', CUDA['lib64']],
+#                         extra_link_args = ['-lstdc++', '-lm'] + omp_link,
+#                         include_dirs = [numpy_include, 'src/scatter', CUDA['include']],
+#                         language='c++')
+# 
+# else:
+#     gpuscatter = None
 
-else:
-    gpuscatter = None
-
-cpuscatter = Extension('thor._cpuscatter',
-                    sources=['src/scatter/cpuscatter_wrap.pyx', 'src/scatter/_cpuscatter.cpp'],
+cpuscatter = Extension('thor._cppscatter',
+                    sources=['src/scatter/cpp_scatter_wrap.pyx', 'src/scatter/cpp_scatter.cpp'],
                     extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
                                         'g++': ['-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] + omp_compile},
                     runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
@@ -291,8 +291,8 @@ metadata['packages']     = ['thor']
 metadata['package_dir']  = {'thor' :         'src/python'}
 
 metadata['ext_modules']  = [cpuscatter, misc, corr]
-if gpuscatter:
-    metadata['ext_modules'].append(gpuscatter)
+# if gpuscatter:
+#     metadata['ext_modules'].append(gpuscatter)
     
 metadata['scripts']      = [s for s in glob('scripts/*') if not s.endswith('__.py')]
 metadata['data_files']   = [('reference', glob('./reference/*'))]

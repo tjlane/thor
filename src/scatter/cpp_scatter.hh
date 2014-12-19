@@ -38,24 +38,20 @@ void CPUScatter(int    nQ,
                 float* h_qx,
                 float* h_qy,
                 float* h_qz,
-    
-                // atomic positions, ids
+
+                // atomic positions, formfactors
                 int    nAtoms,
                 float* h_rx,
                 float* h_ry,
                 float* h_rz,
-                int*   h_id,
-
-                // cromer-mann parameters
-                int    nCM,
-                float* h_cm,
+                float* h_ff,
 
                 // random numbers for rotations
                 int    nRot,
                 float* h_rand1,
                 float* h_rand2,
                 float* h_rand3,
-
+ 
                 // output
                 float* h_outQ );
 
