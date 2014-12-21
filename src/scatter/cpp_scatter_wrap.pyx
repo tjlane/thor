@@ -9,8 +9,6 @@ cimport numpy as np
 from time import time
 import os
 
-from thor.refdata import get_cromermann_parameters
-
 def output_sanity_check(intensities):
     """
     Perform a basic sanity check on the intensity array we're about to return.
@@ -21,37 +19,48 @@ def output_sanity_check(intensities):
         raise RuntimeError('Fatal error, NaNs detected in scattering output!')
         
     # check for negative values in output
-    if len(intensities[intensities < 0.0]) != 0:
-        raise RuntimeError('Fatal error, negative intensities detected in scattering output!')
+    #if len(intensities[intensities < 0.0]) != 0:
+    #    raise RuntimeError('Fatal error, negative intensities detected in scattering output!')
         
     return
     
                     
 cdef extern from "cpp_scatter.hh":
-    void cpuscatter(int    nQ,
-                    float* h_qx,
-                    float* h_qy,
-                    float* h_qz,
-                    int    nAtoms,
-                    float* h_rx,
-                    float* h_ry,
-                    float* h_rz,
-                    float* h_ff,
-                    int    nRot,
-                    float* h_rand1,
-                    float* h_rand2,
-                    float* h_rand3,
-                    float* h_outQ ) except +
+    void cpuscatter(int  n_q,
+                    float * q_x, 
+                    float * q_y, 
+                    float * q_z, 
+
+                    int    n_atoms,
+                    float * r_x, 
+                    float * r_y, 
+                    float * r_z,
+
+                    int   n_atom_types,
+                    int   * atom_types,
+                    float * cromermann,
+
+                    int   n_rotations,
+                    float * randN1, 
+                    float * randN2, 
+                    float * randN3,
+
+                    float * q_out_real,
+                    float * q_out_imag ) except +
 
 
          
 def cpp_scatter(n_molecules, 
                 np.ndarray qxyz,
                 np.ndarray rxyz,
-                np.ndarray atomic_formfactors,
+                np.ndarray atom_types,
+                np.ndarray cromermann_parameters,
                 device_id='CPU',
-                random_state=np.random.RandomState()):
+                random_state=None):
     """
+    A python interface to the C++ and CUDA scattering code. The idea here is to
+    mirror that interface closely, but in a pythonic fashion.
+    
     Parameters
     ----------
     n_molecules : int
@@ -64,8 +73,14 @@ def cpp_scatter(n_molecules,
     rxyz : ndarray, float
         An m x 3 array of the (x,y,z) positions of each atom in the molecule.
     
-    atomic_formfactors : ndarray, float
-        A 1d array of the atomic form factors of each atom (same len as `rxyz`).
+    atom_types : ndarray, int
+        A length-m one dim array of the ID of each atom telling the code which
+        Cromer-Mann parameter to use. See below.
+        
+    cromermann_parameters : ndarray, float
+        A one-d array of length 9 * the number of unique `atom_types`,
+        specifying the 9 Cromer-Mann parameters for each atom type.
+    
     
     Optional Parameters
     -------------------
@@ -76,10 +91,16 @@ def cpp_scatter(n_molecules,
     
     Returns
     -------
-    self.intensities : ndarray, float
-        A flat array of the simulated intensities, each position corresponding
+    amplitudes : ndarray, complex128
+        A flat array of the simulated amplitudes, each position corresponding
         to a scattering vector from `qxyz`.
     """
+    
+    # check input sanity
+    num_atom_types = len(np.unique(atom_types))
+    if not len(cromermann_parameters) == num_atom_types * 9:
+        raise ValueError('input array `cromermann_parameters` should be len '
+                         '9 * num of unique `atom_types`')
     
     # A NOTE ABOUT ARRAY ORDERING
     # In what follows, for multi-dimensional arrays I often take the transpose
@@ -89,21 +110,33 @@ def cpp_scatter(n_molecules,
     # extract arrays from input  
     cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_qxyz
     cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_rxyz
-    cdef np.ndarray[ndim=1, dtype=np.float32_t] c_formfactors
+    cdef np.ndarray[ndim=1, dtype=np.float32_t] c_cromermann
     
     c_qxyz = np.ascontiguousarray(qxyz.T, dtype=np.float32)
     c_rxyz = np.ascontiguousarray(rxyz.T, dtype=np.float32)
-    c_formfactors = np.ascontiguousarray(atomic_formfactors, dtype=np.float32)
+    c_cromermann = np.ascontiguousarray(cromermann_parameters, dtype=np.float32)
+    
+    # for some reason "memoryview" syntax necessary for int arrays...
+    cdef int[::1] c_atom_types = np.ascontiguousarray(atom_types, dtype=np.int32)
     
     # generate random numbers
+    if random_state is None:
+        s = int(time.time() * 1e6) + os.getpid()
+        random_state = np.random.RandomState(s)
+    
     if not isinstance(random_state, np.random.RandomState):
         raise TypeError('`random_state` must be instance of np.random.RandomState')
+        
     cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_rfloats
-    c_rfloats = np.ascontiguousarray( random_state.rand(3, n_molecules), dtype=np.float32)
+    # c_rfloats = np.ascontiguousarray( random_state.rand(3, n_molecules), 
+    #                                   dtype=np.float32 )
+    c_rfloats = np.zeros((3, n_molecules), dtype=np.float32)
 
-    # initialize output array
-    cdef np.ndarray[ndim=1, dtype=np.float32_t] h_outQ
-    h_outQ = np.zeros(qxyz.shape[0], dtype=np.float32)
+    # initialize output arrays
+    cdef np.ndarray[ndim=1, dtype=np.float32_t] real_amplitudes
+    cdef np.ndarray[ndim=1, dtype=np.float32_t] imag_amplitudes
+    real_amplitudes = np.zeros(qxyz.shape[0], dtype=np.float32)
+    imag_amplitudes = np.zeros(qxyz.shape[0], dtype=np.float32)
     
     
     # --- call the actual C++ code
@@ -111,9 +144,9 @@ def cpp_scatter(n_molecules,
     if device_id == 'CPU':
         cpuscatter(qxyz.shape[0], &c_qxyz[0,0], &c_qxyz[1,0], &c_qxyz[2,0],
                    rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
-                   &c_formfactors[0],
+                   num_atom_types, &c_atom_types[0], &c_cromermann[0],
                    n_molecules, &c_rfloats[0,0], &c_rfloats[1,0], &c_rfloats[2,0],
-                   &h_outQ[0])
+                   &real_amplitudes[0], &imag_amplitudes[0])
     
     elif (type(device_id) == int) or (device_id == 'GPU'): # run on GPU
 
@@ -146,7 +179,12 @@ def cpp_scatter(n_molecules,
                          '%s' % str(device_id))
                                    
     # deal with the output
-    output_sanity_check(h_outQ)
+    output_sanity_check(real_amplitudes)
+    output_sanity_check(imag_amplitudes)
     
-    return h_outQ
+    #amplitudes = np.empty(qxyz.shape[0], dtype=np.complex128)
+    amplitudes = real_amplitudes + 1j * imag_amplitudes
+    
+    return amplitudes
+    
 
