@@ -28,7 +28,7 @@ def output_sanity_check(intensities):
     
                     
 cdef extern from "cpp_scatter.hh":
-    void CPUScatter(int    nQ,
+    void cpuscatter(int    nQ,
                     float* h_qx,
                     float* h_qy,
                     float* h_qz,
@@ -109,12 +109,11 @@ def cpp_scatter(n_molecules,
     # --- call the actual C++ code
     
     if device_id == 'CPU':
-    
-        CPUScatter(qxyz.shape[0], &c_qxyz[0,0], &c_qxyz[1,0], &c_qxyz[2,0],
-                     rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
-                     &c_formfactors[0],
-                     n_molecules, &c_rfloats[0,0], &c_rfloats[1,0], &c_rfloats[2,0],
-                     &h_outQ[0])
+        cpuscatter(qxyz.shape[0], &c_qxyz[0,0], &c_qxyz[1,0], &c_qxyz[2,0],
+                   rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
+                   &c_formfactors[0],
+                   n_molecules, &c_rfloats[0,0], &c_rfloats[1,0], &c_rfloats[2,0],
+                   &h_outQ[0])
     
     elif (type(device_id) == int) or (device_id == 'GPU'): # run on GPU
 

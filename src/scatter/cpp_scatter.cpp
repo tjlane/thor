@@ -1,4 +1,10 @@
-/*! YTZ 20121106 */
+/*! 
+ *  Code for computing the Thompson diffraction from an atomic structure,
+ *  in parallel, both on the GPU and CPU.
+ *
+ *  First version: YTZ 2012
+ *  Updated TJL 2012, 2014
+ */
 
 #include <stdio.h>
 #include <stdint.h>
@@ -9,8 +15,6 @@
 #include <fstream>
 #include <sstream>
 
-// #include "gpuscatter.hh"
-// #include "cpuscatter.hh"
 #include "cpp_scatter.hh"
 
 using namespace std;
@@ -106,6 +110,7 @@ void rotate(float x, float y, float z,
 
 
 
+
 /******************************************************************************
  * GPU Only Code
  ******************************************************************************/
@@ -187,10 +192,11 @@ void __global__ gpu_kernel(float const * const __restrict__ q_x,
             float fi;
             
             // for each atom type, compute the atomic form factor f_i(q)
+            int tind;
             for (int type = 0; type < numAtomTypes; type++) {
             
                 // scan through cromermann in blocks of 9 parameters
-                int tind = type * 9;
+                tind = type * 9;
                 fi =  cromermann[tind]   * exp(-cromermann[tind+4]*qo);
                 fi += cromermann[tind+1] * exp(-cromermann[tind+5]*qo);
                 fi += cromermann[tind+2] * exp(-cromermann[tind+6]*qo);
@@ -448,143 +454,172 @@ void GPUScatter (int device_id_,
  * CPU Only Code
  ******************************************************************************/
 
-void cpu_kernel( float const * const __restrict__ q_x, 
+
+
+
+void cpu_kernel( int   const n_q,
+                 float const * const __restrict__ q_x, 
                  float const * const __restrict__ q_y, 
                  float const * const __restrict__ q_z, 
-                 float *outQ, // <-- not const 
-                 int   const nQ,
+                 
+                 int   const n_atoms,
                  float const * const __restrict__ r_x, 
                  float const * const __restrict__ r_y, 
                  float const * const __restrict__ r_z,
-                 int   const * const __restrict__ r_id, 
-                 int   const numAtoms, 
-                 int   const numAtomTypes,
+                 
+                 int   const n_atom_types,
+                 int   const * const __restrict__ atom_types,
                  float const * const __restrict__ cromermann,
+                 
+                 int   const n_rotations,
                  float const * const __restrict__ randN1, 
                  float const * const __restrict__ randN2, 
                  float const * const __restrict__ randN3,
-                 const int n_rotations ) {
-            
+                 
+                 float * q_out_real, // <-- not const 
+                 float * q_out_imag  // <-- not const 
+                ) {
+                      
+    /* CPU code for computing a scattering simulation
+     *
+     * This code is designed to mirror the implementation of the GPU code above,
+     * which should aid development and testing.
+     *
+     * Arguments
+     * ---------
+     * n_q / q_{x,y,z}     : the number and xyz positions of momentum q-vectors
+     * n_atoms / r_{x,y,z} : the number and xyz positions of atomic positions
+     * n_atom_types        : the number of unique atom types (formfactors)
+     * atom_types          : the atom "type", which is an arbitrary index
+     * cromermann          : 9 params specifying formfactor for each atom type 
+     * n_rotations/        : The number of molecules to independently rotate and
+     *  randN{1,2,3}         the random numbers used to perform those rotations
+     *
+     * Output
+     * ------
+     * q_out_real : the real part of the complex scattering amplitude
+     * q_out_imag : the imaginary part of the scattering amplitude
+     *
+     */
 
     // private variables
-    float rand1, rand2, rand3;
-    float q0, q1, q2, q3;
-    float qx, qy, qz;
-    float Qsumx, Qsumy;
-    float mq, qo, fi;
-    int tind;
-    float rx, ry, rz;
-    int id;
-    float ax, ay, az;
-    float qr;
+    float qx, qy, qz;      // extracted q vector
+    // float rx, ry, rz;      // extracted r vector
+    float ax, ay, az;      // rotated r vector
+    float mq, qo, fi;      // mag of q, formfactor for atom i
+    float Qsumx, Qsumy;    // partial sum of real and imaginary amplitude
+    float qr;              // dot product of q and r
     
-    int MAX_NUM_TYPES = 10;
-
-    // main loop
-    // #pragma omp parallel for shared(outQ) private(rand1, rand2, rand3, q0, q1, q2, \
-    //     q3, qx, qy, qz, Qsumx, Qsumy, mq, qo, fi, tind, rx, ry, rz, id, ax, ay, az, qr)
+    // we will use a small array to store form factors
+    float * formfactors = (float *) malloc(n_atom_types * sizeof(float));
+    
+    // pre-compute rotation quaternions    
+    float * q0 = (float *) malloc(n_rotations * sizeof(float));
+    float * q1 = (float *) malloc(n_rotations * sizeof(float));
+    float * q2 = (float *) malloc(n_rotations * sizeof(float));
+    float * q3 = (float *) malloc(n_rotations * sizeof(float));
+    
     for( int im = 0; im < n_rotations; im++ ) {
-       
-        // determine the rotated locations
-        rand1 = randN1[im]; 
-        rand2 = randN2[im]; 
-        rand3 = randN3[im]; 
-
-        // rotation quaternions
-        generate_random_quaternion(rand1, rand2, rand3, q0, q1, q2, q3);
-
-        // for each q vector
-        for( int iq = 0; iq < nQ; iq++ ) {
-            qx = q_x[iq];
-            qy = q_y[iq];
-            qz = q_z[iq];
-
-            // workspace for cm calcs -- static size, but hopefully big enough
-            float formfactors[MAX_NUM_TYPES];
-
-            // accumulant
-            Qsumx = 0;
-            Qsumy = 0;
-     
-            // Cromer-Mann computation, precompute for this value of q
-            mq = qx*qx + qy*qy + qz*qz;
-            qo = mq / (16*M_PI*M_PI); // qo is (sin(theta)/lambda)^2
-            
-            // for each atom type, compute the atomic form factor f_i(q)
-            for (int type = 0; type < numAtomTypes; type++) {
-            
-                // scan through cromermann in blocks of 9 parameters
-                tind = type * 9;
-                fi =  cromermann[tind]   * exp(-cromermann[tind+4]*qo);
-                fi += cromermann[tind+1] * exp(-cromermann[tind+5]*qo);
-                fi += cromermann[tind+2] * exp(-cromermann[tind+6]*qo);
-                fi += cromermann[tind+3] * exp(-cromermann[tind+7]*qo);
-                fi += cromermann[tind+8];
-                
-                formfactors[type] = fi; // store for use in a second
-            }
-
-            // for each atom in molecule
-            // #pragma omp parallel for private(rx, ry, rz, ax, ay, az, id, qr, fi) shared(formfactors, q0, q1, q2, q3, qx, qy, qz)
-            for( int a = 0; a < numAtoms; a++ ) {
-
-                // get the current positions
-                rx = r_x[a];
-                ry = r_y[a];
-                rz = r_z[a];
-                id = r_id[a];
-
-                rotate(rx, ry, rz, q0, q1, q2, q3, ax, ay, az);
-                qr = ax*qx + ay*qy + az*qz;
-
-                fi = formfactors[id];
-                
-                Qsumx += fi*sinf(qr);
-                Qsumy += fi*cosf(qr);
-                
-            } // finished one molecule.
-                        
-            // add the output to the total intensity array
-            // #pragma omp critical
-            outQ[iq] += (Qsumx*Qsumx + Qsumy*Qsumy); // / n_rotations;
-            
-        }
+        generate_random_quaternion(randN1[im], randN2[im], randN3[im],
+                                   q0[im], q1[im], q2[im], q3[im]);
     }
-}
 
 
-void CPUScatter(int    nQ,
-                float* h_qx,
-                float* h_qy,
-                float* h_qz,
+    // ---> main loop (3 nested loops)
+    // for each q vector (1st nested loop)
+    for( int iq = 0; iq < n_q; iq++ ) {
+        
+        qx = q_x[iq];
+        qy = q_y[iq];
+        qz = q_z[iq];
+        
+        // Cromer-Mann computation, precompute for this value of q
+        mq = qx*qx + qy*qy + qz*qz;
+        qo = mq / (16*M_PI*M_PI); // qo is (sin(theta)/lambda)^2
+
+        // accumulant: real and imaginary amplitudes for this q vector
+        Qsumx = 0;
+        Qsumy = 0;
     
-                // atomic positions, ids
-                int    nAtoms,
-                float* h_rx,
-                float* h_ry,
-                float* h_rz,
-                int*   h_id,
+        // precompute atomic form factors for each atom type
+        int tind;
+        for (int type = 0; type < n_atom_types; type++) {
+                        
+            tind = type * 9;
+            fi =  cromermann[tind]   * exp(-cromermann[tind+4]*qo);
+            fi += cromermann[tind+1] * exp(-cromermann[tind+5]*qo);
+            fi += cromermann[tind+2] * exp(-cromermann[tind+6]*qo);
+            fi += cromermann[tind+3] * exp(-cromermann[tind+7]*qo);
+            fi += cromermann[tind+8];
+            
+            formfactors[type] = fi;
 
-                // cromer-mann parameters
-                int    nCM,
-                float* h_cm,
+        }
 
-                // random numbers for rotations
-                int    nRot,
-                float* h_rand1,
-                float* h_rand2,
-                float* h_rand3,
+        // for each molecule (2nd nested loop)
+        for( int im = 0; im < n_rotations; im++ ) {
+            
+            int id;
+            
+            // for each atom in molecule (3rd nested loop)
+            for( int a = 0; a < n_atoms; a++ ) {
 
-                // output
-                float* h_outQ ) {
-                                
-    int numAtomTypes = nCM / 9;
+                id = atom_types[a];
+                fi = formfactors[id];
 
-    // execute the kernel
-    cpu_kernel(h_qx, h_qy, h_qz, 
-               h_outQ, nQ, 
-               h_rx, h_ry, h_rz, 
-               h_id, nAtoms, numAtomTypes, h_cm, 
-               h_rand1, h_rand2, h_rand3, nRot);
+                rotate(r_x[a], r_y[a], r_z[a], 
+                       q0[im], q1[im], q2[im], q3[im],
+                       ax, ay, az);
+                
+                qr = ax*qx + ay*qy + az*qz;
+                
+                Qsumx += fi * sinf(qr);
+                Qsumy += fi * cosf(qr);
+                
+            } // finished one atom (3rd loop)
+        } // finished one molecule (2nd loop)
+        
+        // add the output to the total intensity array
+        q_out_real[iq] += Qsumx;
+        q_out_imag[iq] += Qsumy;
+        
+    } // finished one q vector (1st loop)
+    
+    free(formfactors);
+    free(q0);
+    free(q1);
+    free(q2);
+    free(q3);
+    
 }
 
+void cpuscatter(  int  n_q,
+                  float * q_x, 
+                  float * q_y, 
+                  float * q_z, 
+
+                  int    n_atoms,
+                  float * r_x, 
+                  float * r_y, 
+                  float * r_z,
+
+                  int   n_atom_types,
+                  int   * atom_types,
+                  float * cromermann,
+
+                  int   n_rotations,
+                  float * randN1, 
+                  float * randN2, 
+                  float * randN3,
+
+                  float * q_out_real,
+                  float * q_out_imag
+                 ) {
+
+    cpu_kernel( n_q, q_x, q_y, q_z, 
+                n_atoms, r_x, r_y, r_z,
+                n_atom_types, atom_types, cromermann,
+                n_rotations, randN1, randN2, randN3,
+                q_out_real, q_out_imag );
+
+}

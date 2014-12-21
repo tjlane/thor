@@ -14,15 +14,15 @@ from numpy.testing import assert_almost_equal, assert_allclose
 
 from nose import SkipTest
 
-try:
-    from thor import _gpuscatter
-    GPU = True
-except ImportError:
-    GPU = False
+from thor import _cppscatter
+# try:
+#     from thor import _gpuscatter
+#     GPU = True
+# except ImportError:
+#     GPU = False
 
 from thor.refdata import cromer_mann_params
 from thor import xray
-from thor import _cpuscatter
 from thor import scatter
 from thor import structure
 from thor.testing import skip, ref_file, gputest
@@ -318,8 +318,11 @@ class TestScatter(object):
 
         print "testing c cpu code..."
 
-        cpu_I = _cpuscatter.simulate(self.num_molecules, self.q_grid, self.xyzlist, 
-                                    self.atomic_numbers, rfloats=self.rfloats)
+        cpu_I = _cppscatter.cpp_scatter(self.num_molecules, 
+                                         self.q_grid, 
+                                         self.xyzlist, 
+                                         self.atomic_numbers,
+                                         rfloats=self.rfloats)
 
         print "CPU", cpu_I
         print "REF", self.ref_I

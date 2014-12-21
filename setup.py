@@ -258,7 +258,7 @@ else:
 # else:
 #     gpuscatter = None
 
-cpuscatter = Extension('thor._cppscatter',
+cppscatter = Extension('thor._cppscatter',
                     sources=['src/scatter/cpp_scatter_wrap.pyx', 'src/scatter/cpp_scatter.cpp'],
                     extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
                                         'g++': ['-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] + omp_compile},
@@ -290,7 +290,7 @@ corr = Extension('thor.corr',
 metadata['packages']     = ['thor']
 metadata['package_dir']  = {'thor' :         'src/python'}
 
-metadata['ext_modules']  = [cpuscatter, misc, corr]
+metadata['ext_modules']  = [cppscatter, misc, corr]
 # if gpuscatter:
 #     metadata['ext_modules'].append(gpuscatter)
     
