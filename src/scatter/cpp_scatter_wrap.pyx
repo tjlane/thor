@@ -127,11 +127,8 @@ def cpp_scatter(n_molecules,
         raise TypeError('`random_state` must be instance of np.random.RandomState')
         
     cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_rfloats
-    
-    # TEMPORARY FOR DEBUGGING
-    # c_rfloats = np.ascontiguousarray( random_state.rand(3, n_molecules), 
-    #                                   dtype=np.float32 )
-    c_rfloats = np.zeros((3, n_molecules), dtype=np.float32)
+    c_rfloats = np.ascontiguousarray( random_state.rand(3, n_molecules), 
+                                      dtype=np.float32 )
 
     # initialize output arrays
     cdef np.ndarray[ndim=1, dtype=np.float32_t] real_amplitudes

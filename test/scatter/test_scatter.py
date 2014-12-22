@@ -140,12 +140,13 @@ def ref_simulate_shot(xyzlist, atomic_numbers, num_molecules, q_grid):
     
     A = np.zeros(q_grid.shape[0], dtype=np.complex128)
     
+    rs = np.random.RandomState(0)
+    rfs = rs.rand(3, num_molecules)
+    
     for i,qvector in enumerate(q_grid):    
         for n in range(num_molecules):
         
             # match random numbers that will be generated in actual impl.
-            #rfs = RANDOM_STATE.rand(3, n_molecules)
-            rfs = np.zeros((3, num_molecules))
             rotated_xyzlist = rand_rotate_molecule(xyzlist, rfloat=rfs[:,n])
             
             # compute the molecular form factor F(q)
@@ -319,9 +320,9 @@ class TestScatter(object):
                                         atom_types,
                                         cromermann_parameters,
                                         device_id='CPU',
-                                        random_state=self.random_state)
+                                        random_state=np.random.RandomState(0))
 
-        assert_allclose(cpu_A, self.ref_A, rtol=1e-03,
+        assert_allclose(cpu_A, self.ref_A, rtol=1e-2, atol=1.0,
                         err_msg='scatter: c-cpu/cpu reference mismatch')
         assert not np.all( cpu_A == 0.0 )
         assert not np.sum( cpu_A == np.nan )
