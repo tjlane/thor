@@ -24,8 +24,9 @@ from thor import structure
 from thor.refdata import get_cromermann_parameters, cromer_mann_params
 from thor.testing import skip, ref_file, gputest
 
-global RANDOM_STATE
-RANDOM_STATE = np.random.RandomState(0)
+import time
+global RANDOM_SEED
+RANDOM_SEED = int(time.time() * 1e6)
 
 # ------------------------------------------------------------------------------
 #                        BEGIN REFERENCE IMPLEMENTATIONS
@@ -140,7 +141,7 @@ def ref_simulate_shot(xyzlist, atomic_numbers, num_molecules, q_grid):
     
     A = np.zeros(q_grid.shape[0], dtype=np.complex128)
     
-    rs = np.random.RandomState(0)
+    rs = np.random.RandomState(RANDOM_SEED)
     rfs = rs.rand(3, num_molecules)
     
     for i,qvector in enumerate(q_grid):    
@@ -278,16 +279,10 @@ class TestScatter(object):
         xyzQ = np.loadtxt(ref_file('512_atom_benchmark.xyz'))
         self.xyzlist = xyzQ[:,:3] * 10.0 # nm -> ang.
         self.atomic_numbers = xyzQ[:,3].flatten()
-    
+        
         self.q_grid = np.loadtxt(ref_file('512_q.xyz'))[:self.nq]
         
-        #self.rfloats = np.loadtxt(ref_file('512_x_3_random_floats.txt'))
-        
-        self.num_molecules = 512
-        self.random_state = np.random.RandomState(0)
-        #self.rfloats = self.random_state.rand(3, self.num_molecules)[::-1,:].T
-        self.rfloats = np.zeros((self.num_molecules, 3))
-        
+        self.num_molecules = 512        
         self.ref_A = ref_simulate_shot(self.xyzlist, self.atomic_numbers, 
                                        self.num_molecules, self.q_grid)
     
@@ -320,7 +315,7 @@ class TestScatter(object):
                                         atom_types,
                                         cromermann_parameters,
                                         device_id='CPU',
-                                        random_state=np.random.RandomState(0))
+                                        random_state=np.random.RandomState(RANDOM_SEED))
 
         assert_allclose(cpu_A, self.ref_A, rtol=1e-2, atol=1.0,
                         err_msg='scatter: c-cpu/cpu reference mismatch')
