@@ -449,13 +449,12 @@ void GPUScatter (int device_id_,
     }
 }
 
+// end of GPU enabled code <---
 #endif
+
 /******************************************************************************
  * CPU Only Code
  ******************************************************************************/
-
-
-
 
 void cpu_kernel( int   const n_q,
                  float const * const __restrict__ q_x, 
@@ -503,12 +502,11 @@ void cpu_kernel( int   const n_q,
      */
 
     // private variables
-    float qx, qy, qz;      // extracted q vector
-    // float rx, ry, rz;      // extracted r vector
-    float ax, ay, az;      // rotated r vector
-    float mq, qo, fi;      // mag of q, formfactor for atom i
-    float Qsumx, Qsumy;    // partial sum of real and imaginary amplitude
-    float qr;              // dot product of q and r
+    float qx, qy, qz;             // extracted q vector
+    float ax, ay, az;             // rotated r vector
+    float mq, qo, fi;             // mag of q, formfactor for atom i
+    float q_sum_real, q_sum_imag; // partial sum of real and imaginary amplitude
+    float qr;                     // dot product of q and r
     
     // we will use a small array to store form factors
     float * formfactors = (float *) malloc(n_atom_types * sizeof(float));
@@ -538,8 +536,8 @@ void cpu_kernel( int   const n_q,
         qo = mq / (16*M_PI*M_PI); // qo is (sin(theta)/lambda)^2
 
         // accumulant: real and imaginary amplitudes for this q vector
-        Qsumx = 0;
-        Qsumy = 0;
+        q_sum_real = 0;
+        q_sum_imag = 0;
     
         // precompute atomic form factors for each atom type
         int tind;
@@ -573,15 +571,15 @@ void cpu_kernel( int   const n_q,
                 
                 qr = ax*qx + ay*qy + az*qz;
                 
-                Qsumx += fi * sinf(qr);
-                Qsumy += fi * cosf(qr);
+                q_sum_real += fi * sinf(qr);
+                q_sum_imag += fi * cosf(qr);
                 
             } // finished one atom (3rd loop)
         } // finished one molecule (2nd loop)
         
         // add the output to the total intensity array
-        q_out_real[iq] += Qsumx;
-        q_out_imag[iq] += Qsumy;
+        q_out_real[iq] = q_sum_real;
+        q_out_imag[iq] = q_sum_imag;
         
     } // finished one q vector (1st loop)
     

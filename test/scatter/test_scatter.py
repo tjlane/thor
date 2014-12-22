@@ -24,6 +24,8 @@ from thor import structure
 from thor.refdata import get_cromermann_parameters, cromer_mann_params
 from thor.testing import skip, ref_file, gputest
 
+global RANDOM_STATE
+RANDOM_STATE = np.random.RandomState(0)
 
 # ------------------------------------------------------------------------------
 #                        BEGIN REFERENCE IMPLEMENTATIONS
@@ -104,7 +106,7 @@ def form_factor(qvector, atomz):
     return fi
 
     
-def ref_simulate_shot(xyzlist, atomic_numbers, num_molecules, q_grid, rfloats=None):
+def ref_simulate_shot(xyzlist, atomic_numbers, num_molecules, q_grid):
     """
     Simulate a single x-ray scattering shot off an ensemble of identical
     molecules.
@@ -136,30 +138,24 @@ def ref_simulate_shot(xyzlist, atomic_numbers, num_molecules, q_grid, rfloats=No
         the value of the measured intensity at each point on the grid.
     """
     
-    I = np.zeros(q_grid.shape[0])
+    A = np.zeros(q_grid.shape[0], dtype=np.complex128)
     
-    for n in range(num_molecules):
+    for i,qvector in enumerate(q_grid):    
+        for n in range(num_molecules):
         
-        if rfloats == None:
-            rotated_xyzlist = rand_rotate_molecule(xyzlist)
-        else:
-            rotated_xyzlist = rand_rotate_molecule(xyzlist, rfloat=rfloats[n,:])
-        
-        for i,qvector in enumerate(q_grid):
-
+            # match random numbers that will be generated in actual impl.
+            #rfs = RANDOM_STATE.rand(3, n_molecules)
+            rfs = np.zeros((3, num_molecules))
+            rotated_xyzlist = rand_rotate_molecule(xyzlist, rfloat=rfs[:,n])
+            
             # compute the molecular form factor F(q)
-            F = 0.0
             for j in range(xyzlist.shape[0]):
                 fi = form_factor(qvector, atomic_numbers[j])
                 r = rotated_xyzlist[j,:]
-                F += fi * np.exp( 1j * np.dot(qvector, r) )
-    
-            I[i] += F.real*F.real + F.imag*F.imag
+                A[i] +=      fi * np.sin( np.dot(qvector, r) )
+                A[i] += 1j * fi * np.cos( np.dot(qvector, r) )
 
-    if len(I[I<0.0]) != 0:
-        raise Exception('neg values in reference scattering implementation')
-
-    return I
+    return A
 
 
 def debye_reference(trajectory, weights=None, q_values=None):
@@ -276,7 +272,7 @@ class TestScatter(object):
     
     def setup(self):
         
-        self.nq = 2 # number of detector vectors to do
+        self.nq = 3 # number of detector vectors to do
         
         xyzQ = np.loadtxt(ref_file('512_atom_benchmark.xyz'))
         self.xyzlist = xyzQ[:,:3] * 10.0 # nm -> ang.
@@ -291,9 +287,8 @@ class TestScatter(object):
         #self.rfloats = self.random_state.rand(3, self.num_molecules)[::-1,:].T
         self.rfloats = np.zeros((self.num_molecules, 3))
         
-        self.ref_I = ref_simulate_shot(self.xyzlist, self.atomic_numbers, 
-                                       self.num_molecules, self.q_grid, 
-                                       self.rfloats)
+        self.ref_A = ref_simulate_shot(self.xyzlist, self.atomic_numbers, 
+                                       self.num_molecules, self.q_grid)
     
     def test_gpu_scatter(self):
 
@@ -317,6 +312,7 @@ class TestScatter(object):
         
         cromermann_parameters, atom_types = get_cromermann_parameters(self.atomic_numbers)
         
+        print 'num_molecules:', self.num_molecules
         cpu_A = _cppscatter.cpp_scatter(self.num_molecules, 
                                         self.q_grid, 
                                         self.xyzlist, 
@@ -324,15 +320,11 @@ class TestScatter(object):
                                         cromermann_parameters,
                                         device_id='CPU',
                                         random_state=self.random_state)
-        cpu_I = np.abs( np.square(cpu_A) )
 
-        print "CPU", cpu_I / cpu_I[0]
-        print "REF", self.ref_I / self.ref_I[0]
-
-        assert_allclose(cpu_I, self.ref_I, rtol=1e-03,
+        assert_allclose(cpu_A, self.ref_A, rtol=1e-03,
                         err_msg='scatter: c-cpu/cpu reference mismatch')
-        assert not np.all( cpu_I == 0.0 )
-        assert not np.sum( cpu_I == np.nan )
+        assert not np.all( cpu_A == 0.0 )
+        assert not np.sum( cpu_A == np.nan )
         
                             
     def test_python_call(self):

@@ -9,18 +9,17 @@ cimport numpy as np
 from time import time
 import os
 
-def output_sanity_check(intensities):
+def output_sanity_check(output):
     """
     Perform a basic sanity check on the intensity array we're about to return.
     """
     
     # check for NaNs in output
-    if np.isnan(np.sum(intensities)):
+    if np.isnan(np.sum(output)):
         raise RuntimeError('Fatal error, NaNs detected in scattering output!')
         
-    # check for negative values in output
-    #if len(intensities[intensities < 0.0]) != 0:
-    #    raise RuntimeError('Fatal error, negative intensities detected in scattering output!')
+    if np.any(np.isinf(output)):
+        raise RuntimeError('Fatal error, Infs detected in scattering output!')
         
     return
     
@@ -128,6 +127,8 @@ def cpp_scatter(n_molecules,
         raise TypeError('`random_state` must be instance of np.random.RandomState')
         
     cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_rfloats
+    
+    # TEMPORARY FOR DEBUGGING
     # c_rfloats = np.ascontiguousarray( random_state.rand(3, n_molecules), 
     #                                   dtype=np.float32 )
     c_rfloats = np.zeros((3, n_molecules), dtype=np.float32)
