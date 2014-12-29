@@ -14,7 +14,7 @@ from numpy.testing import assert_almost_equal, assert_allclose
 
 from nose import SkipTest
 
-from mdtraj import Trajectory
+import mdtraj
 import matplotlib.pyplot as plt
 
 from thor import _cppscatter
@@ -368,39 +368,58 @@ class TestPyScatter(object):
     
     def setup(self):
         
-        self.nq = 3 # number of detector vectors to do
+        self.nq = 5 # number of detector vectors to do
         self.q_grid = np.loadtxt(ref_file('512_q.xyz'))[:self.nq]
         
         self.traj = mdtraj.load(ref_file('ala2.pdb'))
         atomic_numbers = np.array([ a.element.atomic_number for a in self.traj.topology.atoms ])
+        cp, at = get_cromermann_parameters(atomic_numbers)
         
-        self.num_molecules = 512
-        self.ref_A = ref_simulate_shot(self.traj.xyz[0] * 10.0, 
+        self.num_molecules = 32
+        rxyz = self.traj.xyz[0] * 10.0
+        
+        self.ref_A = ref_simulate_shot(rxyz, 
                                        atomic_numbers, 
                                        self.num_molecules,
                                        self.q_grid)
+        self.cpp_A = _cppscatter.cpp_scatter(self.num_molecules,
+                                             rxyz,
+                                             self.q_grid,
+                                             at, cp,
+                                             random_state=np.random.RandomState(RANDOM_SEED))
                                        
     def simulate_atomic(self):
-        A = simulate_atomic(self.traj, self.num_molecules, self.q_grid)
-        assert_allclose(A, self.ref_A, rtol=1e-6)
+        rs = np.random.RandomState(RANDOM_SEED)
+        A = scatter.simulate_atomic(self.traj, self.num_molecules, self.q_grid,
+                                    random_state=rs)
+        assert_allclose(A, self.cpp_A, rtol=1e-6, err_msg='doesnt match cpp ref')
+        assert_allclose(A, self.ref_A, rtol=1e-6, err_msg='doesnt match py ref')
         
         
+    def test_dont_rotate_atomic(self):
+        A1 = scatter.simulate_atomic(self.traj, self.num_molecules, self.q_grid,
+                                     dont_rotate=True)
+        A2 = scatter.simulate_atomic(self.traj, self.num_molecules, self.q_grid,
+                                     dont_rotate=True)
+        assert_allclose(A1, A2)
         
-    @skip
-    def test_no_hydrogens():
+    def test_finite_photon_atomic(self):
+        rs = np.random.RandomState(RANDOM_SEED)
+        A = scatter.simulate_atomic(self.traj, self.num_molecules, self.q_grid,
+                                    random_state=rs, finite_photon=1.0e8)
+        assert A.dtype == np.int
+        A = A.astype(np.float)
+        ref_I = np.square( np.abs( self.cpp_A ) )
+        assert_allclose(A / A[0], ref_I / ref_I[0], rtol=1e-2, 
+                        err_msg='Finite photon statistics screwy in large photon limit')
+        
+        
+    def test_no_hydrogens(self):
 
-        traj = Trajectory.load(ref_file('ala2.pdb'))
-
-        num_molecules = 1
-        detector = xray.Detector.generic()
-        detector.beam.photons_scattered_per_shot = 1e3
-
-        I_noH = scatter.simulate_shot(traj, num_molecules, detector, 
-                                      ignore_hydrogens=True,
-                                      dont_rotate=True)
-        I_wH  = scatter.simulate_shot(traj, num_molecules, detector, 
-                                      ignore_hydrogens=False,
-                                      dont_rotate=True)
+        I_wH = scatter.simulate_atomic(self.traj, self.num_molecules, self.q_grid,
+                                       dont_rotate=True, ignore_hydrogens=False)
+        I_noH = scatter.simulate_atomic(self.traj, self.num_molecules, self.q_grid,
+                                        dont_rotate=True, ignore_hydrogens=True)
 
         assert not np.all(I_noH == I_wH)
 
@@ -411,39 +430,25 @@ class TestPyScatter(object):
         assert diff < 1.0, 'ignoring hydrogens makes too big of a difference...'
         
         
-    @skip
     def simulate_density(self):
-        A = simulate_density(grid, 
-                             grid_spacing, 
-                             self.num_molecules, self.q_grid)
-
-
-                          
-    
-        traj = Trajectory.load(ref_file('ala2.pdb'))
-    
-        num_molecules = 1
+        
+        # MANUALLY SET -- detector obj should match grid
         grid_dimensions = [25,] * 3
         grid_spacing = 1.0 # A?
-        detector = xray.Detector.generic()
-    
-        grid = structure.atomic_to_density(traj, grid_dimensions, grid_spacing)
-        test = scatter.simulate_shot_from_grid(grid, grid_spacing, num_molecules, 
-                                               detector, dont_rotate=True)
-        ref = scatter.simulate_shot(traj, num_molecules, detector,
-                                    dont_rotate=True)
-    
-        assert_allclose(test, ref)
-
-
-
+        
+        grid = structure.atomic_to_density(self.traj, grid_dimensions, grid_spacing)
+        
+        A = scatter.simulate_density(grid, grid_spacing, 
+                                     self.num_molecules, self.q_grid)
+        assert_allclose(A, self.cpp_A, rtol=1e-6, err_msg='doesnt match cpp ref')
+        assert_allclose(A, self.ref_A, rtol=1e-6, err_msg='doesnt match py ref')
     
         
 
 def test_sph_harm():
     
     # -----------------------
-    traj = Trajectory.load(ref_file('pentagon.pdb'))
+    traj = mdtraj.load(ref_file('pentagon.pdb'))
     
     q_magnitudes     = [1.6]
     num_coefficients = 44

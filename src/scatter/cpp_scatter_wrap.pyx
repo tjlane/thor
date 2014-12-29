@@ -155,8 +155,6 @@ def parallel_cpp_scatter(n_molecules,
     amplitudes = np.zeros(qxyz.shape[0], dtype=np.complex128)
     threads = []
     
-    print procs_per_node, devices
-    
     def t_fxn(*fargs):
         a = cpp_scatter(*fargs)
         amplitudes[:] += a

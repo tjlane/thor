@@ -6,7 +6,7 @@ Library for performing simulations of x-ray scattering experiments.
 import logging
 logging.basicConfig()
 logger = logging.getLogger(__name__)
-#logger.setLevel('DEBUG')
+logger.setLevel('DEBUG')
 
 import numpy as np
 from scipy import misc
@@ -15,6 +15,7 @@ from scipy import special
 from thor import _cppscatter
 from thor.math2 import arctan3, sph_harm
 from thor.refdata import cromer_mann_params
+from thor.refdata import get_cromermann_parameters
 from thor.refdata import sph_quad_900
 
 
@@ -46,11 +47,21 @@ def _sample_finite_photon_statistics(intensities, poisson_parameter):
     photons = np.random.multinomial(n, p)
     return photons
     
+    
+class _NonRandomState(np.random.RandomState):
+    """
+    A mimic of np.random.RandomState that returns zeros, so that molecules
+    wont rotate
+    """
+        
+    def rand(self, *args):
+        return np.zeros(args)
+    
 
 def simulate_atomic(traj, num_molecules, detector, traj_weights=None,
                     finite_photon=False, ignore_hydrogens=False, 
                     dont_rotate=False, procs_per_node=1, 
-                    nodes=None, devices=None):
+                    nodes=[], devices=[], random_state=None):
     """
     Simulate a scattering 'shot', i.e. one exposure of x-rays to a sample.
     
@@ -117,7 +128,7 @@ def simulate_atomic(traj, num_molecules, detector, traj_weights=None,
     logger.debug('Simulating %d copies in the dilute limit' % num_molecules)
 
     if dont_rotate:
-        raise NotImplementedError('Non-rotations not implemented yet')
+        random_state = _NonRandomState()
 
     
     # sampling statistics for the trajectory
@@ -158,7 +169,6 @@ def simulate_atomic(traj, num_molecules, detector, traj_weights=None,
         logger.debug('Ignoring %d hydrogens (of %d atoms)' % (n_H, n_atoms))
     else:
         atoms_to_keep = np.ones(n_atoms, dtype=np.bool)
-    rxyz = rxyz[atoms_to_keep,:]
         
     
     qxyz = _qxyz_from_detector(detector)
@@ -167,14 +177,15 @@ def simulate_atomic(traj, num_molecules, detector, traj_weights=None,
     for i,num in enumerate(num_per_shapshot):
         
         logger.debug('Running %d molc, snapshot %d' % (num, i))
-        rxyz = traj.xyz[i] * 10.0 # convert nm --> Angstroms
+        rxyz = traj.xyz[i,atoms_to_keep,:] * 10.0 # convert nm --> Angstroms
         
         amplitudes += _cppscatter.parallel_cpp_scatter(num, rxyz, qxyz,
                                                        atom_types,
                                                        cromermann_parameters,
                                                        procs_per_node=procs_per_node,
                                                        nodes=nodes,
-                                                       devices=devices)
+                                                       devices=devices,
+                                                       random_state=random_state)
                                                        
     if finite_photon is not False:
         intensities = np.square(np.abs(amplitudes))
@@ -187,7 +198,7 @@ def simulate_atomic(traj, num_molecules, detector, traj_weights=None,
     
 def simulate_density(grid, grid_spacing, num_molecules, detector,
                      finite_photon=False, dont_rotate=False, 
-                     procs_per_node=1, nodes=None, devices=None):
+                     procs_per_node=1, nodes=[], devices=[]):
     """
     Returns
     -------
