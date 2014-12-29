@@ -1,13 +1,24 @@
 
 """
-Cython wrapper for C++ based scattering.
+Cython wrapper for C++/CUDA implementation of scattering simulations.
 """
 
 import numpy as np
 cimport numpy as np
 
-from time import time
 import os
+import subprocess
+from threading import Thread
+from time import time
+
+try:
+    from mpi4py import MPI
+    MPI_ENABLED = True
+    COMM = MPI.COMM_WORLD
+    RANK = COMM.Get_rank()
+except ImportError as e:
+    MPI_ENABLED = False
+
 
 def output_sanity_check(output):
     """
@@ -48,10 +59,137 @@ cdef extern from "cpp_scatter.hh":
                     float * q_out_imag ) except +
 
 
+def _detect_gpus():
+    try:
+        gpus = subprocess.check_output(['nvidia-smi', '-L']).split('\n')
+    except OSError as e:
+        print(e)
+        gpus = []
+    return gpus
+
+
+def _evenly_distribute_jobs(n_jobs, n_workers):
+    
+    assert n_jobs > 0, '`n_jobs` must be >0'
+    assert n_workers > 0, '`n_workers` must be >0'
+    
+    nj = n_jobs
+    nt = n_workers
+    jobs_per_worker = [((nj / nt) + int((nj%nt - n) > 0)) for n in range(nt)]
+    
+    assert len(jobs_per_worker) == n_workers, 'num workers off'
+    assert np.sum(jobs_per_worker) == n_jobs, 'num jobs off'
+
+    return jobs_per_worker
+
+    
+# TODO:
+#   -- make this MPI aware
+
+def parallel_cpp_scatter(n_molecules, 
+                         rxyz,
+                         qxyz,
+                         atom_types,
+                         cromermann_parameters,
+                         procs_per_node=1,
+                         nodes=[],
+                         devices=[],
+                         random_state=None,
+                         ignore_gpu_check=False):
+    """
+    Multi-threaded interface to `cpp_scatter`. Specify the devices the
+    simulation should run on and the code will split the simulation between
+    them in an efficient manner.
+
+    Parameters
+    ----------
+    n_molecules : int
+        The number of molecules to include in the simulation.
+    
+    qxyz : ndarray, float
+        An n x 3 array of the (x,y,z) positions of each q-vector describing
+        the detector.
+    
+    rxyz : ndarray, float
+        An m x 3 array of the (x,y,z) positions of each atom in the molecule.
+    
+    atom_types : ndarray, int
+        A length-m one dim array of the ID of each atom telling the code which
+        Cromer-Mann parameter to use. See below.
+        
+    cromermann_parameters : ndarray, float
+        A one-d array of length 9 * the number of unique `atom_types`,
+        specifying the 9 Cromer-Mann parameters for each atom type.
+        
+    Returns
+    -------
+    amplitudes : ndarray, complex128
+        A flat array of the simulated amplitudes, each position corresponding
+        to a scattering vector from `qxyz`.
+    """
+
+    # check devices
+    gpus_available = _detect_gpus()
+    for d in devices:
+        if (d not in gpus_available) and (not ignore_gpu_check):
+            raise RuntimeError('Requested GPU Device %d not found. Ensure'
+                               ' this GPU is online and visible to the os using'
+                               ' nvidia-smi. Overwrite this error using the'
+                               '`ignore_gpu_check` flag')
+
+    
+
+    # divide work between CPUs & GPUs
+    # TODO -- right now use as much GPU as possible
+    if len(devices) > 0:
+        num_per_gpu = _evenly_distribute_jobs(n_molecules, len(devices))
+        num_per_cpu = [0,] * procs_per_node
+    else:
+        num_per_gpu = []
+        num_per_cpu = _evenly_distribute_jobs(n_molecules, procs_per_node)
+
+
+    # multiprocessing cannot return values, so generate a helper function
+    # that will dump returned values into a shared array
+    
+    amplitudes = np.zeros(qxyz.shape[0], dtype=np.complex128)
+    threads = []
+    
+    print procs_per_node, devices
+    
+    def t_fxn(*fargs):
+        a = cpp_scatter(*fargs)
+        amplitudes[:] += a
+
+    # run dat shit
+    for cpu_thread in range(procs_per_node):
+        num = num_per_cpu[cpu_thread]
+        print('CPU Thread %d :: %d shots' % (cpu_thread, num))
+        cpu_args = (num, rxyz, qxyz, atom_types, cromermann_parameters, 
+                    'CPU', random_state)
+        t_cpu = Thread(target=t_fxn, args=cpu_args)
+        t_cpu.start()
+        threads.append(t_cpu)                
+
+    for gpu_device in range(len(devices)):
+        num = num_per_gpu[gpu_device]
+        print('GPU Device %d :: %d shots' % (gpu_device, num))
+        gpu_args = (num, rxyz, qxyz, atom_types, cromermann_parameters, 
+                    gpu_device, random_state)
+        t_gpu = Thread(target=t_fxn, args=gpu_args)
+        t_gpu.start()
+        threads.append(t_gpu)
+
+    # ensure child processes have finished
+    for t in threads:
+        t.join()
+
+    return amplitudes
+
          
 def cpp_scatter(n_molecules, 
-                np.ndarray qxyz,
                 np.ndarray rxyz,
+                np.ndarray qxyz,
                 np.ndarray atom_types,
                 np.ndarray cromermann_parameters,
                 device_id='CPU',
@@ -87,6 +225,7 @@ def cpp_scatter(n_molecules,
         Either 'CPU' or the GPU device ID (int) specifying the compute hardware.
         
     random_state : np.random.RandomState
+        Seed the random state. For testing only.
     
     Returns
     -------
@@ -100,6 +239,10 @@ def cpp_scatter(n_molecules,
     if not len(cromermann_parameters) == num_atom_types * 9:
         raise ValueError('input array `cromermann_parameters` should be len '
                          '9 * num of unique `atom_types`')
+                         
+    n_molecules = int(n_molecules)
+    if n_molecules <= 0:
+        raise ValueError('`num` must be 1 or greater, got: %d' % n_molecules)
     
     # A NOTE ABOUT ARRAY ORDERING
     # In what follows, for multi-dimensional arrays I often take the transpose
@@ -120,7 +263,7 @@ def cpp_scatter(n_molecules,
     
     # generate random numbers
     if random_state is None:
-        s = int(time.time() * 1e6) + os.getpid()
+        s = int(time() * 1e6) + os.getpid()
         random_state = np.random.RandomState(s)
     
     if not isinstance(random_state, np.random.RandomState):
@@ -184,5 +327,14 @@ def cpp_scatter(n_molecules,
     amplitudes = real_amplitudes + 1j * imag_amplitudes
     
     return amplitudes
+    
+
+
+# FIND OUT IF A GPU IS AVAILABLE
+global GPU_ENABLED
+if len(_detect_gpus()) > 0:
+    GPU_ENABLED = True
+else:
+    GPU_ENABLED = False
     
 
