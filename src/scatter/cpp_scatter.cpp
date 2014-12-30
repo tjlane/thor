@@ -20,6 +20,9 @@
 using namespace std;
 
 
+#define GBLTPB 32         // threads per block
+#define MAX_NUM_TYPES 10  // maximum number of atom types
+
 
 /******************************************************************************
  * Shared CPU/GPU Code
@@ -131,28 +134,34 @@ double __device__ atomicAdd(double* address, double val) {
 }
 
 
-// blockSize = tpb, templated in case we need to use a faster reduction
-// method later. 
 template<unsigned int blockSize>
-void __global__ gpu_kernel(float const * const __restrict__ q_x, 
-                       float const * const __restrict__ q_y, 
-                       float const * const __restrict__ q_z, 
-                       float *outQ, // <-- not const 
-                       int   const nQ,
-		               float const * const __restrict__ r_x, 
-                       float const * const __restrict__ r_y, 
-                       float const * const __restrict__ r_z,
-		               int   const * const __restrict__ r_id, 
-                       int   const numAtoms, 
-                       int   const numAtomTypes,
-                       float const * const __restrict__ cromermann,
-                       float const * const __restrict__ randN1, 
-                       float const * const __restrict__ randN2, 
-                       float const * const __restrict__ randN3,
-                       unsigned int numRotations) {
-
-    // shared array for block-wise reduction
-    __shared__ float sdata[blockSize];
+void __global__ gpu_kernel(int   const n_q,
+                           float const * const __restrict__ q_x, 
+                           float const * const __restrict__ q_y, 
+                           float const * const __restrict__ q_z, 
+             
+                           int   const n_atoms,
+                           float const * const __restrict__ r_x, 
+                           float const * const __restrict__ r_y, 
+                           float const * const __restrict__ r_z,
+             
+                           int   const n_atom_types,
+                           int   const * const __restrict__ atom_types,
+                           float const * const __restrict__ cromermann,
+             
+                           int   const n_rotations,
+                           float const * const __restrict__ q0,
+                           float const * const __restrict__ q1,
+                           float const * const __restrict__ q2,
+                           float const * const __restrict__ q3,
+             
+                           float * q_out_real, // <-- not const 
+                           float * q_out_imag  // <-- not const 
+                          ) {
+                              
+    /* On-device kernel for scattering simulation
+     * 
+     */
     
     int tid = threadIdx.x;
     int gid = blockIdx.x*blockDim.x + threadIdx.x;
@@ -161,88 +170,72 @@ void __global__ gpu_kernel(float const * const __restrict__ q_x,
     sdata[tid] = 0;
     __syncthreads();
     
-    while(gid < numRotations) {
+    // private variables (for each thread)
+    float qx, qy, qz;             // extracted q vector
+    float ax, ay, az;             // rotated r vector
+    float mq, qo, fi;             // mag of q, formfactor for atom i
+    float qr;                     // dot product of q and r
+    
+    
+    while(gid < n_q) {
+       
+        // workspace for cm calcs -- static size, but hopefully big enough
+       float formfactors[MAX_NUM_TYPES];
        
         // determine the rotated locations
-        float rand1 = randN1[gid]; 
-        float rand2 = randN2[gid]; 
-        float rand3 = randN3[gid]; 
+        qx = q_x[iq];
+        qy = q_y[iq];
+        qz = q_z[iq];
+        
+        // Cromer-Mann computation, precompute for this value of q
+        mq = qx*qx + qy*qy + qz*qz;
+        qo = mq / (16*M_PI*M_PI); // qo is (sin(theta)/lambda)^2
+        
+        // accumulant: real and imaginary amplitudes for this q vector
+        float2 q_sum;
+        q_sum.real = 0;
+        q_sum.imag = 0;
 
-        // rotation quaternions
-        float q0, q1, q2, q3;
-        generate_random_quaternion(rand1, rand2, rand3, q0, q1, q2, q3);
-
-        // for each q vector
-        for(int iq = 0; iq < nQ; iq++) {
-            float qx = q_x[iq];
-            float qy = q_y[iq];
-            float qz = q_z[iq];
-
-            // workspace for cm calcs -- static size, but hopefully big enough
-            float formfactors[MAX_NUM_TYPES];
-
-            // accumulant
-            float2 Qsum;
-            Qsum.x = 0;
-            Qsum.y = 0;
-     
-            // Cromer-Mann computation, precompute for this value of q
-            float mq = qx*qx + qy*qy + qz*qz;
-            float qo = mq / (16*M_PI*M_PI); // qo is (sin(theta)/lambda)^2
-            float fi;
-            
-            // for each atom type, compute the atomic form factor f_i(q)
-            int tind;
-            for (int type = 0; type < numAtomTypes; type++) {
-            
-                // scan through cromermann in blocks of 9 parameters
-                tind = type * 9;
-                fi =  cromermann[tind]   * exp(-cromermann[tind+4]*qo);
-                fi += cromermann[tind+1] * exp(-cromermann[tind+5]*qo);
-                fi += cromermann[tind+2] * exp(-cromermann[tind+6]*qo);
-                fi += cromermann[tind+3] * exp(-cromermann[tind+7]*qo);
-                fi += cromermann[tind+8];
+        // precompute atomic form factors for each atom type
+        int tind;
+        for (int type = 0; type < n_atom_types; type++) {
                 
-                formfactors[type] = fi; // store for use in a second
-            }
+            tind = type * 9;
+            fi =  cromermann[tind]   * exp(-cromermann[tind+4]*qo);
+            fi += cromermann[tind+1] * exp(-cromermann[tind+5]*qo);
+            fi += cromermann[tind+2] * exp(-cromermann[tind+6]*qo);
+            fi += cromermann[tind+3] * exp(-cromermann[tind+7]*qo);
+            fi += cromermann[tind+8];
+    
+            formfactors[type] = fi;
 
-            // for each atom in molecule
-            // bottle-necked by this currently. 
-            for(int a = 0; a < numAtoms; a++) {
-
-                // get the current positions
-                float rx = r_x[a];
-                float ry = r_y[a];
-                float rz = r_z[a];
-                int   id = r_id[a];
-                float ax, ay, az;
-
-                rotate(rx, ry, rz, q0, q1, q2, q3, ax, ay, az);
-                float qr = ax*qx + ay*qy + az*qz;
-
-                fi = formfactors[id];
-                Qsum.x += fi*__sinf(qr);
-                Qsum.y += fi*__cosf(qr);
-            } // finished one molecule.
-            
-            float fQ = (Qsum.x*Qsum.x + Qsum.y*Qsum.y); // / numRotations;  
-            sdata[tid] = fQ;
-            __syncthreads();
-
-            // Todo: quite slow reduction but correct, speed up reduction later if becomes bottleneck!
-            for(unsigned int s=1; s < blockDim.x; s *= 2) {
-                if(tid % (2*s) == 0) {
-                    sdata[tid] += sdata[tid+s];
-                }
-                __syncthreads();
-            }
-            if(tid == 0) {
-                atomicAdd(outQ+iq, sdata[0]); 
-            } 
         }
 
-        // blank out reduction buffer.
-        sdata[tid] = 0;
+        // for each molecule (2nd nested loop)
+        for( int im = 0; im < n_rotations; im++ ) {
+    
+            int id;
+    
+            // for each atom in molecule (3rd nested loop)
+            for( int a = 0; a < n_atoms; a++ ) {
+
+                id = atom_types[a];
+                fi = formfactors[id];
+
+                rotate(r_x[a], r_y[a], r_z[a], 
+                       q0[im], q1[im], q2[im], q3[im],
+                       ax, ay, az);
+        
+                qr = ax*qx + ay*qy + az*qz;
+                
+                q_sum.real += fi*__sinf(qr);
+                q_sum.imag += fi*__cosf(qr);
+            } // finished one atom (3rd loop)
+        } // finished one molecule (2nd loop)
+        
+        // put q 
+        q_out_real[gid] = q_sum.real;
+        q_out_imag[gid] = q_sum.imag;
 
         // syncthreads are important here!
         __syncthreads();
@@ -256,40 +249,41 @@ void __global__ gpu_kernel(float const * const __restrict__ q_x,
 
 // ---- HOST CODE
 
-void deviceMalloc( void ** ptr, int bytes) {
+void deviceMalloc( void ** ptr, int bytes ) {
     cudaError_t err = cudaMalloc(ptr, (size_t) bytes);
     assert(err == 0);
 }
 
 
-void GPUScatter (int device_id_,
+void gpuscatter (int device_id_,
             
                  // scattering q-vectors
-                 int    nQ_,
-                 float* h_qx_,
-                 float* h_qy_,
-                 float* h_qz_,
+                 int     n_q,
+                 float * h_qx,
+                 float * h_qy,
+                 float * h_qz,
         
                  // atomic positions, ids
-                 int    nAtoms_,
-                 float* h_rx_,
-                 float* h_ry_,
-                 float* h_rz_,
-                 int*   h_id_,
+                 int     n_atoms,
+                 float * h_rx,
+                 float * h_ry,
+                 float * h_rz,
 
                  // cromer-mann parameters
-                 int    nCM_,
-                 float* h_cm_,
+                 int     n_atom_types,
+                 int   * h_atom_types,
+                 float * h_cromermann,
 
                  // random numbers for rotations
-                 int    nRot_,
-                 float* h_rand1_,
-                 float* h_rand2_,
-                 float* h_rand3_,
+                 int     n_rotations,
+                 float * rand1,
+                 float * rand2,
+                 float * rand3,
 
                  // output
-                 float* h_outQ_
-                 ) {
+                 float * h_q_out_real,
+                 float * h_q_out_imag,
+                ) {
     
     /* All arguments consist of 
      *   (1) a float pointer to the beginning of the array to be passed
@@ -297,32 +291,11 @@ void GPUScatter (int device_id_,
      */
 
 
-    bpg = nRot_ / 512;
+    // set GPU size parameters
+    static const int tpb = GBLTPB;     // threads per block
+    bpg = n_q / GBLTPB;                // blocks per grid (TODO: +1?)
+    unsigned int total_q = tpb * bpg;  // total q positions to compute
     
-    // unpack arguments
-    device_id = device_id_;
-    //cout << "device id: " << device_id << endl;
-    bpg = bpg_;
-
-    nQ = nQ_;
-    h_qx = h_qx_;
-    h_qy = h_qy_;
-    h_qz = h_qz_;
-
-    nAtoms = nAtoms_;
-    numAtomTypes = nCM_ / 9;
-    h_rx = h_rx_;
-    h_ry = h_ry_;
-    h_rz = h_rz_;
-    h_id = h_id_;
-
-    h_cm = h_cm_;
-
-    h_rand1 = h_rand1_;
-    h_rand2 = h_rand2_;
-    h_rand3 = h_rand3_;
-
-    h_outQ = h_outQ_;
     
     // set the device
     cudaError_t err;
@@ -339,16 +312,14 @@ void GPUScatter (int device_id_,
         exit(-1);
     }
     
-    // set some size parameters
-    static const int tpb = 512;
-    unsigned int nRotations = tpb*bpg;
     
     // compute the memory necessary to hold input/output
-    const unsigned int nQ_size = nQ*sizeof(float);
-    const unsigned int nAtoms_size = nAtoms*sizeof(float);
-    const unsigned int nAtoms_idsize = nAtoms*sizeof(int);
-    const unsigned int nRotations_size = nRotations*sizeof(float);
-    const unsigned int cm_size = 9*numAtomTypes*sizeof(float);
+    const unsigned int q_size           = total_q * sizeof(float);
+    const unsigned int r_size           = n_atoms * sizeof(float);
+    const unsigned int a_size           = n_atom_types * sizeof(int);
+    const unsigned int cm_size          = 9 * n_atom_types * sizeof(float);
+    const unsigned int quat_size        = n_rotations * sizeof(float);
+
 
     err = cudaGetLastError();
     if (err != cudaSuccess) {
@@ -357,18 +328,24 @@ void GPUScatter (int device_id_,
     }
 
     // allocate memory on the board
-    float *d_qx;        deviceMalloc( (void **) &d_qx, nQ_size);
-    float *d_qy;        deviceMalloc( (void **) &d_qy, nQ_size);
-    float *d_qz;        deviceMalloc( (void **) &d_qz, nQ_size);
-    float *d_outQ;      deviceMalloc( (void **) &d_outQ, nQ_size);
-    float *d_rx;        deviceMalloc( (void **) &d_rx, nAtoms_size);
-    float *d_ry;        deviceMalloc( (void **) &d_ry, nAtoms_size);
-    float *d_rz;        deviceMalloc( (void **) &d_rz, nAtoms_size);
-    int   *d_id;        deviceMalloc( (void **) &d_id, nAtoms_idsize);
-    float *d_cm;        deviceMalloc( (void **) &d_cm, cm_size);
-    float *d_rand1;     deviceMalloc( (void **) &d_rand1, nRotations_size);
-    float *d_rand2;     deviceMalloc( (void **) &d_rand2, nRotations_size);
-    float *d_rand3;     deviceMalloc( (void **) &d_rand3, nRotations_size);
+    float *d_qx;         deviceMalloc( (void **) &d_qx, q_size);
+    float *d_qy;         deviceMalloc( (void **) &d_qy, q_size);
+    float *d_qz;         deviceMalloc( (void **) &d_qz, q_size);
+
+    float *d_rx;         deviceMalloc( (void **) &d_rx, r_size);
+    float *d_ry;         deviceMalloc( (void **) &d_ry, r_size);
+    float *d_rz;         deviceMalloc( (void **) &d_rz, r_size);
+    
+    int   *d_id;         deviceMalloc( (void **) &d_id, a_size);
+    float *d_cm;         deviceMalloc( (void **) &d_cm, cm_size);
+    
+    float *d_q0;         deviceMalloc( (void **) &d_q0, quat_size);
+    float *d_q1;         deviceMalloc( (void **) &d_q1, quat_size);
+    float *d_q2;         deviceMalloc( (void **) &d_q2, quat_size);
+    float *d_q3;         deviceMalloc( (void **) &d_q3, quat_size);
+    
+    float *d_q_out_real; deviceMalloc( (void **) &d_q_out_real, q_size);
+    float *d_q_out_imag; deviceMalloc( (void **) &d_q_out_imag, q_size);
     
     // check for errors
     err = cudaGetLastError();
@@ -376,20 +353,34 @@ void GPUScatter (int device_id_,
         printf("Error in device malloc. CUDA error: %s\n", cudaGetErrorString(err));
         exit(-1);
     }
+    
+    // pre-compute quaternions from random numbers
+    float * h_q0 = (float *) malloc(n_rotations * sizeof(float));
+    float * h_q1 = (float *) malloc(n_rotations * sizeof(float));
+    float * h_q2 = (float *) malloc(n_rotations * sizeof(float));
+    float * h_q3 = (float *) malloc(n_rotations * sizeof(float));
+    
+    for( int im = 0; im < n_rotations; im++ ) {
+        generate_random_quaternion(rand1[im], rand2[im], rand3[im],
+                                   h_q0[im], h_q1[im], h_q2[im], h_q3[im]);
+    }
 
     // copy input/output arrays to board memory
-    cudaMemcpy(d_qx, &h_qx[0], nQ_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_qy, &h_qy[0], nQ_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_qz, &h_qz[0], nQ_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_outQ, &h_outQ[0], nQ_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_rx, &h_rx[0], nAtoms_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_ry, &h_ry[0], nAtoms_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_rz, &h_rz[0], nAtoms_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_id, &h_id[0], nAtoms_idsize, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_cm, &h_cm[0], cm_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_rand1, &h_rand1[0], nRotations_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_rand2, &h_rand2[0], nRotations_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_rand3, &h_rand3[0], nRotations_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_qx, &h_qx[0], q_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_qy, &h_qy[0], q_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_qz, &h_qz[0], q_size, cudaMemcpyHostToDevice);
+    
+    cudaMemcpy(d_rx, &h_rx[0], r_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_ry, &h_ry[0], r_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_rz, &h_rz[0], r_size, cudaMemcpyHostToDevice);
+    
+    cudaMemcpy(d_id, &h_atom_types[0], a_size,  cudaMemcpyHostToDevice);
+    cudaMemcpy(d_cm, &h_cromermann[0], cm_size, cudaMemcpyHostToDevice);
+    
+    cudaMemcpy(d_q0, &h_q0[0], quat_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_q1, &h_q1[0], quat_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_q2, &h_q2[0], quat_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_q3, &h_q3[0], quat_size, cudaMemcpyHostToDevice);
 
     // check for errors
     err = cudaGetLastError();
@@ -399,7 +390,11 @@ void GPUScatter (int device_id_,
     }
 
     // execute the kernel
-    kernel<tpb> <<<bpg, tpb>>> (d_qx, d_qy, d_qz, d_outQ, nQ, d_rx, d_ry, d_rz, d_id, nAtoms, numAtomTypes, d_cm, d_rand1, d_rand2, d_rand3, nRotations);
+    gpu_kernel<tpb> <<<bpg, tpb>>> (n_q, d_qx, d_qy, d_qz, 
+                                    n_atoms, d_rx, d_ry, d_rz,
+                                    n_atom_types, d_id, d_cm,
+                                    n_rotations, d_q0, d_q1, d_q2, d_q3,
+                                    d_q_out_real, d_q_out_imag)
     cudaThreadSynchronize();
     err = cudaGetLastError();
     if (err != cudaSuccess) {
@@ -409,7 +404,10 @@ void GPUScatter (int device_id_,
 
     // retrieve the output off the board and back into CPU memory
     // copys the array to the output array passed as input
-    cudaMemcpy(&h_outQ[0], d_outQ, nQ_size, cudaMemcpyDeviceToHost);
+    const unsigned int wanted_q_size = n_q * sizeof(float);
+    cudaMemcpy(&h_q_out_real[0], d_q_out_real, wanted_q_size, cudaMemcpyDeviceToHost);
+    cudaMemcpy(&h_q_out_imag[0], d_q_out_imag, wanted_q_size, cudaMemcpyDeviceToHost);
+    
     cudaThreadSynchronize();
     cudaDeviceSynchronize();
     err = cudaGetLastError();
@@ -422,15 +420,26 @@ void GPUScatter (int device_id_,
     cudaFree(d_qx);
     cudaFree(d_qy);
     cudaFree(d_qz);
+    
     cudaFree(d_rx);
     cudaFree(d_ry);
     cudaFree(d_rz);
+    
     cudaFree(d_id);
     cudaFree(d_cm);
-    cudaFree(d_rand1);
-    cudaFree(d_rand2);
-    cudaFree(d_rand3);
-    cudaFree(d_outQ);
+    
+    cudaFree(d_q0);
+    cudaFree(d_q1);
+    cudaFree(d_q2);
+    cudaFree(d_q3);
+    
+    cudaFree(d_q_out_real);
+    cudaFree(d_q_out_imag);
+    
+    free(q0);
+    free(q1);
+    free(q2);
+    free(q3);
 
     err = cudaGetLastError();
     if (err != cudaSuccess) {
@@ -438,10 +447,10 @@ void GPUScatter (int device_id_,
         exit(-1);
     }
 
-    //err = cudaDeviceReset();
     cudaThreadSynchronize();
     cudaDeviceSynchronize();
     cudaThreadExit();
+    
     err = cudaGetLastError();
     if (err != cudaSuccess) {
         printf("Error resetting device. CUDA error: %s\n", cudaGetErrorString(err));
