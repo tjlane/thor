@@ -72,7 +72,7 @@ def rand_rotate_molecule(xyzlist, rfloat=None):
     return rotated_xyzlist
 
 
-def form_factor(qvector, atomz):
+def form_factor_reference(qvector, atomz):
     
     mq = np.sum( np.power(qvector, 2) )
     qo = mq / (16.*np.pi*np.pi)
@@ -98,13 +98,8 @@ def form_factor(qvector, atomz):
         fi+= 5.86*np.exp(-36.3956*qo)
         fi+= 12.0658
         
-    # else approximate with Nitrogen
     else:
-        fi = 12.2126*np.exp(-0.005700*qo)
-        fi+= 3.13220*np.exp(-9.89330*qo)
-        fi+= 2.01250*np.exp(-28.9975*qo)
-        fi+= 1.16630*np.exp(-0.582600*qo)
-        fi+= -11.529
+        raise KeyError('no implementation for Z=%d' % atomz)
         
     return fi
 
@@ -154,7 +149,8 @@ def ref_simulate_shot(xyzlist, atomic_numbers, num_molecules, q_grid):
             
             # compute the molecular form factor F(q)
             for j in range(xyzlist.shape[0]):
-                fi = form_factor(qvector, atomic_numbers[j])
+                q_mag = np.linalg.norm(qvector)
+                fi = scatter.atomic_formfactor(atomic_numbers[j], q_mag)
                 r = rotated_xyzlist[j,:]
                 A[i] +=      fi * np.sin( np.dot(qvector, r) )
                 A[i] += 1j * fi * np.cos( np.dot(qvector, r) )
@@ -303,7 +299,7 @@ class TestCppScatter(object):
                                         device_id='CPU',
                                         random_state=np.random.RandomState(RANDOM_SEED))
 
-        assert_allclose(cpu_A, self.ref_A, rtol=1e-2, atol=1.0,
+        assert_allclose(cpu_A, self.ref_A, rtol=1e-3, atol=1.0,
                        err_msg='scatter: c-cpu/cpu reference mismatch')
         assert not np.all( cpu_A == 0.0 )
         assert not np.sum( cpu_A == np.nan )
@@ -323,7 +319,7 @@ class TestCppScatter(object):
                                         device_id=0,
                                         random_state=np.random.RandomState(RANDOM_SEED))
 
-        assert_allclose(gpu_A, self.ref_A, rtol=1e-2, atol=1.0,
+        assert_allclose(gpu_A, self.ref_A, rtol=1e-3, atol=1.0,
                         err_msg='scatter: cuda-gpu/cpu reference mismatch')
         assert not np.all( gpu_A == 0.0 )
         assert not np.sum( gpu_A == np.nan )
@@ -368,7 +364,7 @@ class TestPyScatter(object):
     
     def setup(self):
         
-        self.nq = 5 # number of detector vectors to do
+        self.nq = 100 # number of detector vectors to do
         self.q_grid = np.loadtxt(ref_file('512_q.xyz'))[:self.nq]
         
         self.traj = mdtraj.load(ref_file('ala2.pdb'))
@@ -392,9 +388,9 @@ class TestPyScatter(object):
         rs = np.random.RandomState(RANDOM_SEED)
         A = scatter.simulate_atomic(self.traj, self.num_molecules, self.q_grid,
                                     random_state=rs)
-        assert_allclose(A, self.cpp_A, rtol=1e-6, err_msg='doesnt match cpp ref')
-        assert_allclose(A, self.ref_A, rtol=1e-6, err_msg='doesnt match py ref')
-        
+                                    
+        assert_allclose(A, self.cpp_A, rtol=1e-4, err_msg='doesnt match cpp ref')
+        assert_allclose(A, self.ref_A, rtol=1e-3, err_msg='doesnt match py ref')
         
     def test_dont_rotate_atomic(self):
         A1 = scatter.simulate_atomic(self.traj, self.num_molecules, self.q_grid,
@@ -433,14 +429,21 @@ class TestPyScatter(object):
     def simulate_density(self):
         
         # MANUALLY SET -- detector obj should match grid
-        grid_dimensions = [25,] * 3
-        grid_spacing = 1.0 # A?
+        grid_dimensions = [50,] * 3
+        grid_spacing = 0.2 # Angstroms
         
-        grid = structure.atomic_to_density(self.traj, grid_dimensions, grid_spacing)
+        grid = structure.atomic_to_density(self.traj, grid_dimensions, 
+                                           grid_spacing)
+        print grid
         
         A = scatter.simulate_density(grid, grid_spacing, 
                                      self.num_molecules, self.q_grid)
-        assert_allclose(A, self.cpp_A, rtol=1e-6, err_msg='doesnt match cpp ref')
+                                     
+                                     
+        print np.abs(A) / np.abs(A[0])
+        print np.abs(self.cpp_A) / np.abs(self.cpp_A[0])
+                                     
+        assert_allclose(A / A[0], self.cpp_A / self.cpp_A[0], rtol=1e-6, err_msg='doesnt match cpp ref')
         assert_allclose(A, self.ref_A, rtol=1e-6, err_msg='doesnt match py ref')
     
         

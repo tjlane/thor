@@ -126,10 +126,11 @@ def simulate_atomic(traj, num_molecules, detector, traj_weights=None,
     
     logger.debug('Performing scattering simulation...')
     logger.debug('Simulating %d copies in the dilute limit' % num_molecules)
-
+    
+    
     if dont_rotate:
         random_state = _NonRandomState()
-
+    
     
     # sampling statistics for the trajectory
     if traj_weights == None:
@@ -208,7 +209,7 @@ def simulate_density(grid, grid_spacing, num_molecules, detector,
     """
     
     if dont_rotate:
-        raise NotImplementedError('Non-rotations not implemented yet')
+        random_state = _NonRandomState()
     
     if len(grid.shape) != 3:
         raise ValueError('`grid` must be a square 3d grid. Got a %dd grid.'
