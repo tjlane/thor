@@ -38,6 +38,9 @@ try:
     import fabio
     FABIO_IMPORTED = True
 except ImportError as e:
+    logger.info(e)
+    logger.info('could not import FabIO library, will not be able to parse some'
+                ' data formats')
     FABIO_IMPORTED = False
 
 

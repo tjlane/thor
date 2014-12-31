@@ -784,7 +784,7 @@ class TestRings(object):
 
         assert_allclose(fft, cpp)
         
-    def test_correlate_intra(self, rtol=0.05, atol=0.1):
+    def test_correlate_intra(self, rtol=0.1, atol=0.1):
 
         # test autocorrelator
         intra = self.rings.correlate_intra(1.0, 1.0, normed=True)
@@ -797,7 +797,8 @@ class TestRings(object):
             ref_corr += brute_force_masked_correlation(x, np.ones(len(x), dtype=np.bool), normed=True)
         ref_corr /= float(self.num_shots)
         
-        assert_allclose(intra / intra[0], ref_corr / ref_corr[0], rtol=rtol, atol=atol,
+        assert_allclose(intra / intra[0], ref_corr / ref_corr[0], 
+                        rtol=rtol, atol=atol,
                         err_msg='doesnt match reference implementation')
         assert_allclose(intra, ref_corr, rtol=rtol, atol=atol,
                         err_msg='doesnt match reference implementation normalization')

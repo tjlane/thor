@@ -40,11 +40,18 @@ def _qxyz_from_detector(detector):
 
 
 def _sample_finite_photon_statistics(intensities, poisson_parameter):
+    
     if not poisson_parameter > 0.0:
         raise ValueError('`poisson_parameter` <= 0 (got: %f)' % poisson_parameter)
-    n = np.random.poisson(poisson_parameter)
-    p = intensities / intensities.sum()
+        
+    n = np.random.poisson(poisson_parameter) # total scattered photons
+    p = intensities / intensities.sum()      # prob of going to each pixel
+    if not np.all( intensities > 0.0 ):
+        raise ValueError('negative intensities found')
+    
     photons = np.random.multinomial(n, p)
+    assert np.all(photons >= 0), 'negative sample from np.random.multinomial'
+    
     return photons
     
     
@@ -395,8 +402,7 @@ def sph_harm_coefficients(trajectory, q_values, weights=None,
             logger.info('Computing coefficients for q=%f\t(%d/%d)' % (q, iq+1, num_q_mags))
             
             # compute S, the single molecule scattering intensity
-            S_q = simulate_shot(trajectory[i], 1, q * sph_quad_900[:,:3],
-                                force_no_gpu=True)
+            S_q = simulate_atomic(trajectory[i], 1, q * sph_quad_900[:,:3])
 
             # project S onto the spherical harmonics using spherical quadrature
             for il,l in enumerate(l_vals):                

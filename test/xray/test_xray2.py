@@ -89,7 +89,7 @@ class TestRingsFromDisk(test_xray.TestRings):
         self.q_values  = np.array([1.0, 2.0])
         self.num_phi   = 360
         self.traj      = Trajectory.load(ref_file('ala2.pdb'))
-        self.num_shots = 2
+        self.num_shots = 3
 
         # generate the tables file on disk, then re-open it
         intensities = np.abs( np.random.randn(self.num_shots, len(self.q_values),
@@ -128,15 +128,15 @@ class TestRingsFromDisk(test_xray.TestRings):
         # because we have noise in these sims, the error tol needs to be higher
         # this is uncomfortably high right now, but better to have a basic
         # sanity check than no test at all...
-        super(TestRingsFromDisk, self).test_correlate_intra(rtol=0.1, atol=0.1)
+        super(TestRingsFromDisk, self).test_correlate_intra(rtol=0.2, atol=0.1)
         
     def test_correlate_inter(self):
         # see comment above
-        super(TestRingsFromDisk, self).test_correlate_inter(rtol=0.1, atol=0.1)
+        super(TestRingsFromDisk, self).test_correlate_inter(rtol=0.2, atol=0.1)
         
     def test_correlate_inter_mean_only(self):
         # see comment above
-        super(TestRingsFromDisk, self).test_correlate_inter_mean_only(rtol=0.1, atol=0.1)
+        super(TestRingsFromDisk, self).test_correlate_inter_mean_only(rtol=0.2, atol=0.1)
 
     def teardown(self):
         self.tables_file.close()
