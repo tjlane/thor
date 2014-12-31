@@ -402,7 +402,8 @@ def sph_harm_coefficients(trajectory, q_values, weights=None,
             logger.info('Computing coefficients for q=%f\t(%d/%d)' % (q, iq+1, num_q_mags))
             
             # compute S, the single molecule scattering intensity
-            S_q = simulate_atomic(trajectory[i], 1, q * sph_quad_900[:,:3])
+            A_q = simulate_atomic(trajectory[i], 1, q * sph_quad_900[:,:3])
+            S_q = np.square(np.abs(A_q))
 
             # project S onto the spherical harmonics using spherical quadrature
             for il,l in enumerate(l_vals):                
