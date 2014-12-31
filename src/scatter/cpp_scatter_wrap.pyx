@@ -63,7 +63,6 @@ def _detect_gpus():
     try:
         gpus = subprocess.check_output(['nvidia-smi', '-L']).split('\n')
     except OSError as e:
-        print(e)
         gpus = []
     return gpus
 
@@ -334,5 +333,4 @@ if len(_detect_gpus()) > 0:
     GPU_ENABLED = True
 else:
     GPU_ENABLED = False
-    
 
