@@ -360,7 +360,7 @@ class TestCppScatter(object):
         #                 err_msg='error in 2 thread cpu')
         
         
-class TestPyScatter(object):
+class TestSimulateAtomic(object):
     """ tests for src/python/scatter.py """
     
     def setup(self):
@@ -429,26 +429,104 @@ class TestPyScatter(object):
         print diff
         assert diff < 1.0, 'ignoring hydrogens makes too big of a difference...'
         
-    @skip
-    def test_simulate_density(self):
+        
+        
+class TestSimulateDensity(object):
+    
+    
+    def setup(self):
+        
+        self.GRIDSIZE = 35
+        self.GRIDSPAC = 1.0
+
+        self.gs = (self.GRIDSIZE,)*3
+
+        self.rxyz = np.mgrid[:self.gs[0],:self.gs[1],:self.gs[2]].reshape(3, -1).T * self.GRIDSPAC
+
+        self.detector = np.mgrid[:self.gs[0],:self.gs[1],:self.gs[2]].reshape(3, -1).T * 1.0
+        self.detector -= self.detector.mean(axis=0)[None,:]
+        self.detector *= 1.0 / (2.0 * np.pi)
+        
+        
+    def fft_and_simulate_density(self, dens):
+        """
+        NOT A TEST
+        
+        Take `dens`, a square grid, and use both a generic ND fft method
+        and simulate_density() to transform it -- for comparison.
+        
+        returns:
+        tst : the simulate_density() amplitudes
+        ref : the fftn() amplitudes
+        """
+        
+        ref = np.fft.fftn(dens)
+        ref = np.fft.fftshift(ref)
+        ref = np.abs(ref)
+        ref /= ref.max()
+
+        tst = scatter.simulate_density(dens, self.GRIDSPAC, 1, 
+                                       self.detector, dont_rotate=True)
+        tst = tst.T.reshape(*self.gs) # confirmed
+        tst = np.abs(tst)
+        tst /= tst.max()
+        
+        return tst, ref
+    
+    
+    def test_box_dens(self):
+        
+        # make a 3d square pulse
+        dens = np.zeros(self.gs)
+        sq = 2 # size of box
+        dens[self.GRIDSIZE/2:self.GRIDSIZE/2+sq,
+             self.GRIDSIZE/2:self.GRIDSIZE/2+sq,
+             self.GRIDSIZE/2:self.GRIDSIZE/2+sq] = 1.0
+             
+        tst, ref = self.fft_and_simulate_density(dens)
+        
+        # confirm total error is < 10%, per-pixel is < 100%
+        total_error = np.sum(np.abs(tst - ref)) / np.product(self.gs), 'total err > 10%'
+        assert_allclose(tst, ref, rtol=1.0, atol=0.1, err_msg='per-pixel error > 100%')
+        
+    def test_random_dens(self):
+        
+        # use just a random density, no structures
+        dens = np.abs( np.random.randn(*self.gs) )
+             
+        tst, ref = self.fft_and_simulate_density(dens)
+        
+        # confirm total error is < 10%, per-pixel is < 100%
+        total_error = np.sum(np.abs(tst - ref)) / np.product(self.gs), 'total err > 10%'
+        assert_allclose(tst, ref, rtol=1.0, atol=0.1, err_msg='per-pixel error > 100%')
+        
+    def test_from_atomic(self):
+        
+        nq = 100 # number of detector vectors to do
+        q_grid = np.loadtxt(ref_file('512_q.xyz'))[:nq]
+        
+        traj = mdtraj.load(ref_file('ala2.pdb'))
+        atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
+        cp, at = get_cromermann_parameters(atomic_numbers)
+        
+        num_molecules = 32
+        rxyz = traj.xyz[0] * 10.0
+        
+        ref_A = ref_simulate_shot(rxyz, atomic_numbers, num_molecules, q_grid)
         
         # MANUALLY SET -- detector obj should match grid
         grid_dimensions = [50,] * 3
         grid_spacing = 0.2 # Angstroms
         
-        grid = structure.atomic_to_density(self.traj, grid_dimensions, 
+        grid = structure.atomic_to_density(traj, grid_dimensions, 
                                            grid_spacing)
-        print grid
-        
         A = scatter.simulate_density(grid, grid_spacing, 
-                                     self.num_molecules, self.q_grid)
+                                     num_molecules, q_grid)
                                      
                                      
         print np.abs(A) / np.abs(A[0])
-        print np.abs(self.cpp_A) / np.abs(self.cpp_A[0])
-                                     
-        assert_allclose(A / A[0], self.cpp_A / self.cpp_A[0], rtol=1e-6, err_msg='doesnt match cpp ref')
-        assert_allclose(A, self.ref_A, rtol=1e-6, err_msg='doesnt match py ref')
+        
+        assert_allclose(A, ref_A, rtol=1e-6, err_msg='doesnt match py ref')
     
         
 

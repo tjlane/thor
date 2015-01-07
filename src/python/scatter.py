@@ -205,9 +205,19 @@ def simulate_atomic(traj, num_molecules, detector, traj_weights=None,
 
     
 def simulate_density(grid, grid_spacing, num_molecules, detector,
-                     finite_photon=False, dont_rotate=False, 
-                     procs_per_node=1, nodes=[], devices=[]):
+                     finite_photon=False, dont_rotate=False,
+                     reshape_output=False, procs_per_node=1, nodes=[], 
+                     devices=[]):
     """
+    
+    Optional Parameters
+    -------------------
+    reshape_output : bool
+        If `True`, put the output back in square grid form, such that it is the
+        same shape as `grid`. Can only be used if the detector is the same
+        number of pixels as the `grid` has points. Useful for comparing results
+        to straight up 3D FFTs (testing). Default: False.
+    
     Returns
     -------
     amplitudes : ndarray, complex128
@@ -222,9 +232,11 @@ def simulate_density(grid, grid_spacing, num_molecules, detector,
         raise ValueError('`grid` must be a square 3d grid. Got a %dd grid.'
                          '' % len(grid.shape))
     
+    # the below operations is equiv to flattening x/y/z individually
     gs = grid.shape
-    rxyz = np.mgrid[:gs[0],:gs[1],:gs[2]].reshape(3, -1) * grid_spacing
-    qxyz = _qxyz_from_detector(detector) 
+    rxyz = np.mgrid[:gs[0],:gs[1],:gs[2]].reshape(3, -1).T * grid_spacing
+    
+    qxyz = _qxyz_from_detector(detector)
     
     # the 9th Cromer-Mann parameter is a constant -- for a point density
     # scalar field, set this to be the density value
@@ -239,6 +251,10 @@ def simulate_density(grid, grid_spacing, num_molecules, detector,
                                                   procs_per_node=procs_per_node,
                                                   nodes=nodes,
                                                   devices=devices)
+    
+    # put the output back in sq grid form if requested
+    if reshape_output:
+        amplitudes = amplitudes.T.reshape(*gs)
     
     return amplitudes
     

@@ -240,6 +240,11 @@ def cpp_scatter(n_molecules,
     n_molecules = int(n_molecules)
     if n_molecules <= 0:
         raise ValueError('`num` must be 1 or greater, got: %d' % n_molecules)
+        
+    # for s in [rxyz.shape, qxyz.shape]:
+    #     if (not len(s) == 2) or (s[1] == 3):
+    #         raise ValueError('`rxyz` and `qxyz` must be (N, 3) shape arrays')
+    
     
     # A NOTE ABOUT ARRAY ORDERING
     # In what follows, for multi-dimensional arrays I often take the transpose
