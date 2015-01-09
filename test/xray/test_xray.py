@@ -26,12 +26,6 @@ from thor.refdata import cromer_mann_params
 
 from mdtraj import Trajectory, io
 
-try:
-    from thor import _gpuscatter
-    GPU = True
-except ImportError as e:
-    GPU = False
-
 from numpy.testing import (assert_almost_equal, assert_array_almost_equal,
                            assert_allclose, assert_array_equal)
 
@@ -445,22 +439,23 @@ class TestShotset(object):
         assert_allclose(p1, p2, rtol=0.1)
 
     def test_sim(self):
-        if not GPU: raise SkipTest
+        # todo
         shot = xray.Shotset.simulate(self.t, self.d, 512, 1)
 
-    def test_simulate_cpu_only(self):
-        d = xray.Detector.generic(spacing=0.6)
-        x = xray.Shotset.simulate(self.t, d, 1, 1)
-
-    def test_simulate_gpu_only(self):
-        if not GPU: raise SkipTest
-        d = xray.Detector.generic(spacing=0.6)
-        x = xray.Shotset.simulate(self.t, d, 512, 1)
-
-    def test_simulate_gpu_and_cpu(self):
-        if not GPU: raise SkipTest
-        d = xray.Detector.generic(spacing=0.6)
-        x = xray.Shotset.simulate(self.t, d, 513, 1)
+    # def test_simulate_cpu_only(self):
+    #     # todo
+    #     d = xray.Detector.generic(spacing=0.6)
+    #     x = xray.Shotset.simulate(self.t, d, 1, 1)
+    # 
+    # def test_simulate_gpu_only(self):
+    #     # todo
+    #     d = xray.Detector.generic(spacing=0.6)
+    #     x = xray.Shotset.simulate(self.t, d, 512, 1)
+    # 
+    # def test_simulate_gpu_and_cpu(self):
+    #     # todo
+    #     d = xray.Detector.generic(spacing=0.6)
+    #     x = xray.Shotset.simulate(self.t, d, 513, 1)
 
     def test_to_rings(self):
         

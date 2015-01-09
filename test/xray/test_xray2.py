@@ -25,12 +25,6 @@ from thor.refdata import cromer_mann_params
 
 from mdtraj import Trajectory, io
 
-try:
-    from thor import _gpuscatter
-    GPU = True
-except ImportError as e:
-    GPU = False
-
 from numpy.testing import (assert_almost_equal, assert_array_almost_equal,
                            assert_allclose, assert_array_equal)
 

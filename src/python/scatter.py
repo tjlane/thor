@@ -207,7 +207,7 @@ def simulate_atomic(traj, num_molecules, detector, traj_weights=None,
 def simulate_density(grid, grid_spacing, num_molecules, detector,
                      finite_photon=False, dont_rotate=False,
                      reshape_output=False, procs_per_node=1, nodes=[], 
-                     devices=[]):
+                     devices=[], random_state=None):
     """
     
     Optional Parameters
@@ -250,7 +250,8 @@ def simulate_density(grid, grid_spacing, num_molecules, detector,
                                                   cromermann_parameters,
                                                   procs_per_node=procs_per_node,
                                                   nodes=nodes,
-                                                  devices=devices)
+                                                  devices=devices,
+                                                  random_state=random_state)
     
     # put the output back in sq grid form if requested
     if reshape_output:
@@ -287,7 +288,7 @@ def atomic_formfactor(atomic_Z, q_mag):
     return fi
     
     
-def atomic_electrondens(atomic_Z, r_mag):
+def atomic_electrondens(atomic_Z, r_mag, radial_cutoff=None):
     """
     Evaluate the contribution of the electron density due to a particular atom
     at distance `r_mag`. This function employs an isotropic sum-of-Gaussians
@@ -327,20 +328,46 @@ def atomic_electrondens(atomic_Z, r_mag):
     This function employs the numerical inverse FT of a Gaussian to compute
     the atomic contribution to the electron density. Let x = |r - r_0|,
 
-        phi[x] = [SUM 4*a_i*SQRT{pi^3/b_i} * EXP{-16/b_i * x^2}]
+        phi[x] = [SUM a_i * {4pi/b_i}^(3/2) * EXP{- (4pi^2 / b_i) * x^2}]
                  i=1,4
+                 
+    References
+    ----------
+    ..[1] Afonine and Urzhumtsev, Acta Cryst (2004) A60 19-32.
     """
 
-    xo = np.power(4.0 * r_mag, 2)
-    cromermann = cromer_mann_params[(atomic_Z,0)]
+    # OLD --->
+    # xo = np.power(4.0 * r_mag, 2)
+    # cromermann = cromer_mann_params[(atomic_Z,0)]
+    # 
+    # # retain constant term (?)
+    # phi = cromermann[8] * np.ones_like(r_mag) # retain
+    # #phi = np.zeros_like(r_mag)               # discard
+    # 
+    # for i in range(4):
+    #     phi = 4.0 * cromermann[i] * np.sqrt(np.power(np.pi,3) / cromermann[i+4]) *\
+    #           np.exp( - xo / cromermann[i+4])
+    # END OLD <---
+    
+    # NEW code is based on Formulae given in [1], differs in some coefficients
+    # I am currently IGNORING the constant term. It is usually pretty small...
 
-    # retain constant term (?)
-    phi = cromermann[8] * np.ones_like(r_mag) # retain
-    #phi = np.zeros_like(r_mag)               # discard
+    phi = np.zeros_like(r_mag)
+    
+    if radial_cutoff is not None:
+        inds = (r_mag < radial_cutoff)
+        if np.sum(inds) == 0:
+            raise ValueError('No grid points contained in radial cutoff!s')
+    else:
+        inds = np.ones(r_mag.shape, dtype=np.bool)
+    
+    xo = 4.0 * (np.pi ** 2) * np.power(r_mag[inds], 2)
+    cromermann = cromer_mann_params[(atomic_Z,0)]
     
     for i in range(4):
-        phi = 4.0 * cromermann[i] * np.sqrt(np.power(np.pi,3) / cromermann[i+4]) *\
-              np.exp( - xo / cromermann[i+4])
+        phi[inds] = cromermann[i] * \
+                    np.power(4.0 * np.pi / cromermann[i+4], 1.5) * \
+                    np.exp( - xo / cromermann[i+4] )
 
     return phi
 

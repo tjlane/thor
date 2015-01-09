@@ -1,5 +1,4 @@
 
-
 """
 structure.py
 
@@ -389,9 +388,10 @@ def load_coor(filename):
     return structure
     
     
-def atomic_to_density(traj, grid_dimensions, grid_spacing):
+def atomic_to_density(traj, grid_dimensions, grid_spacing, radial_cutoff=3.0):
     """
     Evaluate the electron density on a rectangular grid given an atomic model.
+    Uses and atom-centered Gaussian model.
     
     Parameters
     ----------
@@ -404,12 +404,24 @@ def atomic_to_density(traj, grid_dimensions, grid_spacing):
 
     grid_spacing : float
         The distance between grid points, in Angstroms.
+        
+    Optional Parameters
+    -------------------
+    radial_cutoff : float
+        A cutoff for the size of the Gaussian calculation. Can result in a
+        significant speedup for large grids at the cost of a very small error.
+        Afonine and Urzhumtsev recommend 3.0-3.5 A for most applications. 
+        Default: 3.5.
 
     Returns
     -------
     grid : np.ndarray, float
         A 3-dimensional array, representing the electron density (scalar field)
         sampled at each point on the grid.
+        
+    References
+    ----------
+    ..[1] Afonine and Urzhumtsev, Acta Cryst (2004) A60 19-32.
     """
     
     grid_dimensions = tuple(grid_dimensions)
@@ -418,7 +430,9 @@ def atomic_to_density(traj, grid_dimensions, grid_spacing):
 
     grid = np.zeros(grid_dimensions)
     center = grid_spacing * np.array(grid_dimensions) / 2.0
-    nxyz = grid_spacing * np.mgrid[:grid_dimensions[0],:grid_dimensions[1],:grid_dimensions[2]]
+    nxyz = grid_spacing * np.mgrid[:grid_dimensions[0],
+                                   :grid_dimensions[1],
+                                   :grid_dimensions[2]]
 
     atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
 
@@ -426,7 +440,8 @@ def atomic_to_density(traj, grid_dimensions, grid_spacing):
         r = traj.xyz[0,i,:] * 10.0 + center
         r_mag = np.sqrt(np.sum( np.square(nxyz - r[:,None,None,None]), axis=0 ))
         assert r_mag.shape == grid_dimensions, '%s / %s' % (str(r_mag.shape), str(grid_dimensions))
-        grid += atomic_electrondens(atomic_numbers[i], r_mag)
+        grid += atomic_electrondens(atomic_numbers[i], r_mag, 
+                                    radial_cutoff=radial_cutoff)
 
     return grid
 
