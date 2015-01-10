@@ -265,7 +265,7 @@ def cpp_scatter(n_molecules,
     
     # generate random numbers
     if random_state is None:
-        s = int(time() * 1e6) + os.getpid()
+        s = (int(time() * 1e6) + os.getpid()) % 4294967294
         random_state = np.random.RandomState(s)
     
     if not isinstance(random_state, np.random.RandomState):
