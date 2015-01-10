@@ -1690,8 +1690,11 @@ class Shotset(object):
 
         Optional Parameters
         -------------------
-        kwargs
-            Mimic of scatter.simulate_atomic kwarg interface.
+        kwargs : dict
+            Mimic of scatter.simulate_atomic kwarg interface. Kwargs include:
+            -- finite_photon, float : mean number of photons scattered per shot
+            -- ignore_hydrogens, bool : possible speedup at cost of small err
+            -- dont_rotate, bool : dont rotate each structure
 
         Returns
         -------
@@ -3589,7 +3592,7 @@ class Rings(object):
 
     @classmethod
     def simulate(cls, traj, num_molecules, q_values, num_phi, num_shots,
-                 energy=10, **kwargs):
+                 energy=10.0, **kwargs):
         """
         Simulate many scattering 'shot's, i.e. one exposure of x-rays to a
         sample, but onto a polar detector. Return that as a Rings object
@@ -3630,8 +3633,11 @@ class Rings(object):
         energy : float
             The energy, in keV
 
-        kwargs
-            Mimic of scatter.simulate_atomic kwarg interface.
+        kwargs : dict
+            Mimic of scatter.simulate_atomic kwarg interface. Kwargs include:
+            -- finite_photon, float : mean number of photons scattered per shot
+            -- ignore_hydrogens, bool : possible speedup at cost of small err
+            -- dont_rotate, bool : dont rotate each structure
 
         Returns
         -------

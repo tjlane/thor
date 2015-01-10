@@ -240,8 +240,6 @@ else:
     omp_link    = []
 
 
-
-
 # if CUDA:
 #     print "Attempting to install GPU functionality"
 #     gpuscatter = Extension('thor._gpuscatter',
