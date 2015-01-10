@@ -229,15 +229,17 @@ class custom_build_ext(build_ext):
 # 
 
 
-# openmp
-if '--no-openmp' in sys.argv[2:]:
-    sys.argv.remove('--no-openmp')
-    omp_compile = ['-DNO_OMP']
-    omp_link    = []
-    print_warning('set --no-openmp, disabling OPENMP support')
-else:
+# openmp support -- disabled by default
+if '--enable-openmp' in sys.argv[2:]:
+    sys.argv.remove('--enable-openmp')
     omp_compile = ['-fopenmp']
     omp_link    = ['-lgomp']
+    print_warning('set --enable-openmp, enabling OPENMP support')
+else:    
+    omp_compile = ['-DNO_OMP']
+    omp_link    = []
+
+
 
 
 # if CUDA:
