@@ -549,8 +549,8 @@ def test_sph_harm():
     num_coefficients = 44
 
     num_molecules = 1
-    num_shots     = 20000
-    num_phi       = 2048
+    num_shots     = 2000
+    num_phi       = 256
     # -----------------------
         
     q = q_magnitudes[0]
