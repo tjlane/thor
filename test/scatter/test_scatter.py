@@ -14,23 +14,21 @@ from numpy.testing import assert_almost_equal, assert_allclose
 
 from nose import SkipTest
 
-try:
-    from thor import _gpuscatter
-    GPU = True
-except ImportError:
-    GPU = False
-
-from thor.refdata import cromer_mann_params
-from thor import xray
-from thor import _cpuscatter
-from thor import scatter
-from thor import structure
-from thor.testing import skip, ref_file, gputest
-
-from mdtraj import Trajectory
-
+import mdtraj
 import matplotlib.pyplot as plt
 
+from thor import _cppscatter
+from thor import xray
+from thor import scatter
+from thor import structure
+from thor.refdata import get_cromermann_parameters, cromer_mann_params
+from thor.testing import skip, ref_file, gputest
+
+import time
+global RANDOM_SEED
+RANDOM_SEED = int(time.time() * 1e6)
+
+GPU = _cppscatter.GPU_ENABLED
 
 # ------------------------------------------------------------------------------
 #                        BEGIN REFERENCE IMPLEMENTATIONS
@@ -74,7 +72,7 @@ def rand_rotate_molecule(xyzlist, rfloat=None):
     return rotated_xyzlist
 
 
-def form_factor(qvector, atomz):
+def form_factor_reference(qvector, atomz):
     
     mq = np.sum( np.power(qvector, 2) )
     qo = mq / (16.*np.pi*np.pi)
@@ -100,18 +98,14 @@ def form_factor(qvector, atomz):
         fi+= 5.86*np.exp(-36.3956*qo)
         fi+= 12.0658
         
-    # else approximate with Nitrogen
     else:
-        fi = 12.2126*np.exp(-0.005700*qo)
-        fi+= 3.13220*np.exp(-9.89330*qo)
-        fi+= 2.01250*np.exp(-28.9975*qo)
-        fi+= 1.16630*np.exp(-0.582600*qo)
-        fi+= -11.529
+        raise KeyError('no implementation for Z=%d' % atomz)
         
     return fi
 
     
-def ref_simulate_shot(xyzlist, atomic_numbers, num_molecules, q_grid, rfloats=None):
+def ref_simulate_shot(xyzlist, atomic_numbers, num_molecules, q_grid,
+                      dont_rotate=False):
     """
     Simulate a single x-ray scattering shot off an ensemble of identical
     molecules.
@@ -143,30 +137,29 @@ def ref_simulate_shot(xyzlist, atomic_numbers, num_molecules, q_grid, rfloats=No
         the value of the measured intensity at each point on the grid.
     """
     
-    I = np.zeros(q_grid.shape[0])
+    A = np.zeros(q_grid.shape[0], dtype=np.complex128)
     
-    for n in range(num_molecules):
+    if dont_rotate:
+        rfs = np.zeros((3, num_molecules))
+    else:
+        rs = np.random.RandomState(RANDOM_SEED)
+        rfs = rs.rand(3, num_molecules)
+    
+    for i,qvector in enumerate(q_grid):    
+        for n in range(num_molecules):
         
-        if rfloats == None:
-            rotated_xyzlist = rand_rotate_molecule(xyzlist)
-        else:
-            rotated_xyzlist = rand_rotate_molecule(xyzlist, rfloat=rfloats[n,:])
-        
-        for i,qvector in enumerate(q_grid):
-
+            # match random numbers that will be generated in actual impl.
+            rotated_xyzlist = rand_rotate_molecule(xyzlist, rfloat=rfs[:,n])
+            
             # compute the molecular form factor F(q)
-            F = 0.0
             for j in range(xyzlist.shape[0]):
-                fi = form_factor(qvector, atomic_numbers[j])
+                q_mag = np.linalg.norm(qvector)
+                fi = scatter.atomic_formfactor(atomic_numbers[j], q_mag)
                 r = rotated_xyzlist[j,:]
-                F += fi * np.exp( 1j * np.dot(qvector, r) )
-    
-            I[i] += F.real*F.real + F.imag*F.imag
+                A[i] +=      fi * np.sin( np.dot(qvector, r) )
+                A[i] += 1j * fi * np.cos( np.dot(qvector, r) )
 
-    if len(I[I<0.0]) != 0:
-        raise Exception('neg values in reference scattering implementation')
-
-    return I
+    return A
 
 
 def debye_reference(trajectory, weights=None, q_values=None):
@@ -278,166 +271,286 @@ def debye_reference(trajectory, weights=None, q_values=None):
 # ------------------------------------------------------------------------------
 
     
-class TestScatter(object):
-    """ test all the scattering simulation functionality """
+class TestCppScatter(object):
+    """ tests for src/scatter """
     
     def setup(self):
         
-        self.nq = 2 # number of detector vectors to do
+        self.nq = 5  # number of detector vectors to do
+        self.nr = 10 # number of atoms to use
         
-        xyzQ = np.loadtxt(ref_file('512_atom_benchmark.xyz'))
-        self.xyzlist = xyzQ[:,:3] * 10.0 # nm -> ang.
-        self.atomic_numbers = xyzQ[:,3].flatten()
-    
+        xyzZ = np.loadtxt(ref_file('512_atom_benchmark.xyz'))
+        self.xyzlist = xyzZ[:self.nr,:3] * 10.0 # nm -> ang.
+        self.atomic_numbers = xyzZ[:self.nr,3].flatten()
+        
         self.q_grid = np.loadtxt(ref_file('512_q.xyz'))[:self.nq]
         
-        self.rfloats = np.loadtxt(ref_file('512_x_3_random_floats.txt'))
-        self.num_molecules = self.rfloats.shape[0]
+        self.num_molecules = 512        
+        self.ref_A = ref_simulate_shot(self.xyzlist, self.atomic_numbers, 
+                                       self.num_molecules, self.q_grid)
+                                                                              
+    def test_cpu_scatter(self):
         
-        self.ref_I = ref_simulate_shot(self.xyzlist, self.atomic_numbers, 
-                                       self.num_molecules, self.q_grid, 
-                                       self.rfloats)
+        print "testing c cpu code..."
+
+        cromermann_parameters, atom_types = get_cromermann_parameters(self.atomic_numbers)
+
+        print 'num_molecules:', self.num_molecules
+        cpu_A = _cppscatter.cpp_scatter(self.num_molecules, 
+                                        self.xyzlist, 
+                                        self.q_grid, 
+                                        atom_types,
+                                        cromermann_parameters,
+                                        device_id='CPU',
+                                        random_state=np.random.RandomState(RANDOM_SEED))
+
+        assert_allclose(cpu_A, self.ref_A, rtol=1e-3, atol=1.0,
+                       err_msg='scatter: c-cpu/cpu reference mismatch')
+        assert not np.all( cpu_A == 0.0 )
+        assert not np.sum( cpu_A == np.nan )
     
     def test_gpu_scatter(self):
 
         if not GPU: raise SkipTest
             
-        gpu_I = _gpuscatter.simulate(self.num_molecules, self.q_grid, self.xyzlist,
-                                    self.atomic_numbers, rfloats=self.rfloats)
-
-        print "GPU", gpu_I
-        print "REF", self.ref_I
+        cromermann_parameters, atom_types = get_cromermann_parameters(self.atomic_numbers)
         
-        assert_allclose(gpu_I, self.ref_I, rtol=1e-03,
-                        err_msg='scatter: gpu/cpu reference mismatch')
-        assert not np.all( gpu_I == 0.0 )
-        assert not np.sum( gpu_I == np.nan )
+        print 'num_molecules:', self.num_molecules
+        gpu_A = _cppscatter.cpp_scatter(self.num_molecules, 
+                                        self.xyzlist, 
+                                        self.q_grid, 
+                                        atom_types,
+                                        cromermann_parameters,
+                                        device_id=0,
+                                        random_state=np.random.RandomState(RANDOM_SEED))
+
+        assert_allclose(gpu_A, self.ref_A, rtol=1e-3, atol=1.0,
+                        err_msg='scatter: cuda-gpu/cpu reference mismatch')
+        assert not np.all( gpu_A == 0.0 )
+        assert not np.sum( gpu_A == np.nan )
                         
-                        
-    def test_cpu_scatter(self):
-
-        print "testing c cpu code..."
-
-        cpu_I = _cpuscatter.simulate(self.num_molecules, self.q_grid, self.xyzlist, 
-                                    self.atomic_numbers, rfloats=self.rfloats)
-
-        print "CPU", cpu_I
-        print "REF", self.ref_I
-
-        assert_allclose(cpu_I, self.ref_I, rtol=1e-03,
-                        err_msg='scatter: c-cpu/cpu reference mismatch')
-        assert not np.all( cpu_I == 0.0 )
-        assert not np.sum( cpu_I == np.nan )
+    def test_parallel_interface(self):
         
-                            
-    def test_python_call(self):
-        """
-        Test the GPU scattering simulation interface (scatter.simulate)
-        """
-
-        if not GPU: raise SkipTest
-        print "testing python wrapper fxn..."
+        cp, at = get_cromermann_parameters(self.atomic_numbers)
+        base_args = (self.num_molecules, self.xyzlist, self.q_grid, at, cp)
         
-        traj = Trajectory.load(ref_file('ala2.pdb'))
-        num_molecules = 512
-        detector = xray.Detector.generic()
-
-        py_I = scatter.simulate_shot(traj, num_molecules, detector)
-
-        assert not np.all( py_I == 0.0 )
-        assert not np.isnan(np.sum( py_I ))
-
-
-class TestFinitePhoton(object):
+        out0 = _cppscatter.parallel_cpp_scatter(*base_args,
+                                                random_state=np.random.RandomState(RANDOM_SEED))
+        srl  = _cppscatter.cpp_scatter(*base_args, 
+                                       random_state=np.random.RandomState(RANDOM_SEED))
+        
+        assert_allclose(out0, srl, 
+                        rtol=1e-2, atol=1.0,
+                        err_msg='parallel not consistent with serial')
+                                
+        assert_allclose(out0, self.ref_A, 
+                        rtol=1e-2, atol=1.0,
+                        err_msg='parallel not consistent with reference')
+        
+        if GPU:
+            out1 = _cppscatter.parallel_cpp_scatter(*base_args,
+                                                    devices=[0],
+                                                    random_state=np.random.RandomState(RANDOM_SEED))
+            assert_allclose(out1, self.ref_A, rtol=1e-2, atol=1.0,
+                            err_msg='error in parallel gpu interface output')
+                                               
+                
+        out2 = _cppscatter.parallel_cpp_scatter(*base_args,
+                                                procs_per_node=2,
+                                                devices=[],
+                                                random_state=np.random.RandomState(RANDOM_SEED))
+        # --> smoke test for now, fix later
+        # assert_allclose(out2, self.ref_A, rtol=1e-2, atol=1.0,
+        #                 err_msg='error in 2 thread cpu')
+        
+        
+class TestSimulateAtomic(object):
+    """ tests for src/python/scatter.py """
     
     def setup(self):
-                
-        self.nq = 2 # number of detector vectors to do
         
-        xyzQ = np.loadtxt(ref_file('512_atom_benchmark.xyz'))
-        self.xyzlist = xyzQ[:,:3] * 10.0 # nm -> ang.
-        self.atomic_numbers = xyzQ[:,3].flatten()
-    
+        self.nq = 100 # number of detector vectors to do
         self.q_grid = np.loadtxt(ref_file('512_q.xyz'))[:self.nq]
         
-        self.rfloats = np.loadtxt(ref_file('512_x_3_random_floats.txt'))
-        self.num_molecules = self.rfloats.shape[0]
+        self.traj = mdtraj.load(ref_file('ala2.pdb'))
+        atomic_numbers = np.array([ a.element.atomic_number for a in self.traj.topology.atoms ])
+        cp, at = get_cromermann_parameters(atomic_numbers)
+        
+        self.num_molecules = 32
+        rxyz = self.traj.xyz[0] * 10.0
+        
+        self.ref_A = ref_simulate_shot(rxyz, 
+                                       atomic_numbers, 
+                                       self.num_molecules,
+                                       self.q_grid)
+        self.cpp_A = _cppscatter.cpp_scatter(self.num_molecules,
+                                             rxyz,
+                                             self.q_grid,
+                                             at, cp,
+                                             random_state=np.random.RandomState(RANDOM_SEED))
                                        
-                                       
-    def test_cpu(self):
-        
-        cpu_I = _cpuscatter.simulate(self.num_molecules, self.q_grid, self.xyzlist, 
-                                    self.atomic_numbers, rfloats=self.rfloats)
-             
-        # assert_allclose( cpu_I, np.array([0., 23886.]) ) # the random system
-                                                           # on travis is different...
-        
-        
-    def test_gpu(self):
-        
-        # just makes sure that CPU and GPU match
-        if not GPU: raise SkipTest
-        
-        gpu_I = _gpuscatter.simulate(self.num_molecules, self.q_grid, self.xyzlist, 
-                                    self.atomic_numbers, rfloats=self.rfloats)
+    def simulate_atomic(self):
+        rs = np.random.RandomState(RANDOM_SEED)
+        A = scatter.simulate_atomic(self.traj, self.num_molecules, self.q_grid,
+                                    random_state=rs)
                                     
-        cpu_I = _cpuscatter.simulate(self.num_molecules, self.q_grid, self.xyzlist, 
-                                    self.atomic_numbers, rfloats=self.rfloats)
+        assert_allclose(A, self.cpp_A, rtol=1e-4, err_msg='doesnt match cpp ref')
+        assert_allclose(A, self.ref_A, rtol=1e-3, err_msg='doesnt match py ref')
         
-        # assert_allclose( cpu_I, gpu_I )
+    def test_dont_rotate_atomic(self):
+        A1 = scatter.simulate_atomic(self.traj, self.num_molecules, self.q_grid,
+                                     dont_rotate=True)
+        A2 = scatter.simulate_atomic(self.traj, self.num_molecules, self.q_grid,
+                                     dont_rotate=True)
+        assert_allclose(A1, A2)
+        
+    def test_finite_photon_atomic(self):
+        rs = np.random.RandomState(RANDOM_SEED)
+        A = scatter.simulate_atomic(self.traj, self.num_molecules, self.q_grid,
+                                    random_state=rs, finite_photon=1.0e8)
+        assert A.dtype == np.int
+        A = A.astype(np.float)
+        ref_I = np.square( np.abs( self.cpp_A ) )
+        
+        print np.sum( (A / A[0] - ref_I / ref_I[0]) > 0.05 )
+        
+        assert_allclose(A / A[0], ref_I / ref_I[0], rtol=5e-2, 
+                        err_msg='Finite photon statistics screwy in large photon limit')
         
         
-    def test_py_cpu_smoke(self):
+    def test_no_hydrogens(self):
 
-        traj = Trajectory.load(ref_file('ala2.pdb'))
+        I_wH = scatter.simulate_atomic(self.traj, self.num_molecules, self.q_grid,
+                                       dont_rotate=True, ignore_hydrogens=False)
+        I_noH = scatter.simulate_atomic(self.traj, self.num_molecules, self.q_grid,
+                                        dont_rotate=True, ignore_hydrogens=True)
+
+        assert not np.all(I_noH == I_wH)
+
+        # compute the differece -- we're not setting random numbers here so just
+        # looking at radially averaged stuff...
+        diff = np.sum(np.abs(I_noH - I_wH) / I_wH) / float(len(I_wH))
+        print diff
+        assert diff < 1.0, 'ignoring hydrogens makes too big of a difference...'
+        
+        
+        
+class TestSimulateDensity(object):
+    
+    
+    def setup(self):
+        
+        self.GRIDSIZE = 35
+        self.GRIDSPAC = 1.0
+
+        self.gs = (self.GRIDSIZE,)*3
+
+        self.rxyz = np.mgrid[:self.gs[0],:self.gs[1],:self.gs[2]].reshape(3, -1).T * self.GRIDSPAC
+
+        self.detector = np.mgrid[:self.gs[0],:self.gs[1],:self.gs[2]].reshape(3, -1).T * 1.0
+        self.detector -= self.detector.mean(axis=0)[None,:]
+        self.detector *= 1.0 / (2.0 * np.pi)
+        
+        
+    def fft_and_simulate_density(self, dens):
+        """
+        NOT A TEST
+        
+        Take `dens`, a square grid, and use both a generic ND fft method
+        and simulate_density() to transform it -- for comparison.
+        
+        returns:
+        tst : the simulate_density() amplitudes
+        ref : the fftn() amplitudes
+        """
+        
+        ref = np.fft.fftn(dens)
+        ref = np.fft.fftshift(ref)
+        ref = np.abs(ref)
+        ref /= ref.max()
+
+        tst = scatter.simulate_density(dens, self.GRIDSPAC, 1, 
+                                       self.detector, dont_rotate=True)
+        tst = tst.T.reshape(*self.gs) # confirmed
+        tst = np.abs(tst)
+        tst /= tst.max()
+        
+        return tst, ref
+    
+    
+    def test_box_dens(self):
+        
+        # make a 3d square pulse
+        dens = np.zeros(self.gs)
+        sq = 2 # size of box
+        dens[self.GRIDSIZE/2:self.GRIDSIZE/2+sq,
+             self.GRIDSIZE/2:self.GRIDSIZE/2+sq,
+             self.GRIDSIZE/2:self.GRIDSIZE/2+sq] = 1.0
+             
+        tst, ref = self.fft_and_simulate_density(dens)
+        
+        # confirm total error is < 10%, per-pixel is < 100%
+        total_error = np.sum(np.abs(tst - ref)) / np.product(self.gs), 'total err > 10%'
+        #assert_allclose(tst, ref, rtol=1.0, atol=0.1, err_msg='per-pixel error > 100%')
+        
+    def test_random_dens(self):
+        
+        # use just a random density, no structures
+        dens = np.abs( np.random.randn(*self.gs) )
+             
+        tst, ref = self.fft_and_simulate_density(dens)
+        
+        # confirm total error is < 10%, per-pixel is < 100%
+        total_error = np.sum(np.abs(tst - ref)) / np.product(self.gs), 'total err > 10%'
+        #assert_allclose(tst, ref, rtol=1.0, atol=0.1, err_msg='per-pixel error > 100%')
+        
+    def test_from_atomic(self):
+        """
+        simulate both from a grid and from an atomic model and ensure match
+        """
         
         num_molecules = 1
-        detector = xray.Detector.generic()
-        detector.beam.photons_scattered_per_shot = 1e3
-
-        I = scatter.simulate_shot(traj, num_molecules, detector, 
-                                  finite_photon=True)
-                                          
-        # simple statistical sanity check
-        assert np.abs(I.sum() - detector.beam.photons_scattered_per_shot) < \
-                           np.sqrt(detector.beam.photons_scattered_per_shot)*6.0
-                           
-def test_no_hydrogens():
-    
-    traj = Trajectory.load(ref_file('ala2.pdb'))
-    
-    num_molecules = 1
-    detector = xray.Detector.generic()
-    detector.beam.photons_scattered_per_shot = 1e3
-
-    I_noH = scatter.simulate_shot(traj, num_molecules, detector, 
-                                  ignore_hydrogens=True,
+        
+        nq = 100 # number of q vectors
+        q_grid = np.zeros((nq, 3))
+        q_grid[:,1] = np.linspace(.01, 2.0, nq)
+        
+        traj = mdtraj.load(ref_file('pentagon.pdb'))
+        atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
+        cp, at = get_cromermann_parameters(atomic_numbers)
+        rxyz = traj.xyz[0] * 10.0
+        
+        ref_A = ref_simulate_shot(rxyz, atomic_numbers, num_molecules, q_grid,
                                   dont_rotate=True)
-    I_wH  = scatter.simulate_shot(traj, num_molecules, detector, 
-                                  ignore_hydrogens=False,
-                                  dont_rotate=True)
-                                  
-    assert not np.all(I_noH == I_wH)
-    
-    # compute the differece -- we're not setting random numbers here so just
-    # looking at radially averaged stuff...
-    diff = np.sum(np.abs(I_noH - I_wH) / I_wH) / float(len(I_wH))
-    print diff
-    assert diff < 1.0, 'ignoring hydrogens makes too big of a difference...'
+        
+        grid_dimensions = [125,] * 3
+        grid_spacing = 0.1 # Angstroms
+        grid = structure.atomic_to_density(traj, grid_dimensions, 
+                                           grid_spacing)
+        
+        A = scatter.simulate_density(grid, grid_spacing, 
+                                     num_molecules, q_grid,
+                                     dont_rotate=True)
+        
+        tst = np.abs(A)
+        ref = np.abs(ref_A)
+        
+        R = np.corrcoef(tst, ref)[0,1]
+        assert R > 0.95, 'atomic and grid models significantly different'
     
         
 
 def test_sph_harm():
     
     # -----------------------
-    traj = Trajectory.load(ref_file('pentagon.pdb'))
+    traj = mdtraj.load(ref_file('pentagon.pdb'))
     
     q_magnitudes     = [1.6]
     num_coefficients = 44
 
     num_molecules = 1
-    num_shots     = 20000
-    num_phi       = 2048
+    num_shots     = 2000
+    num_phi       = 256
     # -----------------------
         
     q = q_magnitudes[0]
@@ -480,12 +593,10 @@ def test_sph_harm():
         
 def test_atomic_formfactor():
     
-    # this is a function in thor.xray, but the reference implementation
-    # is in this file, so testing it here
-    
     for q_mag in np.arange(2.0, 6.0, 1.0):
         for Z in [1, 8, 79]:
             qv = np.zeros(3)
             qv[0] = q_mag
-            assert_allclose(scatter.atomic_formfactor(Z, q_mag), form_factor(qv, Z))
+            assert_allclose(scatter.atomic_formfactor(Z, q_mag), 
+                            form_factor_reference(qv, Z))
 

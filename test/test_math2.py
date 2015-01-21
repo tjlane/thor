@@ -18,7 +18,7 @@ def test_kabsch():
     fn = ref_file('gold1k.coor')
 
     obj = structure.load_coor(fn).xyz[0,:,:]
-    rot_obj = structure.rand_rotate_molecule2(obj)
+    rot_obj = structure.rand_rotate_molecule(obj)
 
     U = math2.kabsch(rot_obj, obj)
     obj2 = np.dot(rot_obj, U)

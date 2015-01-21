@@ -42,8 +42,8 @@ try:
     logger.debug('pyfftw import successful -- constructing Rings._fft_correlate from pyfftw')
     PYFFTW_INSTALLED = True
 except ImportError as e:
-    logger.debug(e)
-    logger.debug('Could not import pyfftw -- constructing Rings._fft_correlate from np.fft')
+    logger.info(e)
+    logger.info('Could not import pyfftw -- constructing Rings._fft_correlate from np.fft')
     PYFFTW_INSTALLED = False
     
 FORCE_NO_FFTW = False # mostly for testing
@@ -1657,8 +1657,7 @@ class Shotset(object):
 
 
     @classmethod
-    def simulate(cls, traj, detector, num_molecules, num_shots, traj_weights=None,
-                 finite_photon=False, force_no_gpu=False, device_id=0):
+    def simulate(cls, traj, detector, num_molecules, num_shots, **kwargs):
         """
         Simulate a scattering 'shot', i.e. one exposure of x-rays to a sample, and
         return that as a Shot object (factory function).
@@ -1691,19 +1690,11 @@ class Shotset(object):
 
         Optional Parameters
         -------------------
-        traj_weights : ndarray, float
-            If `traj` contains many structures, an array that provides the Boltzmann
-            weight of each structure. Default: if traj_weights is None, weights
-            each structure equally.
-
-        finite_photon : bool
-            Use finite photon statistics in the simulation.
-
-        force_no_gpu : bool
-            Run the (slow) CPU version of this function.
-
-        device_id : int
-            The index of the GPU to run on.
+        kwargs : dict
+            Mimic of scatter.simulate_atomic kwarg interface. Kwargs include:
+            -- finite_photon, float : mean number of photons scattered per shot
+            -- ignore_hydrogens, bool : possible speedup at cost of small err
+            -- dont_rotate, bool : dont rotate each structure
 
         Returns
         -------
@@ -1714,14 +1705,12 @@ class Shotset(object):
         I = np.zeros((num_shots, detector.num_pixels))
 
         for i in range(num_shots):
-            I[i,:] = scatter.simulate_shot(traj, num_molecules, detector,
-                                           traj_weights=traj_weights,
-                                           finite_photon=finite_photon,
-                                           force_no_gpu=force_no_gpu,
-                                           device_id=device_id)
+            I[i,:] = np.square( np.abs( scatter.simulate_atomic(traj, 
+                                                                num_molecules, 
+                                                                detector,
+                                                                **kwargs) ))
                                            
-            logger.info(utils.logger_return + 'Finished simulating shot %d/%d'
-                       ' on device %d' % (i+1, num_shots, device_id) )
+            logger.info(utils.logger_return + 'Finished simulating shot %d/%d' % (i+1, num_shots) )
 
         ss = cls(I, detector)
 
@@ -3603,8 +3592,7 @@ class Rings(object):
 
     @classmethod
     def simulate(cls, traj, num_molecules, q_values, num_phi, num_shots,
-                 energy=10, traj_weights=None, force_no_gpu=False, 
-                 photons_scattered_per_shot=None, device_id=0):
+                 energy=10.0, **kwargs):
         """
         Simulate many scattering 'shot's, i.e. one exposure of x-rays to a
         sample, but onto a polar detector. Return that as a Rings object
@@ -3645,18 +3633,11 @@ class Rings(object):
         energy : float
             The energy, in keV
 
-        traj_weights : ndarray, float
-            If `traj` contains many structures, an array that provides the
-            Boltzmann weight of each structure. Default: if traj_weights is None
-            weights each structure equally.
-
-        force_no_gpu : bool
-            Run the (slow) CPU version of this function.
-
-        photons_scattered_per_shot : int
-            The number of photons scattered to the detector per shot. For use
-            with `finite_photon`. If "-1" (default), use continuous scattering
-            (infinite photon limit).
+        kwargs : dict
+            Mimic of scatter.simulate_atomic kwarg interface. Kwargs include:
+            -- finite_photon, float : mean number of photons scattered per shot
+            -- ignore_hydrogens, bool : possible speedup at cost of small err
+            -- dont_rotate, bool : dont rotate each structure
 
         Returns
         -------
@@ -3664,8 +3645,7 @@ class Rings(object):
             A Rings instance, containing the simulated shots.
         """
 
-        device_id = int(device_id)
-        beam = Beam(photons_scattered_per_shot, energy=energy)
+        beam = Beam(1, energy=energy)
         k = beam.k
         q_values = np.array(q_values)
 
@@ -3676,15 +3656,11 @@ class Rings(object):
         polar_intensities = np.zeros((num_shots, len(q_values), num_phi))
 
         for i in range(num_shots):
-            I = scatter.simulate_shot(traj, num_molecules, qxyz,
-                                      traj_weights=traj_weights,
-                                      finite_photon=photons_scattered_per_shot,
-                                      force_no_gpu=force_no_gpu,
-                                      device_id=device_id)
+            A = scatter.simulate_atomic(traj, num_molecules, qxyz, **kwargs)
+            I = np.square(np.abs(A))
             polar_intensities[i,:,:] = I.reshape(len(q_values), num_phi)
 
-            logger.info(utils.logger_return + 'Finished polar shot %d/%d on '
-                        'device %d' % (i+1, num_shots, device_id) )
+            logger.info(utils.logger_return + 'Finished polar shot %d/%d' % (i+1, num_shots) )
 
         return cls(q_values, polar_intensities, k, polar_mask=None)
 
