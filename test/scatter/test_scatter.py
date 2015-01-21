@@ -26,7 +26,7 @@ from thor.testing import skip, ref_file, gputest
 
 import time
 global RANDOM_SEED
-RANDOM_SEED = int(time.time() * 1e6)
+RANDOM_SEED = int(time.time() * 1e6) % 4294967294
 
 GPU = _cppscatter.GPU_ENABLED
 
