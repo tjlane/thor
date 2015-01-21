@@ -2,23 +2,19 @@ u"""
 setup.py: Install THOR
 """
 
-import os, sys,re
+import os
+import sys
+import re
+import subprocess
 from os.path import join as pjoin
 from glob import glob
-
-#try:
-    #from setuptools import Extension, setup
-#except:
 
 from distutils.extension import Extension
 from distutils.core import setup
 
 from Cython.Distutils import build_ext
-
 import numpy
 
-import subprocess
-from subprocess import CalledProcessError
 
 # ------------------------------------------------------------------------------
 # HEADER
@@ -178,54 +174,41 @@ if CUDA == False:
 else:
     CUDA_SUCCESS = True
 
-def customize_compiler_for_nvcc(self):
-    """
-    Inject deep into distutils to customize how the dispatch
-    to gcc/nvcc works.
 
-    If you subclass UnixCCompiler, it's not trivial to get your subclass
-    injected in, and still have the right customizations (i.e.
-    distutils.sysconfig.customize_compiler) run on it. So instead of going
-    the OO route, I have this. Note, it's kindof like a wierd functional
-    subclassing going on.
-    """
-    
-    # tell the compiler it can processes .cu
-    self.src_extensions.append('.cu')
 
-    # save references to the default compiler_so and _comple methods
-    default_compiler_so = self.compiler_so
-    super = self._compile
+def customize_compiler_for_nvcc(compiler):
 
-    # now redefine the _compile method. This gets executed for each
-    # object but distutils doesn't have the ability to change compilers
-    # based on source extension: we add it.
-    def _compile(obj, src, ext, cc_args, extra_postargs, pp_opts):
-        if os.path.splitext(src)[1] == '.cu':
-            # use the cuda for .cu files
-            self.set_executable('compiler_so', CUDA['nvcc'])
-            # use only a subset of the extra_postargs, which are 1-1 translated
-            # from the extra_compile_args in the Extension class
-            postargs = extra_postargs['nvcc']
+    old_compile     = compiler._compile
+    old_compiler_so = compiler.compiler_so
+
+    def _new_compile(obj, src, ext, cc_args, postargs, pp_opts):
+        """
+        `postargs` is usually a list, but here we let it be a dict
+        as a sloppy way of choosing both the compiler and args for
+        that compiler...
+        """
+
+        if type(postargs) == dict:
+            if ('nvcc' in postargs.keys()) and CUDA_SUCCESS:
+                compiler.set_executable('compiler_so', CUDA['nvcc'])
+                postargs_list = postargs['nvcc']
+            else:
+                postargs_list = postargs[postargs.keys()[0]]
         else:
-            postargs = extra_postargs['gcc']
+            postargs_list = postargs
+        old_compile(obj, src, ext, cc_args, postargs_list, pp_opts)
+        compiler.compiler_so = old_compiler_so
 
-        super(obj, src, ext, cc_args, postargs, pp_opts)
-        # reset the default compiler_so, which we might have changed for cuda
-        self.compiler_so = default_compiler_so
-
-    # inject our redefined _compile method into the class
-    self._compile = _compile
+    compiler._compile = _new_compile
 
 
-class custom_build_ext(build_ext):
+class custom_build_ext(build_ext, object):
     def build_extensions(self):
         customize_compiler_for_nvcc(self.compiler)
         build_ext.build_extensions(self)
 
 # -----------------------------------------------------------------------------
 # INSTALL C/C++ EXTENSIONS
-# gpuscatter, cpuscatter, interp
 # 
 
 
@@ -242,12 +225,10 @@ else:
 
 if CUDA:
     print "Attempting to install GPU functionality"
-    gpuscatter = Extension('thor._cppscatter',
+    cppscatter = Extension('thor._cppscatter',
                         sources=['src/scatter/cpp_scatter_wrap.pyx', 'src/scatter/cpp_scatter.cpp'],
-                        extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
-                                            'g++': ['-O3', '-fPIC', '-Wall'] + omp_compile,
-                                            'nvcc': ['-use_fast_math', '-arch=sm_20', '--ptxas-options=-v', 
-                                                     '-c', '--compiler-options', "'-fPIC'"]},
+                        extra_compile_args={'nvcc' : ['-use_fast_math', '-arch=sm_20', '--ptxas-options=-v', 
+                                                     '-c', '--shared', '-Xcompiler=-fPIC']},
                         library_dirs=[CUDA['lib64']],
                         libraries=['cudart'],
                         runtime_library_dirs=['/usr/lib', '/usr/local/lib', CUDA['lib64']],
@@ -267,17 +248,19 @@ else:
 
 misc = Extension('thor.misc_ext',
                     sources=['src/misc/misc_wrap.pyx', 'src/misc/solidangle.cpp'],
-                    extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
-                                        'g++': ['-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] + omp_compile},
+                    #extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
+                    #                    'g++': ['-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] + omp_compile},
+                    extra_compile_args = ['-O3', '-fPIC', '-Wall'],
                     runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
                     extra_link_args = ['-lstdc++', '-lm'] + omp_link,
-                    include_dirs = [numpy_include, 'src/scatter'],
+                    include_dirs = [numpy_include, 'src/misc'],
                     language='c++')
 
 corr = Extension('thor.corr',
                      sources=['src/corr/correlate.pyx', 'src/corr/corr.cpp'],
-                     extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
-                                         'g++': ['-O3', '-fPIC', '-Wall'] + omp_compile},
+                     #extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
+                     #                    'g++': ['-O3', '-fPIC', '-Wall'] + omp_compile},
+                     extra_compile_args = ['-O3', '-fPIC', '-Wall'],
                      runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
                      extra_link_args = ['-lstdc++', '-lm'],
                      include_dirs = [numpy_include, 'src/corr'],
@@ -286,14 +269,11 @@ corr = Extension('thor.corr',
 
 metadata['packages']     = ['thor']
 metadata['package_dir']  = {'thor' :         'src/python'}
-
 metadata['ext_modules']  = [cppscatter, misc, corr]
-# if gpuscatter:
-#     metadata['ext_modules'].append(gpuscatter)
-    
 metadata['scripts']      = [s for s in glob('scripts/*') if not s.endswith('__.py')]
 metadata['data_files']   = [('reference', glob('./reference/*'))]
 metadata['cmdclass']     = {'build_ext': custom_build_ext}
+#metadata['cmdclass']     = {'build_ext': build_ext}
 
 # ------------------------------------------------------------------------------
 #

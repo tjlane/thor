@@ -37,14 +37,14 @@ def output_sanity_check(output):
                     
 cdef extern from "cpp_scatter.hh":
     
-    void gpuscatter(int device_id,
+    void gpuscatter(int   device_id,
 
-                    int  n_q,
+                    int   n_q,
                     float * q_x, 
                     float * q_y, 
                     float * q_z, 
 
-                    int    n_atoms,
+                    int   n_atoms,
                     float * r_x, 
                     float * r_y, 
                     float * r_z,
@@ -60,13 +60,13 @@ cdef extern from "cpp_scatter.hh":
 
                     float * q_out_real,
                     float * q_out_imag ) except +
-                
-    void cpuscatter(int  n_q,
+
+    void cpuscatter(int   n_q,
                     float * q_x, 
                     float * q_y, 
                     float * q_z, 
 
-                    int    n_atoms,
+                    int   n_atoms,
                     float * r_x, 
                     float * r_y, 
                     float * r_z,
@@ -324,7 +324,7 @@ def cpp_scatter(n_molecules,
         if device_id == 'GPU':
             device_id = 0 # default GPU
         
-        cpuscatter(device_id,
+        gpuscatter(device_id,
                    qxyz.shape[0], &c_qxyz[0,0], &c_qxyz[1,0], &c_qxyz[2,0],
                    rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
                    num_atom_types, &c_atom_types[0], &c_cromermann[0],
