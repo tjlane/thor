@@ -240,32 +240,29 @@ else:
     omp_link    = []
 
 
-# if CUDA:
-#     print "Attempting to install GPU functionality"
-#     gpuscatter = Extension('thor._gpuscatter',
-#                         sources=['src/scatter/gpuscatter_wrap.pyx', 'src/scatter/_gpuscatter.cu'],
-#                         extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
-#                                             'g++': ['-O3', '-fPIC', '-Wall'] + omp_compile,
-#                                             'nvcc': ['-use_fast_math', '-arch=sm_20', '--ptxas-options=-v', 
-#                                                      '-c', '--compiler-options', "'-fPIC'"]},
-#                         library_dirs=[CUDA['lib64']],
-#                         libraries=['cudart'],
-#                         runtime_library_dirs=['/usr/lib', '/usr/local/lib', CUDA['lib64']],
-#                         extra_link_args = ['-lstdc++', '-lm'] + omp_link,
-#                         include_dirs = [numpy_include, 'src/scatter', CUDA['include']],
-#                         language='c++')
-# 
-# else:
-#     gpuscatter = None
-
-cppscatter = Extension('thor._cppscatter',
-                    sources=['src/scatter/cpp_scatter_wrap.pyx', 'src/scatter/cpp_scatter.cpp'],
-                    extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
-                                        'g++': ['-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] + omp_compile},
-                    runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
-                    extra_link_args = ['-lstdc++', '-lm'] + omp_link,
-                    include_dirs = [numpy_include, 'src/scatter'],
-                    language='c++')
+if CUDA:
+    print "Attempting to install GPU functionality"
+    gpuscatter = Extension('thor._cppscatter',
+                        sources=['src/scatter/cpp_scatter_wrap.pyx', 'src/scatter/cpp_scatter.cpp'],
+                        extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
+                                            'g++': ['-O3', '-fPIC', '-Wall'] + omp_compile,
+                                            'nvcc': ['-use_fast_math', '-arch=sm_20', '--ptxas-options=-v', 
+                                                     '-c', '--compiler-options', "'-fPIC'"]},
+                        library_dirs=[CUDA['lib64']],
+                        libraries=['cudart'],
+                        runtime_library_dirs=['/usr/lib', '/usr/local/lib', CUDA['lib64']],
+                        extra_link_args = ['-lstdc++', '-lm'] + omp_link,
+                        include_dirs = [numpy_include, 'src/scatter', CUDA['include']],
+                        language='c++')
+else:
+    cppscatter = Extension('thor._cppscatter',
+                        sources=['src/scatter/cpp_scatter_wrap.pyx', 'src/scatter/cpp_scatter.cpp'],
+                        extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
+                                            'g++': ['-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] + omp_compile},
+                        runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
+                        extra_link_args = ['-lstdc++', '-lm'] + omp_link,
+                        include_dirs = [numpy_include, 'src/scatter'],
+                        language='c++')
                     
 
 misc = Extension('thor.misc_ext',
