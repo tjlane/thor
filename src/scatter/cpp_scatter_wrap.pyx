@@ -36,6 +36,31 @@ def output_sanity_check(output):
     
                     
 cdef extern from "cpp_scatter.hh":
+    
+    void gpuscatter(int device_id,
+
+                    int  n_q,
+                    float * q_x, 
+                    float * q_y, 
+                    float * q_z, 
+
+                    int    n_atoms,
+                    float * r_x, 
+                    float * r_y, 
+                    float * r_z,
+
+                    int   n_atom_types,
+                    int   * atom_types,
+                    float * cromermann,
+
+                    int   n_rotations,
+                    float * randN1, 
+                    float * randN2, 
+                    float * randN3,
+
+                    float * q_out_real,
+                    float * q_out_imag ) except +
+                
     void cpuscatter(int  n_q,
                     float * q_x, 
                     float * q_y, 
@@ -57,6 +82,9 @@ cdef extern from "cpp_scatter.hh":
 
                     float * q_out_real,
                     float * q_out_imag ) except +
+                    
+
+
 
 
 def _detect_gpus():
@@ -292,30 +320,16 @@ def cpp_scatter(n_molecules,
                    &real_amplitudes[0], &imag_amplitudes[0])
     
     elif (type(device_id) == int) or (device_id == 'GPU'): # run on GPU
-
-        raise NotImplementedError()
+    
+        if device_id == 'GPU':
+            device_id = 0 # default GPU
         
-        # if device_id == 'GPU':
-        #     device_id = 0
-        # if not type(device_id) == int:
-        #     raise TypeError('`device_id` must be type int')
-        # 
-        # if not n_molecules % 512 == 0:
-        #     raise ValueError('`n_rotations` must be a multiple of 512')
-        # bpg = int(n_molecules) / 512 # blocks-per-grid
-        # 
-        # if bpg <= 0:
-        #     print "Error, bpg = %d" % bpg 
-        #     raise RuntimeError('bpg <= 0; invalid number of molecules passed: %d' % n_molecules)
-        # 
-        # # call the actual C++ code
-        # gpu_scatter_obj = new C_GPUScatter(device_id, bpg, qxyz.shape[0],
-        #                            &c_qxyz[0,0], &c_qxyz[1,0], &c_qxyz[2,0],
-        #                            rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
-        #                            &c_aid[0], len(c_cromermann), &c_cromermann[0],
-        #                            n_molecules, &c_rfloats[0,0], &c_rfloats[1,0], &c_rfloats[2,0],
-        #                            &h_outQ[0])
-        # del gpu_scatter_obj
+        cpuscatter(device_id,
+                   qxyz.shape[0], &c_qxyz[0,0], &c_qxyz[1,0], &c_qxyz[2,0],
+                   rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
+                   num_atom_types, &c_atom_types[0], &c_cromermann[0],
+                   n_molecules, &c_rfloats[0,0], &c_rfloats[1,0], &c_rfloats[2,0],
+                   &real_amplitudes[0], &imag_amplitudes[0])
         
     else:
         raise ValueError('`device_id` must be one of {CPU, GPU, int}, got: '

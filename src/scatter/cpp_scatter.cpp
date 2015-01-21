@@ -1,6 +1,6 @@
 /*! 
  *  Code for computing the Thompson diffraction from an atomic structure,
- *  in parallel, both on the GPU and CPU.
+ *  both on the GPU and CPU.
  *
  *  First version: YTZ 2012
  *  Updated TJL 2012, 2014
@@ -21,7 +21,7 @@
 using namespace std;
 
 
-#define GBLTPB 32         // threads per block
+#define GBLTPB 32         // global threads per block
 #define MAX_NUM_TYPES 10  // maximum number of atom types
 
 
