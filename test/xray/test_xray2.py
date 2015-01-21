@@ -16,7 +16,6 @@ from thor import utils
 from thor import math2
 from thor import utils
 from thor import xray
-from thor import _cpuscatter
 from thor import parse
 from thor import structure
 from thor.testing import (skip, ref_file, expected_failure, 
