@@ -72,12 +72,16 @@ def find_in_path(name, path):
     return None
     
 
-# Obtain the numpy include directory. This logic works across numpy versions.
-try:
-    numpy_include = numpy.get_include()
-except AttributeError:
-    numpy_include = numpy.get_numpy_include()
-
+def get_numpy_include():
+    """
+    Obtain the numpy include directory. This logic works across numpy versions.
+    """
+    try:
+        numpy_include = numpy.get_include()
+    except AttributeError:
+        numpy_include = numpy.get_numpy_include()
+    return numpy_include
+    
 
 def git_version():
     """
@@ -126,10 +130,10 @@ def locate_cuda():
 
     # first check if the CUDA_HOME or CUDA_ROOT env variable is in use
     
-    CUDA_ENV_ = ['CUDA_HOME','CUDA_ROOT']
+    CUDA_ENVs = ['CUDA_HOME','CUDA_ROOT']
     
     found_config = False
-    for CUDA_ENV in CUDA_ENV_:
+    for CUDA_ENV in CUDA_ENVs:
         if CUDA_ENV in os.environ:
             home = os.environ[CUDA_ENV].split(':')
             nvcc = map( lambda x:pjoin(x, 'bin', 'nvcc'), home)
@@ -150,6 +154,7 @@ def locate_cuda():
                           'lib64'  : pjoin(home[x], 'lib64')} \
                           for x in xrange(len(home)) ]
         
+        # be sure all the necessary items are there
         for cudaconfig in cudaconfig_list:
             found_items = 0
             for k, v in cudaconfig.iteritems():
@@ -162,22 +167,36 @@ def locate_cuda():
                 break
         if found_config:
             break
+            
     if not found_config:
-        return False
+        cudaconfig = {'enabled' : False,
+                      'home'    : '', 
+                      'nvcc'    : '',
+                      'include' : '',
+                      'lib64'   : ''}
+        
     else:
+        cudaconfig['enabled'] = True
         print "Found CUDA config:", cudaconfig
-        return cudaconfig
+        
+    return cudaconfig
     
-CUDA = locate_cuda()
-if CUDA == False:
-    CUDA_SUCCESS = False
-else:
-    CUDA_SUCCESS = True
-
-
 
 def customize_compiler_for_nvcc(compiler):
-
+    """
+    Inject deep into distutils to customize how the dispatch
+    to gcc/nvcc works.
+    
+    If you subclass UnixCCompiler, it's not trivial to get your subclass
+    injected in, and still have the right customizations (i.e.
+    distutils.sysconfig.customize_compiler) run on it. So instead of going
+    the OO route, I have this. Note, it's kindof like a wierd functional
+    subclassing going on.
+    """
+    
+    CUDA = locate_cuda()
+    
+    # save references to the default compiler_so and _comple methods
     old_compile     = compiler._compile
     old_compiler_so = compiler.compiler_so
 
@@ -189,16 +208,20 @@ def customize_compiler_for_nvcc(compiler):
         """
 
         if type(postargs) == dict:
-            if ('nvcc' in postargs.keys()) and CUDA_SUCCESS:
+            if ('nvcc' in postargs.keys()) and CUDA['enabled']:
                 compiler.set_executable('compiler_so', CUDA['nvcc'])
                 postargs_list = postargs['nvcc']
             else:
                 postargs_list = postargs[postargs.keys()[0]]
         else:
             postargs_list = postargs
+            
+        # call the compile routine, then
+        # reset the default compiler_so, which we might have changed for cuda
         old_compile(obj, src, ext, cc_args, postargs_list, pp_opts)
         compiler.compiler_so = old_compiler_so
 
+    # inject our redefined _compile method into the class
     compiler._compile = _new_compile
 
 
@@ -206,65 +229,64 @@ class custom_build_ext(build_ext, object):
     def build_extensions(self):
         customize_compiler_for_nvcc(self.compiler)
         build_ext.build_extensions(self)
+        
+        
+        
+def locate_open_mp():
+    # openmp support -- disabled by default
+    if '--enable-openmp' in sys.argv[2:]:
+        sys.argv.remove('--enable-openmp')
+        enabled     = True
+        omp_compile = ['-fopenmp']
+        omp_link    = ['-lgomp']
+        print_warning('set --enable-openmp, enabling OPENMP support')
+    else:
+        enabled = False
+        omp_compile = ['-DNO_OMP']
+        omp_link    = []
+        
+    OMP = {'enabled' : enabled,
+           'compile' : omp_compile,
+           'link'    : omp_link}
+        
+    return OMP
 
 # -----------------------------------------------------------------------------
 # INSTALL C/C++ EXTENSIONS
 # 
 
+OMP  = locate_open_mp()
+CUDA = locate_cuda()
 
-# openmp support -- disabled by default
-if '--enable-openmp' in sys.argv[2:]:
-    sys.argv.remove('--enable-openmp')
-    omp_compile = ['-fopenmp']
-    omp_link    = ['-lgomp']
-    print_warning('set --enable-openmp, enabling OPENMP support')
-else:    
-    omp_compile = ['-DNO_OMP']
-    omp_link    = []
-
-
-if CUDA:
-    print "Attempting to install GPU functionality"
-    cppscatter = Extension('thor._cppscatter',
-                        sources=['src/scatter/cpp_scatter_wrap.pyx', 'src/scatter/cpp_scatter.cpp'],
-                        extra_compile_args={'nvcc' : ['-use_fast_math', '-arch=sm_20', '--ptxas-options=-v', 
-                                                     '-c', '--shared', '-Xcompiler=-fPIC']},
-                        library_dirs=[CUDA['lib64']],
-                        libraries=['cudart'],
-                        runtime_library_dirs=['/usr/lib', '/usr/local/lib', CUDA['lib64']],
-                        extra_link_args = ['-lstdc++', '-lm'] + omp_link,
-                        include_dirs = [numpy_include, 'src/scatter', CUDA['include']],
-                        language='c++')
-else:
-    cppscatter = Extension('thor._cppscatter',
-                        sources=['src/scatter/cpp_scatter_wrap.pyx', 'src/scatter/cpp_scatter.cpp'],
-                        extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
-                                            'g++': ['-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] + omp_compile},
-                        runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
-                        extra_link_args = ['-lstdc++', '-lm'] + omp_link,
-                        include_dirs = [numpy_include, 'src/scatter'],
-                        language='c++')
-                    
-
-misc = Extension('thor.misc_ext',
-                    sources=['src/misc/misc_wrap.pyx', 'src/misc/solidangle.cpp'],
-                    #extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
-                    #                    'g++': ['-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] + omp_compile},
-                    extra_compile_args = ['-O3', '-fPIC', '-Wall'],
-                    runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
-                    extra_link_args = ['-lstdc++', '-lm'] + omp_link,
-                    include_dirs = [numpy_include, 'src/misc'],
+cppscatter = Extension('thor._cppscatter',
+                    sources=['src/scatter/cpp_scatter_wrap.pyx', 'src/scatter/cpp_scatter.cpp'],
+                    extra_compile_args={'nvcc' : ['-use_fast_math', '-arch=sm_20', '--ptxas-options=-v', 
+                                                 '-c', '--shared', '-Xcompiler=-fPIC']
+                                         'gcc': ['-O3', '-fPIC', '-Wall'],
+                                         'g++': ['-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] }},
+                                                 
+                    library_dirs=[CUDA['lib64']],
+                    libraries=['cudart'],
+                    runtime_library_dirs=['/usr/lib', '/usr/local/lib', CUDA['lib64']],
+                    extra_link_args = ['-lstdc++', '-lm'],
+                    include_dirs = [get_numpy_include(), 'src/scatter', CUDA['include']],
                     language='c++')
 
+misc = Extension('thor.misc_ext',
+                 sources=['src/misc/misc_wrap.pyx', 'src/misc/solidangle.cpp'],
+                 extra_compile_args = ['-O3', '-fPIC', '-Wall'],
+                 runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
+                 extra_link_args = ['-lstdc++', '-lm'],
+                 include_dirs = [get_numpy_include(), 'src/misc'],
+                 language='c++')
+
 corr = Extension('thor.corr',
-                     sources=['src/corr/correlate.pyx', 'src/corr/corr.cpp'],
-                     #extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
-                     #                    'g++': ['-O3', '-fPIC', '-Wall'] + omp_compile},
-                     extra_compile_args = ['-O3', '-fPIC', '-Wall'],
-                     runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
-                     extra_link_args = ['-lstdc++', '-lm'],
-                     include_dirs = [numpy_include, 'src/corr'],
-                     language='c++')
+                 sources=['src/corr/correlate.pyx', 'src/corr/corr.cpp'],
+                 extra_compile_args = ['-O3', '-fPIC', '-Wall'],
+                 runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
+                 extra_link_args = ['-lstdc++', '-lm'],
+                 include_dirs = [get_numpy_include(), 'src/corr'],
+                 language='c++')
 
 
 metadata['packages']     = ['thor']
@@ -273,7 +295,6 @@ metadata['ext_modules']  = [cppscatter, misc, corr]
 metadata['scripts']      = [s for s in glob('scripts/*') if not s.endswith('__.py')]
 metadata['data_files']   = [('reference', glob('./reference/*'))]
 metadata['cmdclass']     = {'build_ext': custom_build_ext}
-#metadata['cmdclass']     = {'build_ext': build_ext}
 
 # ------------------------------------------------------------------------------
 #
