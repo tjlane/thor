@@ -20,10 +20,11 @@ import numpy
 # HEADER
 # 
 
-VERSION     = "0.0.1"
-ISRELEASED  = False
-__author__  = "TJ Lane"
-__version__ = VERSION
+VERSION      = "0.0.1"
+ISRELEASED   = False
+DISABLE_CUDA = False
+__author__   = "TJ Lane"
+__version__  = VERSION
 
 metadata = {
     'name': 'thor',
@@ -167,8 +168,7 @@ def locate_cuda():
             print "Found CUDA config:", cudaconfig
             break
 
-            
-    if cudaconfig_found is False:
+    if (cudaconfig_found is False) or DISABLE_CUDA:
         print_warning('The nvcc binary could not be located in your $PATH. '
                       'add it to your path, or set $CUDA_HOME.')
         cudaconfig = {'enabled' : False,
@@ -193,6 +193,7 @@ def customize_compiler_for_nvcc(compiler):
     """
     
     CUDA = locate_cuda()
+    compiler.src_extensions.append('.cu')
     
     # save references to the default compiler_so and _comple methods
     old_compile     = compiler._compile
@@ -258,18 +259,21 @@ CUDA = locate_cuda()
 
 if CUDA['enabled']:
     cppscatter = Extension('thor._cppscatter',
-                        sources=['src/scatter/cpp_scatter_wrap.pyx', 'src/scatter/cpp_scatter.cpp'],
-                        extra_compile_args={'nvcc' : ['-use_fast_math', '-arch=sm_20', '--ptxas-options=-v', 
-                                                     '-c', '--shared', '-Xcompiler=-fPIC']},
-                        library_dirs=[CUDA['lib64']],
-                        libraries=['cudart'],
-                        runtime_library_dirs=['/usr/lib', '/usr/local/lib', CUDA['lib64']],
-                        extra_link_args = ['-lstdc++', '-lm'],
-                        include_dirs = [get_numpy_include(), 'src/scatter', CUDA['include']],
-                        language='c++')
+                            sources=['src/scatter/cpp_scatter_wrap.pyx',
+                                     'src/scatter/cpp_scatter.cu'],
+                            extra_compile_args={'nvcc' : ['-use_fast_math', '-arch=sm_20', 
+                                                          '--ptxas-options=-v', '-c', '--shared',
+                                                          '-Xcompiler=-fPIC', '-Xcompiler=-Wall']},
+                            library_dirs=[CUDA['lib64']],
+                            libraries=['cudart'],
+                            runtime_library_dirs=['/usr/lib', '/usr/local/lib', CUDA['lib64']],
+                            extra_link_args = ['-lstdc++', '-lm'],
+                            include_dirs = [get_numpy_include(), 'src/scatter', CUDA['include']],
+                            language='c++')
 else:
     cppscatter = Extension('thor._cppscatter',
-                           sources=['src/scatter/cpp_scatter_wrap.pyx', 'src/scatter/cpp_scatter.cpp'],
+                           sources=['src/scatter/cpp_scatter_wrap.pyx',
+                                    'src/scatter/cpp_scatter.cpp'],
                            extra_compile_args = { 'gcc': ['-O3', '-fPIC', '-Wall'],
                                                   'g++': ['-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] },
                            runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
