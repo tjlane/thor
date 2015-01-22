@@ -133,10 +133,10 @@ def locate_cuda():
     # first check if the CUDA_HOME or CUDA_ROOT env variable is in use
     if 'CUDA_HOME' in os.environ:
         home = os.environ['CUDA_HOME'].split(':')
-        viable_nvcc_bins.append( map( lambda x : pjoin(x, 'bin', 'nvcc'), home) )
+        viable_nvcc_bins.extend( map( lambda x : pjoin(x, 'bin', 'nvcc'), home) )
     elif 'CUDA_ROOT' in os.environ:
         home = os.environ['CUDA_ROOT'].split(':')
-        viable_nvcc_bins.append( map( lambda x : pjoin(x, 'bin', 'nvcc'), home) )
+        viable_nvcc_bins.extend( map( lambda x : pjoin(x, 'bin', 'nvcc'), home) )
     else:
         nvcc_in_path = find_in_path('nvcc', os.environ['PATH'])
         if nvcc_in_path is not None:
@@ -144,16 +144,17 @@ def locate_cuda():
 
     cudaconfig_found = False
     for nvcc in viable_nvcc_bins:
+        print nvcc
         home = os.path.dirname(os.path.dirname(nvcc))
 
-        cudaconfig = {'enabled' : False,     # set below
-                      'home'    : home[x], 
-                      'nvcc'    : nvcc[x],
-                      'include' : pjoin(home[x], 'include'),
-                      'lib64'   : pjoin(home[x], 'lib64')
+        cudaconfig = {
+                      'home'    : home,
+                      'nvcc'    : nvcc,
+                      'include' : pjoin(home, 'include'),
+                      'lib64'   : pjoin(home, 'lib64')
                       }
         
-
+        found_items = 0
         for k, v in cudaconfig.iteritems():
             if not os.path.exists(v):
                 print_warning('The CUDA %s path could not be located in %s' % (k, v))

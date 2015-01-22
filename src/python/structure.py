@@ -46,7 +46,7 @@ class quaternion(object):
             sphere.
         """
     
-        if rfloat == None:
+        if rfloat is None:
             rfloat = np.random.rand(3)
     
         q = np.zeros(4)
