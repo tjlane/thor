@@ -256,7 +256,7 @@ void deviceMalloc( void ** ptr, int bytes ) {
 }
 
 
-void gpuscatter (int device_id_,
+void _gpuscatter(int device_id_,
             
                  // scattering q-vectors
                  int     n_q,
@@ -283,10 +283,12 @@ void gpuscatter (int device_id_,
 
                  // output
                  float * h_q_out_real,
-                 float * h_q_out_imag,
+                 float * h_q_out_imag
                 ) {
     
-    /* All arguments consist of 
+    /* This is the code to be called if nvcc is found, a GPU is around, etc
+     *
+     *  All arguments consist of 
      *   (1) a float pointer to the beginning of the array to be passed
      *   (2) ints representing the size of each array
      */
@@ -461,6 +463,56 @@ void gpuscatter (int device_id_,
 
 // end of GPU enabled code <---
 #endif
+
+/******************************************************************************
+ * Hybrid CPU/GPU Code
+ * decides whether to try and call GPU code or raise an exception, depending
+ * on if this file was compiled with nvcc or not
+ ******************************************************************************/
+
+
+void gpuscatter (int device_id_,
+            
+                 // scattering q-vectors
+                 int     n_q,
+                 float * h_qx,
+                 float * h_qy,
+                 float * h_qz,
+        
+                 // atomic positions, ids
+                 int     n_atoms,
+                 float * h_rx,
+                 float * h_ry,
+                 float * h_rz,
+
+                 // cromer-mann parameters
+                 int     n_atom_types,
+                 int   * h_atom_types,
+                 float * h_cromermann,
+
+                 // random numbers for rotations
+                 int     n_rotations,
+                 float * rand1,
+                 float * rand2,
+                 float * rand3,
+
+                 // output
+                 float * h_q_out_real,
+                 float * h_q_out_imag
+                ) {
+
+    #ifdef __CUDACC__
+        _gpuscatter( device_id_,
+                     n_q, h_qx, h_qy, h_qz,
+                     n_atoms, h_rx, h_ry, h_rz,
+                     n_atom_types, h_atom_types, h_cromermann,
+                     n_rotations, rand1, rand2, rand3,
+                     h_q_out_real, h_q_out_imag);
+    #else
+        throw runtime_error("gpuscatter called but cpp_scatter.cpp not compiled w/nvcc!");
+    #endif
+
+}
 
 /******************************************************************************
  * CPU Only Code
