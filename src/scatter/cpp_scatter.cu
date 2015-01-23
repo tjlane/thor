@@ -23,7 +23,7 @@
 #include "cpp_scatter.cpp"
 
 
-#define GBLTPB 32         // global threads per block
+#define GBLTPB 128        // global threads per block
 #define MAX_NUM_TYPES 10  // maximum number of atom types
 
 using namespace std;
@@ -93,7 +93,7 @@ void __global__ gpu_kernel(int   const n_q,
     while(gid < n_q) {
        
         // workspace for cm calcs -- static size, but hopefully big enough
-       float formfactors[MAX_NUM_TYPES];
+        float formfactors[MAX_NUM_TYPES];
        
         // determine the rotated locations
         qx = q_x[gid];
@@ -126,7 +126,6 @@ void __global__ gpu_kernel(int   const n_q,
 
         // for each molecule (2nd nested loop)
         for( int im = 0; im < n_rotations; im++ ) {
-    
             int id;
     
             // for each atom in molecule (3rd nested loop)
@@ -155,8 +154,7 @@ void __global__ gpu_kernel(int   const n_q,
 
         // offset by total working threads across all blocks. 
         gid += gridDim.x * blockDim.x;
-    }
-
+    } // finished all pixels
 }
 
 
@@ -208,7 +206,7 @@ void _gpuscatter(int device_id,
 
     // set GPU size parameters
     static const int tpb = GBLTPB;     // threads per block
-    int bpg = n_q / GBLTPB;            // blocks per grid (TODO: +1?)
+    int bpg = n_q / GBLTPB + 1;        // blocks per grid
     unsigned int total_q = tpb * bpg;  // total q positions to compute
     
     
@@ -231,7 +229,7 @@ void _gpuscatter(int device_id,
     // compute the memory necessary to hold input/output
     const unsigned int q_size           = total_q * sizeof(float);
     const unsigned int r_size           = n_atoms * sizeof(float);
-    const unsigned int a_size           = n_atom_types * sizeof(int);
+    const unsigned int id_size          = n_atoms * sizeof(int);
     const unsigned int cm_size          = 9 * n_atom_types * sizeof(float);
     const unsigned int quat_size        = n_rotations * sizeof(float);
 
@@ -251,7 +249,7 @@ void _gpuscatter(int device_id,
     float *d_ry;         deviceMalloc( (void **) &d_ry, r_size);
     float *d_rz;         deviceMalloc( (void **) &d_rz, r_size);
     
-    int   *d_id;         deviceMalloc( (void **) &d_id, a_size);
+    int   *d_id;         deviceMalloc( (void **) &d_id, id_size);
     float *d_cm;         deviceMalloc( (void **) &d_cm, cm_size);
     
     float *d_q0;         deviceMalloc( (void **) &d_q0, quat_size);
@@ -289,7 +287,7 @@ void _gpuscatter(int device_id,
     cudaMemcpy(d_ry, &h_ry[0], r_size, cudaMemcpyHostToDevice);
     cudaMemcpy(d_rz, &h_rz[0], r_size, cudaMemcpyHostToDevice);
     
-    cudaMemcpy(d_id, &h_atom_types[0], a_size,  cudaMemcpyHostToDevice);
+    cudaMemcpy(d_id, &h_atom_types[0], id_size, cudaMemcpyHostToDevice);
     cudaMemcpy(d_cm, &h_cromermann[0], cm_size, cudaMemcpyHostToDevice);
     
     cudaMemcpy(d_q0, &h_q0[0], quat_size, cudaMemcpyHostToDevice);
