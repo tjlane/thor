@@ -193,7 +193,8 @@ def customize_compiler_for_nvcc(compiler):
     """
     
     CUDA = locate_cuda()
-    compiler.src_extensions.append('.cu')
+    if '.cu' not in compiler.src_extensions:
+        compiler.src_extensions.append('.cu')
     
     # save references to the default compiler_so and _comple methods
     old_compile     = compiler._compile
@@ -268,7 +269,7 @@ if CUDA['enabled']:
                             libraries=['cudart'],
                             runtime_library_dirs=['/usr/lib', '/usr/local/lib', CUDA['lib64']],
                             extra_link_args = ['-lstdc++', '-lm'],
-                            include_dirs = [get_numpy_include(), 'src/scatter', CUDA['include']],
+                            include_dirs = [get_numpy_include(), CUDA['include']],
                             language='c++')
 else:
     cppscatter = Extension('thor._cppscatter',

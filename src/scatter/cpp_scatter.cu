@@ -19,8 +19,8 @@
 
 // usually bad form, but here it makes sense to include a cpp file -- this
 // facilitaties compilation on GPU enabled and disabled platforms
-#include "cpp_scatter.cpp"
 #include "cpp_scatter.hh"
+#include "cpp_scatter.cpp"
 
 
 #define GBLTPB 32         // global threads per block
@@ -76,11 +76,11 @@ void __global__ gpu_kernel(int   const n_q,
      * 
      */
     
-    int tid = threadIdx.x;
+    // int tid = threadIdx.x;
     int gid = blockIdx.x*blockDim.x + threadIdx.x;
 
     // blank-out reduction buffer. 
-    sdata[tid] = 0;
+    // sdata[tid] = 0;
     __syncthreads();
     
     // private variables (for each thread)
@@ -96,9 +96,9 @@ void __global__ gpu_kernel(int   const n_q,
        float formfactors[MAX_NUM_TYPES];
        
         // determine the rotated locations
-        qx = q_x[iq];
-        qy = q_y[iq];
-        qz = q_z[iq];
+        qx = q_x[gid];
+        qy = q_y[gid];
+        qz = q_z[gid];
         
         // Cromer-Mann computation, precompute for this value of q
         mq = qx*qx + qy*qy + qz*qz;
@@ -106,8 +106,8 @@ void __global__ gpu_kernel(int   const n_q,
         
         // accumulant: real and imaginary amplitudes for this q vector
         float2 q_sum;
-        q_sum.real = 0;
-        q_sum.imag = 0;
+        q_sum.x = 0; // x=real
+        q_sum.y = 0; // y=imag
 
         // precompute atomic form factors for each atom type
         int tind;
@@ -141,14 +141,14 @@ void __global__ gpu_kernel(int   const n_q,
         
                 qr = ax*qx + ay*qy + az*qz;
                 
-                q_sum.real += fi*__sinf(qr);
-                q_sum.imag += fi*__cosf(qr);
+                q_sum.x += fi*__sinf(qr);
+                q_sum.y += fi*__cosf(qr);
             } // finished one atom (3rd loop)
         } // finished one molecule (2nd loop)
         
         // put q 
-        q_out_real[gid] = q_sum.real;
-        q_out_imag[gid] = q_sum.imag;
+        q_out_real[gid] = q_sum.x;
+        q_out_imag[gid] = q_sum.y;
 
         // syncthreads are important here!
         __syncthreads();
@@ -168,7 +168,7 @@ void deviceMalloc( void ** ptr, int bytes ) {
 }
 
 
-void _gpuscatter(int device_id_,
+void _gpuscatter(int device_id,
             
                  // scattering q-vectors
                  int     n_q,
@@ -208,7 +208,7 @@ void _gpuscatter(int device_id_,
 
     // set GPU size parameters
     static const int tpb = GBLTPB;     // threads per block
-    bpg = n_q / GBLTPB;                // blocks per grid (TODO: +1?)
+    int bpg = n_q / GBLTPB;            // blocks per grid (TODO: +1?)
     unsigned int total_q = tpb * bpg;  // total q positions to compute
     
     
@@ -309,7 +309,7 @@ void _gpuscatter(int device_id_,
                                     n_atoms, d_rx, d_ry, d_rz,
                                     n_atom_types, d_id, d_cm,
                                     n_rotations, d_q0, d_q1, d_q2, d_q3,
-                                    d_q_out_real, d_q_out_imag)
+                                    d_q_out_real, d_q_out_imag);
     cudaThreadSynchronize();
     err = cudaGetLastError();
     if (err != cudaSuccess) {
@@ -351,10 +351,10 @@ void _gpuscatter(int device_id_,
     cudaFree(d_q_out_real);
     cudaFree(d_q_out_imag);
     
-    free(q0);
-    free(q1);
-    free(q2);
-    free(q3);
+    free(h_q0);
+    free(h_q1);
+    free(h_q2);
+    free(h_q3);
 
     err = cudaGetLastError();
     if (err != cudaSuccess) {
@@ -374,3 +374,4 @@ void _gpuscatter(int device_id_,
 }
 
 // end of GPU enabled code <---
+

@@ -53,5 +53,35 @@ void cpuscatter(
                 float * q_out_imag
                 );
 
+// guarenteed interface between cpp_scatter.cu and cpp_scatter.cpp
+void _gpuscatter(int device_id,
+
+                 // scattering q-vectors
+                 int     n_q,
+                 float * h_qx,
+                 float * h_qy,
+                 float * h_qz,
+
+                 // atomic positions, ids
+                 int     n_atoms,
+                 float * h_rx,
+                 float * h_ry,
+                 float * h_rz,
+
+                 // cromer-mann parameters
+                 int     n_atom_types,
+                 int   * h_atom_types,
+                 float * h_cromermann,
+
+                 // random numbers for rotations
+                 int     n_rotations,
+                 float * rand1,
+                 float * rand2,
+                 float * rand3,
+
+                 // output
+                 float * h_q_out_real,
+                 float * h_q_out_imag);
+
 // __CPP_SCATTER_INCLUDED__
 #endif 

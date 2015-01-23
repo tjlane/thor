@@ -147,7 +147,6 @@ void gpuscatter (int device_id_,
                 ) {
 
     #ifdef __CUDACC__
-        #warning ("Warning : compiling with gpuscatter enabled")
         _gpuscatter( device_id_,
                      n_q, h_qx, h_qy, h_qz,
                      n_atoms, h_rx, h_ry, h_rz,
@@ -156,7 +155,7 @@ void gpuscatter (int device_id_,
                      h_q_out_real, h_q_out_imag);
     #else
         #warning ("Warning : gpuscatter DISABLED")
-        throw runtime_error("gpuscatter called but cpp_scatter.cpp not compiled w/nvcc!");
+        throw std::runtime_error("gpuscatter called but cpp_scatter.cpp not compiled w/nvcc!");
     #endif
 
 }
