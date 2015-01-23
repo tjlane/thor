@@ -7,6 +7,7 @@ import numpy as np
 cimport numpy as np
 
 import os
+import re
 import subprocess
 from threading import Thread
 from time import time
@@ -89,10 +90,21 @@ cdef extern from "cpp_scatter.hh":
 
 def _detect_gpus():
     try:
-        gpus = subprocess.check_output(['nvidia-smi', '-L']).split('\n')
+        gpu_list = subprocess.check_output(['nvidia-smi', '-L']).strip().split('\n')
     except OSError as e:
-        gpus = []
-    return gpus
+        gpu_list = []
+
+    devices = {}
+    for gpu in gpu_list:
+
+        s = re.match('GPU (\d+): (.+) \(UUID: (\S+)\)', gpu)
+        if s is None:
+            raise RuntimeError('regex error parsing: %s' % gpu)
+
+        # key : (name, UUID)
+        devices[ int(s.group(1)) ] = (s.group(2), s.group(3))
+
+    return devices
 
 
 def _evenly_distribute_jobs(n_jobs, n_workers):
@@ -158,7 +170,9 @@ def parallel_cpp_scatter(n_molecules,
     # check devices
     gpus_available = _detect_gpus()
     for d in devices:
-        if (d not in gpus_available) and (not ignore_gpu_check):
+        if (d not in gpus_available.keys()) and (not ignore_gpu_check):
+            print 'Device requested: %d' % d
+            print 'Available:', gpus_available
             raise RuntimeError('Requested GPU Device %d not found. Ensure'
                                ' this GPU is online and visible to the os using'
                                ' nvidia-smi. Overwrite this error using the'
@@ -189,6 +203,8 @@ def parallel_cpp_scatter(n_molecules,
     # run dat shit
     for cpu_thread in range(procs_per_node):
         num = num_per_cpu[cpu_thread]
+        if num == 0:
+            continue
         print('CPU Thread %d :: %d shots' % (cpu_thread, num))
         cpu_args = (num, rxyz, qxyz, atom_types, cromermann_parameters, 
                     'CPU', random_state)
@@ -198,6 +214,8 @@ def parallel_cpp_scatter(n_molecules,
 
     for gpu_device in range(len(devices)):
         num = num_per_gpu[gpu_device]
+        if num == 0:
+            continue
         print('GPU Device %d :: %d shots' % (gpu_device, num))
         gpu_args = (num, rxyz, qxyz, atom_types, cromermann_parameters, 
                     gpu_device, random_state)

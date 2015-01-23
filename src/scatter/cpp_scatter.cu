@@ -19,11 +19,11 @@
 
 // usually bad form, but here it makes sense to include a cpp file -- this
 // facilitaties compilation on GPU enabled and disabled platforms
-#include "cpp_scatter.cpp"
 #include "cpp_scatter.hh"
+#include "cpp_scatter.cpp"
 
 
-#define GBLTPB 32         // global threads per block
+#define GBLTPB 128        // global threads per block
 #define MAX_NUM_TYPES 10  // maximum number of atom types
 
 using namespace std;
@@ -76,11 +76,11 @@ void __global__ gpu_kernel(int   const n_q,
      * 
      */
     
-    int tid = threadIdx.x;
+    // int tid = threadIdx.x;
     int gid = blockIdx.x*blockDim.x + threadIdx.x;
 
     // blank-out reduction buffer. 
-    sdata[tid] = 0;
+    // sdata[tid] = 0;
     __syncthreads();
     
     // private variables (for each thread)
@@ -93,12 +93,12 @@ void __global__ gpu_kernel(int   const n_q,
     while(gid < n_q) {
        
         // workspace for cm calcs -- static size, but hopefully big enough
-       float formfactors[MAX_NUM_TYPES];
+        float formfactors[MAX_NUM_TYPES];
        
         // determine the rotated locations
-        qx = q_x[iq];
-        qy = q_y[iq];
-        qz = q_z[iq];
+        qx = q_x[gid];
+        qy = q_y[gid];
+        qz = q_z[gid];
         
         // Cromer-Mann computation, precompute for this value of q
         mq = qx*qx + qy*qy + qz*qz;
@@ -106,8 +106,8 @@ void __global__ gpu_kernel(int   const n_q,
         
         // accumulant: real and imaginary amplitudes for this q vector
         float2 q_sum;
-        q_sum.real = 0;
-        q_sum.imag = 0;
+        q_sum.x = 0; // x=real
+        q_sum.y = 0; // y=imag
 
         // precompute atomic form factors for each atom type
         int tind;
@@ -126,7 +126,6 @@ void __global__ gpu_kernel(int   const n_q,
 
         // for each molecule (2nd nested loop)
         for( int im = 0; im < n_rotations; im++ ) {
-    
             int id;
     
             // for each atom in molecule (3rd nested loop)
@@ -141,22 +140,21 @@ void __global__ gpu_kernel(int   const n_q,
         
                 qr = ax*qx + ay*qy + az*qz;
                 
-                q_sum.real += fi*__sinf(qr);
-                q_sum.imag += fi*__cosf(qr);
+                q_sum.x += fi*__sinf(qr);
+                q_sum.y += fi*__cosf(qr);
             } // finished one atom (3rd loop)
         } // finished one molecule (2nd loop)
         
         // put q 
-        q_out_real[gid] = q_sum.real;
-        q_out_imag[gid] = q_sum.imag;
+        q_out_real[gid] = q_sum.x;
+        q_out_imag[gid] = q_sum.y;
 
         // syncthreads are important here!
         __syncthreads();
 
         // offset by total working threads across all blocks. 
         gid += gridDim.x * blockDim.x;
-    }
-
+    } // finished all pixels
 }
 
 
@@ -168,7 +166,7 @@ void deviceMalloc( void ** ptr, int bytes ) {
 }
 
 
-void _gpuscatter(int device_id_,
+void _gpuscatter(int device_id,
             
                  // scattering q-vectors
                  int     n_q,
@@ -208,7 +206,7 @@ void _gpuscatter(int device_id_,
 
     // set GPU size parameters
     static const int tpb = GBLTPB;     // threads per block
-    bpg = n_q / GBLTPB;                // blocks per grid (TODO: +1?)
+    int bpg = n_q / GBLTPB + 1;        // blocks per grid
     unsigned int total_q = tpb * bpg;  // total q positions to compute
     
     
@@ -231,7 +229,7 @@ void _gpuscatter(int device_id_,
     // compute the memory necessary to hold input/output
     const unsigned int q_size           = total_q * sizeof(float);
     const unsigned int r_size           = n_atoms * sizeof(float);
-    const unsigned int a_size           = n_atom_types * sizeof(int);
+    const unsigned int id_size          = n_atoms * sizeof(int);
     const unsigned int cm_size          = 9 * n_atom_types * sizeof(float);
     const unsigned int quat_size        = n_rotations * sizeof(float);
 
@@ -251,7 +249,7 @@ void _gpuscatter(int device_id_,
     float *d_ry;         deviceMalloc( (void **) &d_ry, r_size);
     float *d_rz;         deviceMalloc( (void **) &d_rz, r_size);
     
-    int   *d_id;         deviceMalloc( (void **) &d_id, a_size);
+    int   *d_id;         deviceMalloc( (void **) &d_id, id_size);
     float *d_cm;         deviceMalloc( (void **) &d_cm, cm_size);
     
     float *d_q0;         deviceMalloc( (void **) &d_q0, quat_size);
@@ -289,7 +287,7 @@ void _gpuscatter(int device_id_,
     cudaMemcpy(d_ry, &h_ry[0], r_size, cudaMemcpyHostToDevice);
     cudaMemcpy(d_rz, &h_rz[0], r_size, cudaMemcpyHostToDevice);
     
-    cudaMemcpy(d_id, &h_atom_types[0], a_size,  cudaMemcpyHostToDevice);
+    cudaMemcpy(d_id, &h_atom_types[0], id_size, cudaMemcpyHostToDevice);
     cudaMemcpy(d_cm, &h_cromermann[0], cm_size, cudaMemcpyHostToDevice);
     
     cudaMemcpy(d_q0, &h_q0[0], quat_size, cudaMemcpyHostToDevice);
@@ -309,7 +307,7 @@ void _gpuscatter(int device_id_,
                                     n_atoms, d_rx, d_ry, d_rz,
                                     n_atom_types, d_id, d_cm,
                                     n_rotations, d_q0, d_q1, d_q2, d_q3,
-                                    d_q_out_real, d_q_out_imag)
+                                    d_q_out_real, d_q_out_imag);
     cudaThreadSynchronize();
     err = cudaGetLastError();
     if (err != cudaSuccess) {
@@ -351,10 +349,10 @@ void _gpuscatter(int device_id_,
     cudaFree(d_q_out_real);
     cudaFree(d_q_out_imag);
     
-    free(q0);
-    free(q1);
-    free(q2);
-    free(q3);
+    free(h_q0);
+    free(h_q1);
+    free(h_q2);
+    free(h_q3);
 
     err = cudaGetLastError();
     if (err != cudaSuccess) {
@@ -374,3 +372,64 @@ void _gpuscatter(int device_id_,
 }
 
 // end of GPU enabled code <---
+
+int main() {
+
+    int nQ_ = 1000;
+    int nAtoms_ = 1000;
+    int n_atom_types_ = 10;
+    int nRot_ = 1000;
+
+    float * h_qx_ = new float[nQ_];
+    float * h_qy_ = new float[nQ_];
+    float * h_qz_ = new float[nQ_];
+
+    float * h_rx_ = new float[nAtoms_];
+    float * h_ry_ = new float[nAtoms_];
+    float * h_rz_ = new float[nAtoms_];
+
+    int   * atom_types_ = new int[nAtoms_];
+    float * cromermann_ = new float[n_atom_types_ * 9];
+
+    float * h_rand1_ = new float[nRot_];
+    float * h_rand2_ = new float[nRot_];
+    float * h_rand3_ = new float[nRot_];
+
+    float * h_outQ_R = new float[nQ_];
+    float * h_outQ_I = new float[nQ_];
+
+    gpuscatter    ( 0, // device ID
+
+                    // q vectors
+                    nQ_,
+                    h_qx_,
+                    h_qy_,
+                    h_qz_,
+
+                    // atomic positions, ids
+                    nAtoms_,
+                    h_rx_,
+                    h_ry_,
+                    h_rz_,
+
+                    // formfactor info
+                    n_atom_types_,
+                    atom_types_,
+                    cromermann_,
+
+                    // random numbers for rotations
+                    nRot_,
+                    h_rand1_,
+                    h_rand2_,
+                    h_rand3_,
+
+                    // output
+                    h_outQ_R,
+                    h_outQ_I );
+
+    cout << h_outQ_R[0] << endl;
+    cout << h_outQ_I[0] << endl;
+
+    return 0;
+}
+
