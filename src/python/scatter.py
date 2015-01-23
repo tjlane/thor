@@ -13,7 +13,8 @@ from scipy import misc
 from scipy import special
 
 from thor import _cppscatter
-from thor.math2 import arctan3, sph_harm
+from thor.math2 import arctan3
+from thor.sphere import sph_harm
 from thor.refdata import cromer_mann_params
 from thor.refdata import get_cromermann_parameters
 from thor.refdata import sph_quad_900
