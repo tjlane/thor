@@ -490,5 +490,6 @@ def sph_harm_coefficients(trajectory, q_values, weights=None,
     
     return sph_coefficients
 
-        
+    
+    
         

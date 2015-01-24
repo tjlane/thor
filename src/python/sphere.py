@@ -12,6 +12,7 @@ logger.setLevel('DEBUG')
 import numpy as np
 from scipy import sparse
 from scipy import special
+from scipy.interpolate import interpn
 
 from thor.math2 import arctan3
 
@@ -233,7 +234,8 @@ def radial_sph_harm(n, l, m, u, theta, phi, Rtype='legendre', **kwargs):
 
 
 def interp_grid_to_spherical(grid, radii, num_phi, num_theta, 
-                             grid_origin=(0,0,0), return_spherical_coords=False):
+                             grid_origin=(0,0,0), return_spherical_coords=False,
+                             theta_offset=0.0):
     """
     Compute interpolated values in 3D spherical coordinates from a 3D square 
     grid. The interpolated values lie equally spaced along the azumithal and
@@ -271,7 +273,7 @@ def interp_grid_to_spherical(grid, radii, num_phi, num_theta,
     # find the cartesian x,y,z values for each interpolant
     xi = np.zeros( (len(radii) * num_theta * num_phi, 3), dtype=grid.dtype )
 
-    thetas = np.arange(0.0, 2.0*np.pi, 2.0*np.pi / num_theta)
+    thetas = np.arange(0.0, 2.0*np.pi, 2.0*np.pi / num_theta) + theta_offset
     phis = np.arange(0.0, np.pi, np.pi / num_phi)
     assert len(thetas) == num_theta, 'thetas len mistmatch %d %d' % (len(thetas), num_theta)
     assert len(phis) == num_phi, 'phi len mistmatch %d %d' % (len(phis), num_phi)

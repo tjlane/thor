@@ -23,6 +23,7 @@ from scipy.ndimage import filters
 from scipy.ndimage import interpolation as ndinterp
 
 from thor import math2
+from thor import sphere
 from thor import utils
 from thor import scatter
 from thor import parse
@@ -2730,11 +2731,15 @@ class Rings(object):
             The cosine of psi, the angle between the scattering vectors.
         """
         
-        t1     = np.pi/2. + np.arcsin( q1 / (2.*self.k) ) # theta 1 in spherical coor
-        t2     = np.pi/2. + np.arcsin( q2 / (2.*self.k) ) # theta 2 in spherical coor
-        cospsi = np.cos(t1)*np.cos(t2) + np.sin(t1)*np.sin(t2) *\
-                 np.cos( self.phi_values )
-              
+        # this is the flag that psi = phi
+        if self.k == 0.0:
+            cospsi = np.cos(self.phi_values)
+        else:
+            t1     = np.pi/2. + np.arcsin( q1 / (2.*self.k) ) # theta 1 in spherical coor
+            t2     = np.pi/2. + np.arcsin( q2 / (2.*self.k) ) # theta 2 in spherical coor
+            cospsi = np.cos(t1)*np.cos(t2) + np.sin(t1)*np.sin(t2) *\
+                     np.cos( self.phi_values )
+        
         return cospsi
     
 
@@ -2786,6 +2791,10 @@ class Rings(object):
         ..[1] Hura et. al. J. Chem. Phys. 113, 9140 (2000); doi10.1063/1.1319614
         ..[2] Jackson. Classical Electrostatics.
         """
+        
+        if self.k == 0.0:
+            raise ValueError('Rings.k is 0.0, which indicates simulated data --'
+                             ' no polarization correction possible.')
         
         logger.info('Applying polarization correction w/P_y=%.3f' % yaxis_polarization)
         if (yaxis_polarization > 1.0) or (yaxis_polarization < 0.0):
@@ -3662,6 +3671,31 @@ class Rings(object):
 
             logger.info(utils.logger_return + 'Finished polar shot %d/%d' % (i+1, num_shots) )
 
+        return cls(q_values, polar_intensities, k, polar_mask=None)
+
+
+    @classmethod
+    def simulate_density(cls, grid, grid_spacing, num_shots, q_values, num_phi):
+        
+        # fft to get intensities
+        Igrid = np.fft.fftshift( np.abs( np.fft.fftn(grid) ) )
+
+        origin = np.array(grid.shape) / 2.0
+        assert len(origin) == 3
+        
+        # need to figure out how to deal with energy
+        k = 0.0
+
+        polar_intensities = np.zeros((num_shots, len(q_values), num_phi))
+        for i in range(num_shots):
+            theta0 = 2.0 * np.pi * np.random.rand()
+            si = sphere.interp_grid_to_spherical(Igrid, q_values, 
+                                                 num_phi, 1,
+                                                 grid_origin=origin,
+                                                 theta_offset=theta0)
+            polar_intensities[i,:,:] = np.squeeze(si)
+                                                                 
+                                           
         return cls(q_values, polar_intensities, k, polar_mask=None)
 
 
