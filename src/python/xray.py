@@ -3675,26 +3675,73 @@ class Rings(object):
 
 
     @classmethod
-    def simulate_density(cls, grid, grid_spacing, num_shots, q_values, num_phi):
+    def simulate_density(cls, grid, grid_spacing, num_shots, q_values, num_phi,
+                         energy=10.0):
+        """
+        Simulate many scattering 'shot's, i.e. one exposure of x-rays to a
+        sample, but onto a polar detector. Return that as a Rings object
+        (factory function).
+        
+        This function uses a grid-based representation of the structure 
+        (electron density) instead of the Rings.simulate() method, which 
+        employs an atomic model.
+        
+        Note: the simulation is preformed independent of energy, Rings.k will
+        be 0.0. This may change in the future if requested.
+        
+        Parameters
+        ----------
+        grid : np.ndarray
+            The rectangular grid of electron density
+            
+        grid_spacing: float
+            The distance between grid points, in Angstroms
+            
+        num_shots : int
+            The number of shots to simulate
+            
+        q_values : np.ndarray, float
+            A range of q-magnitudes to scatter on to.
+            
+        num_phi : int
+            The number of polar values to use in the range [0, 2pi)
+            
+        Optional Parameters
+        -------------------
+        energy : float
+            The energy, in keV
+            
+        Returns
+        -------
+        rings : thor.xray.Rings
+            A Rings instance, containing the simulated shots.
+        """
+        
+        # compute the wavenumber, which dictates the angle of the cone
+        # on which we interpolate the reciprocal space grid (called theta2)
+        beam = Beam(1, energy=energy)
+        k = beam.k
         
         # fft to get intensities
         Igrid = np.fft.fftshift( np.abs( np.fft.fftn(grid) ) )
 
         origin = np.array(grid.shape) / 2.0
         assert len(origin) == 3
-        
-        # need to figure out how to deal with energy
-        k = 0.0
 
         polar_intensities = np.zeros((num_shots, len(q_values), num_phi))
+        
         for i in range(num_shots):
-            theta0 = 2.0 * np.pi * np.random.rand()
-            si = sphere.interp_grid_to_spherical(Igrid, q_values, 
-                                                 num_phi, 1,
-                                                 grid_origin=origin,
-                                                 theta_offset=theta0)
-            polar_intensities[i,:,:] = np.squeeze(si)
-                                                                 
+            R = math2.rand_rot()
+            for iq, q in enumerate(q_values):
+                theta2 = np.arccos(q / (2.0 * k))
+                r = 1.0 / (2.0 * np.pi * grid_spacing) # dbl ck
+                si = sphere.interp_grid_to_spherical(Igrid,
+                                                     np.array([r]), 
+                                                     num_phi, 1,
+                                                     grid_origin=origin,
+                                                     theta_offset=theta2,
+                                                     rotate=R)
+                polar_intensities[i,iq,:] = np.squeeze(si)             
                                            
         return cls(q_values, polar_intensities, k, polar_mask=None)
 

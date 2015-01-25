@@ -537,7 +537,6 @@ class TestSimulateDensity(object):
         
         R = np.corrcoef(tst, ref)[0,1]
         assert R > 0.95, 'atomic and grid models significantly different'
-    
         
 
 def test_sph_harm():

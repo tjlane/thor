@@ -235,7 +235,7 @@ def radial_sph_harm(n, l, m, u, theta, phi, Rtype='legendre', **kwargs):
 
 def interp_grid_to_spherical(grid, radii, num_phi, num_theta, 
                              grid_origin=(0,0,0), return_spherical_coords=False,
-                             theta_offset=0.0):
+                             theta_offset=0.0, rotate=False):
     """
     Compute interpolated values in 3D spherical coordinates from a 3D square 
     grid. The interpolated values lie equally spaced along the azumithal and
@@ -269,12 +269,14 @@ def interp_grid_to_spherical(grid, radii, num_phi, num_theta,
         A 3D array of the interpolated values. The dimensions are 
         (radial, polar [theta], azmuthal [phi]).
     """
+    
+    assert not np.isnan(theta_offset)
 
     # find the cartesian x,y,z values for each interpolant
     xi = np.zeros( (len(radii) * num_theta * num_phi, 3), dtype=grid.dtype )
 
-    thetas = np.arange(0.0, 2.0*np.pi, 2.0*np.pi / num_theta) + theta_offset
-    phis = np.arange(0.0, np.pi, np.pi / num_phi)
+    thetas = np.arange(0.0, np.pi, np.pi / num_theta) + theta_offset
+    phis = np.arange(0.0, 2.0*np.pi, 2.0*np.pi / num_phi)
     assert len(thetas) == num_theta, 'thetas len mistmatch %d %d' % (len(thetas), num_theta)
     assert len(phis) == num_phi, 'phi len mistmatch %d %d' % (len(phis), num_phi)
 
@@ -286,12 +288,13 @@ def interp_grid_to_spherical(grid, radii, num_phi, num_theta,
     xi[:,0] = r * np.sin(t) * np.cos(p) # x
     xi[:,1] = r * np.sin(t) * np.sin(p) # y
     xi[:,2] = r * np.cos(t)             # z
-
-    xi += np.array(grid_origin)[None,:]
+    
+    if rotate is not False:
+        xi = np.dot(xi, rotate)
 
     # compute an interpolator for the rectangular grid
-    gi = [ np.arange(l) for l in grid.shape ]
-    interpolated = interpn(gi, grid, xi, bounds_error=False)
+    gi = [ np.arange(grid.shape[i]) - grid_origin[i] for i in range(3) ]
+    interpolated = interpn(gi, grid, xi, bounds_error=True)
 
     res = interpolated.reshape(len(radii), num_theta, num_phi)
 

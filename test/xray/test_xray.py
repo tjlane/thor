@@ -22,8 +22,9 @@ from thor import structure
 from thor import scatter
 from thor.testing import (skip, ref_file, expected_failure, 
                           brute_force_masked_correlation)
-from thor.refdata import cromer_mann_params
+from thor.refdata import cromer_mann_params, get_cromermann_parameters
 
+import mdtraj
 from mdtraj import Trajectory, io
 
 from numpy.testing import (assert_almost_equal, assert_array_almost_equal,
@@ -958,6 +959,45 @@ class TestRings(object):
         
         # smoke test version where it computes correlators
         #p = self.rings.correlation_significance(1.0, 1.0)
+        
+    def test_simulate_density(self):
+        # generate a rings object both from an atomic and density model and
+        # ensure the correlations match
+        
+        num_shots = 100
+        num_phi   = 1024
+        
+        nq = 100 # number of q vectors
+        q_values = [1.0, 2.5]
+        
+        # atomic model
+        traj = mdtraj.load(ref_file('pentagon.pdb'))
+        atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
+        cp, at = get_cromermann_parameters(atomic_numbers)
+        rxyz = traj.xyz[0] * 10.0
+        
+        r1 = xray.Rings.simulate(traj, 1, q_values, num_phi, num_shots)
+                                  
+        # density model
+        grid_dimensions = [125,] * 3
+        grid_spacing = 0.1 # Angstroms
+        grid = structure.atomic_to_density(traj, grid_dimensions, 
+                                           grid_spacing)
+                                           
+        r2 = xray.Rings.simulate_density(grid, grid_spacing, num_shots, 
+                                         q_values, num_phi)        
+        
+        # compute correlations & ensure match
+        c1 = r1.correlate_intra(1.0, 1.0)
+        c2 = r2.correlate_intra(1.0, 1.0)
+        
+        import matplotlib.pyplot as plt
+        plt.figure()
+        plt.plot(c1 / c1[0])
+        plt.plot(c2 / c2[0])
+        plt.show()
+        
+        assert_allclose(c1, c2)
 
     def test_io(self):
         if os.path.exists('test.ring'): os.remove('test.ring')
