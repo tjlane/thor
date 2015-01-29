@@ -3721,6 +3721,11 @@ class Rings(object):
         # on which we interpolate the reciprocal space grid (called theta2)
         beam = Beam(1, energy=energy)
         k = beam.k
+        for q in q_values:
+            if q > (2.0 * k):
+                raise ValueError('At least one of `q_values` (%f) is greater '
+                                 'than 2k, which is not theoretically possible.'
+                                 'Passed energy: %f keV.' % (q, energy))
         
         # fft to get intensities
         Igrid = np.fft.fftshift( np.abs( np.fft.fftn(grid) ) )

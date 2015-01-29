@@ -18,8 +18,9 @@ from scipy import stats
 from scipy import optimize
 from scipy import spatial
 from scipy import special
+
 from scipy.misc import factorial
-from scipy.ndimage import filters, interpolation
+from scipy.ndimage import filters, interpolation, morphology
 from scipy.signal import fftconvolve
 from scipy.interpolate import interpn
  
@@ -64,6 +65,40 @@ def smooth(x, beta=10.0, window_size=11):
     smoothed = y[b:len(y)-b]
     
     return smoothed
+
+
+def find_local_maxima(arr):
+    """
+    Find local maxima in a multidimensional array `arr`.
+    
+    Parameters
+    ----------
+    arr : np.ndarray
+        The array to find maxima in
+    
+    Returns
+    -------
+    indices : tuple of np.ndarray
+        The indices of local maxima in `arr`
+    """
+    
+    # http://stackoverflow.com/questions/3684484/peak-detection-in-a-2d-array/3689710#3689710
+    
+    # neighborhood is simply a 3x3x3 array of True
+    neighborhood = morphology.generate_binary_structure(len(arr.shape), 2)
+    local_max = ( filters.maximum_filter(arr, footprint=neighborhood) == arr )
+    
+    # http://www.scipy.org/doc/api_docs/SciPy.ndimage.morphology.html#binary_erosion
+    background = ( arr == 0 )
+    eroded_background = morphology.binary_erosion(background,
+                                                  structure=neighborhood,
+                                                  border_value=1)
+        
+    # we obtain the final mask, containing only peaks, 
+    # by removing the background from the local_min mask
+    detected_max = local_max ^ eroded_background # ^ = XOR
+    
+    return np.where(detected_max)
 
 
 def arctan3(y, x):

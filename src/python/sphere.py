@@ -270,7 +270,8 @@ def interp_grid_to_spherical(grid, radii, num_phi, num_theta,
         (radial, polar [theta], azmuthal [phi]).
     """
     
-    assert not np.isnan(theta_offset)
+    if np.isnan(theta_offset):
+        raise ValueError('`theta_offset` is NaN')
 
     # find the cartesian x,y,z values for each interpolant
     xi = np.zeros( (len(radii) * num_theta * num_phi, 3), dtype=grid.dtype )
