@@ -15,6 +15,19 @@ from thor import math2
 from thor.testing import skip, ref_file
 
 
+def test_pad_grid_to_square():
+    
+    tg = np.random.rand(5,4,3)
+    padded = structure.pad_grid_to_square(tg)
+    assert padded.shape == (5,5,5), padded.shape
+    
+    padded2 = structure.pad_grid_to_square(tg, min_pad_size=1)
+    assert padded2.shape == (7,7,7), padded2.shape
+    
+    padded3 = structure.pad_grid_to_square(tg, min_pad_size=2)
+    assert padded3.shape == (9,9,9), padded3.shape
+
+
 class TestAtomicToDensity(object):
 
     def test_atomic_to_density_positions(self):

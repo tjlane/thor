@@ -3718,13 +3718,13 @@ class Rings(object):
         """
         
         # compute the wavenumber, which dictates the angle of the cone
-        # on which we interpolate the reciprocal space grid (called theta2)
+        # on which we interpolate the reciprocal space grid (theta2)
         beam = Beam(1, energy=energy)
         k = beam.k
         for q in q_values:
             if q > (2.0 * k):
                 raise ValueError('At least one of `q_values` (%f) is greater '
-                                 'than 2k, which is not theoretically possible.'
+                                 'than 2*k, which is not theoretically possible.'
                                  'Passed energy: %f keV.' % (q, energy))
         
         # fft to get intensities
@@ -3739,7 +3739,7 @@ class Rings(object):
             R = math2.rand_rot()
             for iq, q in enumerate(q_values):
                 theta2 = np.arccos(q / (2.0 * k))
-                r = 1.0 / (2.0 * np.pi * grid_spacing) # dbl ck
+                r = (grid_spacing * np.product(grid.shape)) / (2.0 * np.pi)
                 si = sphere.interp_grid_to_spherical(Igrid,
                                                      np.array([r]), 
                                                      num_phi, 1,

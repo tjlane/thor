@@ -968,19 +968,15 @@ class TestRings(object):
         num_phi   = 1024
         
         nq = 100 # number of q vectors
-        q_values = np.arange(1.0, 10.0, 0.5)
+        q_values = [1.0, 2.0]
         
         # atomic model
-        traj = mdtraj.load(ref_file('pentagon.pdb'))
-        atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
-        cp, at = get_cromermann_parameters(atomic_numbers)
-        rxyz = traj.xyz[0] * 10.0
-        
+        traj = mdtraj.load(ref_file('pentagon.pdb'))        
         r1 = xray.Rings.simulate(traj, 1, q_values, num_phi, num_shots)
                                   
         # density model
-        grid_dimensions = [125,] * 3
-        grid_spacing = 0.1 # Angstroms
+        grid_dimensions = [205,] * 3
+        grid_spacing = 0.05 # Angstroms
         grid = structure.atomic_to_density(traj, grid_dimensions, 
                                            grid_spacing)
                                            
@@ -988,16 +984,16 @@ class TestRings(object):
                                          q_values, num_phi)        
         
         # compute correlations & ensure match
-        #c1 = r1.correlate_intra(1.0, 1.0)
-        #c2 = r2.correlate_intra(1.0, 1.0)
+        c1 = r1.correlate_intra(1.0, 1.0)
+        c2 = r2.correlate_intra(1.0, 1.0)
         
         import matplotlib.pyplot as plt
         plt.figure()
-        # plt.plot(c1 / c1[0])
-        # plt.plot(c2 / c2[0])
+        plt.plot(c1 / c1[0])
+        plt.plot(c2 / c2[0])
         
-        for q in q_values:
-            plt.plot(r1.correlate_intra(q, q))
+        # for q in q_values:
+        #     plt.plot(r1.correlate_intra(q, q))
         plt.show()
         
         #assert_allclose(c1, c2)

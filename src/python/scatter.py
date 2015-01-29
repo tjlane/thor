@@ -226,6 +226,8 @@ def simulate_density(grid, grid_spacing, num_molecules, detector,
         to a scattering vector from `qxyz`.
     """
     
+    raise NotImplementedError('Implementation currently incorrect')
+    
     if dont_rotate:
         random_state = _NonRandomState()
     

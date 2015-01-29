@@ -187,6 +187,40 @@ def remove_COM(traj):
     return traj
 
     
+def pad_grid_to_square(grid, min_pad_size=0):
+    """
+    Pads a grid with zeros so that it is:
+        1) square
+        2) has at least `min_pad_size` zeros on the edge of each axis
+    
+    Parameters
+    ----------
+    grid : np.ndarray
+        The grid to pad
+        
+    min_pad_size : int
+        The minimum number of zeros along each axis to pad with
+        
+    Returns
+    -------
+    padded_grid : np.ndarray
+        A square, padded grid!
+    """
+    
+    ms = max(grid.shape)
+    too_add = [ max( ms-s+2*min_pad_size, 2*min_pad_size) for s in grid.shape ]
+    too_add = np.array(too_add)
+    
+    bottom = too_add / 2
+    top    = too_add / 2 + too_add % 2
+    assert np.all(top + bottom == too_add)
+    pt = [ (bottom[i], top[i]) for i in range(len(grid.shape)) ]
+    
+    padded_grid = np.pad(grid, pt, mode='constant', constant_values=[0.0])
+    
+    return padded_grid
+    
+    
 def rand_rotate_molecule(xyzlist, rfloat=None):
     """
     Randomly rotate the molecule defined by xyzlist.
