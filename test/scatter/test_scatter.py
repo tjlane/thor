@@ -440,7 +440,7 @@ class TestSimulateDensity(object):
     
     def setup(self):
         
-        self.GRIDSIZE = 35
+        self.GRIDSIZE = 15
         self.GRIDSPAC = 1.0
 
         self.gs = (self.GRIDSIZE,)*3
