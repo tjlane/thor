@@ -449,7 +449,7 @@ class TestSimulateDensity(object):
 
         self.detector = np.mgrid[:self.gs[0],:self.gs[1],:self.gs[2]].reshape(3, -1).T * 1.0
         self.detector -= self.detector.mean(axis=0)[None,:]
-        self.detector *= 1.0 / (2.0 * np.pi)
+        self.detector *= (self.GRIDSPAC * self.GRIDSIZE) / (2.0 * np.pi)
         
         
     def fft_and_simulate_density(self, dens):
