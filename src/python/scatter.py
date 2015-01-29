@@ -358,7 +358,7 @@ def atomic_electrondens(atomic_Z, r_mag, radial_cutoff=None):
     if radial_cutoff is not None:
         inds = (r_mag < radial_cutoff)
         if np.sum(inds) == 0:
-            raise ValueError('No grid points contained in radial cutoff!s')
+            raise ValueError('No grid points contained in radial cutoff!')
     else:
         inds = np.ones(r_mag.shape, dtype=np.bool)
     

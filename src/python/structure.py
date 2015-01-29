@@ -429,17 +429,19 @@ def atomic_to_density(traj, grid_dimensions, grid_spacing, radial_cutoff=3.0):
     traj = remove_COM(traj)
 
     grid = np.zeros(grid_dimensions)
-    center = grid_spacing * np.array(grid_dimensions) / 2.0
-    nxyz = grid_spacing * np.mgrid[:grid_dimensions[0],
-                                   :grid_dimensions[1],
-                                   :grid_dimensions[2]]
+    center = np.array(grid_dimensions) / 2.0 + np.array([0.5, 0.5, 0.5])
+    nxyz = np.mgrid[:grid_dimensions[0],
+                    :grid_dimensions[1],
+                    :grid_dimensions[2]].astype(np.float) - center[:,None,None,None]
+    nxyz *= grid_spacing
 
     atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
 
     for i in range(traj.n_atoms):
-        r = traj.xyz[0,i,:] * 10.0 + center
+        r = traj.xyz[0,i,:] * 10.0
         r_mag = np.sqrt(np.sum( np.square(nxyz - r[:,None,None,None]), axis=0 ))
         assert r_mag.shape == grid_dimensions, '%s / %s' % (str(r_mag.shape), str(grid_dimensions))
+        
         grid += atomic_electrondens(atomic_numbers[i], r_mag, 
                                     radial_cutoff=radial_cutoff)
 
