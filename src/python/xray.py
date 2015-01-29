@@ -24,6 +24,7 @@ from scipy.ndimage import interpolation as ndinterp
 
 from thor import math2
 from thor import sphere
+from thor import structure
 from thor import utils
 from thor import scatter
 from thor import parse
@@ -3676,7 +3677,7 @@ class Rings(object):
 
     @classmethod
     def simulate_density(cls, grid, grid_spacing, num_shots, q_values, num_phi,
-                         energy=10.0):
+                         energy=10.0, pad=3):
         """
         Simulate many scattering 'shot's, i.e. one exposure of x-rays to a
         sample, but onto a polar detector. Return that as a Rings object
@@ -3711,6 +3712,9 @@ class Rings(object):
         energy : float
             The energy, in keV
             
+        pad : int
+            Pad the input grid with at least this many zeros before FFT.
+            
         Returns
         -------
         rings : thor.xray.Rings
@@ -3728,6 +3732,10 @@ class Rings(object):
                                  'Passed energy: %f keV.' % (q, energy))
         
         # fft to get intensities
+        grid = structure.pad_grid_to_square(grid, pad)
+        N = grid.shape[0]
+        assert grid.shape == (N,)*3
+        
         Igrid = np.fft.fftshift( np.abs( np.fft.fftn(grid) ) )
 
         origin = np.array(grid.shape) / 2.0
@@ -3739,7 +3747,7 @@ class Rings(object):
             R = math2.rand_rot()
             for iq, q in enumerate(q_values):
                 theta2 = np.arccos(q / (2.0 * k))
-                r = (grid_spacing * np.product(grid.shape)) / (2.0 * np.pi)
+                r = q * (grid_spacing * N) / (2.0 * np.pi)
                 si = sphere.interp_grid_to_spherical(Igrid,
                                                      np.array([r]), 
                                                      num_phi, 1,

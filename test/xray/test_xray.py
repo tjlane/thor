@@ -975,8 +975,8 @@ class TestRings(object):
         r1 = xray.Rings.simulate(traj, 1, q_values, num_phi, num_shots)
                                   
         # density model
-        grid_dimensions = [205,] * 3
-        grid_spacing = 0.05 # Angstroms
+        grid_dimensions = [151,] * 3
+        grid_spacing = 1.0 # Angstroms
         grid = structure.atomic_to_density(traj, grid_dimensions, 
                                            grid_spacing)
                                            
@@ -986,17 +986,13 @@ class TestRings(object):
         # compute correlations & ensure match
         c1 = r1.correlate_intra(1.0, 1.0)
         c2 = r2.correlate_intra(1.0, 1.0)
+        R = np.corrcoef(c1, c2)[0,1]
+        assert R > 0.95
         
-        import matplotlib.pyplot as plt
-        plt.figure()
-        plt.plot(c1 / c1[0])
-        plt.plot(c2 / c2[0])
-        
-        # for q in q_values:
-        #     plt.plot(r1.correlate_intra(q, q))
-        plt.show()
-        
-        #assert_allclose(c1, c2)
+        c1 = r1.correlate_intra(2.0, 2.0)
+        c2 = r2.correlate_intra(2.0, 2.0)
+        R = np.corrcoef(c1, c2)[0,1]
+        assert R > 0.95
 
     def test_io(self):
         if os.path.exists('test.ring'): os.remove('test.ring')

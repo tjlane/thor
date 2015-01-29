@@ -277,8 +277,10 @@ def interp_grid_to_spherical(grid, radii, num_phi, num_theta,
     xi = np.zeros( (len(radii) * num_theta * num_phi, 3), dtype=grid.dtype )
 
     thetas = np.arange(0.0, np.pi, np.pi / num_theta) + theta_offset
-    phis = np.arange(0.0, 2.0*np.pi, 2.0*np.pi / num_phi)
+    thetas = thetas % np.pi
     assert len(thetas) == num_theta, 'thetas len mistmatch %d %d' % (len(thetas), num_theta)
+    
+    phis = np.arange(0.0, 2.0*np.pi, 2.0*np.pi / num_phi)
     assert len(phis) == num_phi, 'phi len mistmatch %d %d' % (len(phis), num_phi)
 
     # the repeat rate will be important for the reshape, below
