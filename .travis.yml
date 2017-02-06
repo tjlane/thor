@@ -24,9 +24,9 @@ before_install:
 
 install:
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION binstar atlas numexpr numpy scipy matplotlib nose pytables pyyaml cython
-  - conda install --channel https://conda.binstar.org/omnia mdtraj --yes
-  - conda install --channel https://conda.anaconda.org/conda-forge pyfftw --yes
-  - conda install --channel https://conda.anaconda.org/conda-forge fabio --yes
+  - conda install -n test-environment --channel https://conda.binstar.org/omnia mdtraj --yes
+  - conda install -n test-environment --channel https://conda.anaconda.org/conda-forge pyfftw --yes
+  - conda install -n test-environment --channel https://conda.anaconda.org/conda-forge fabio --yes
   - source activate test-environment
   - python setup.py install
 
