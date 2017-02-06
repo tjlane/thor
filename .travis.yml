@@ -7,26 +7,31 @@ python:
   #- 3.3
 
 # Setup anaconda
+# updated 2/6/17 with instructions: https://conda.io/docs/travis.html
 before_install:
-  - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
-  - chmod +x miniconda.sh
-  - ./miniconda.sh -b
-  - export PATH=/home/travis/miniconda/bin:$PATH
-  - conda update --yes conda
-  # The next couple lines fix a crash with multiprocessing 
-  # on Travis and are not specific to using Miniconda
-  - sudo rm -rf /dev/shm
-  - sudo ln -s /run/shm /dev/shm
-  # install python dependencies
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION binstar atlas numexpr numpy scipy matplotlib nose pytables pyyaml cython
-  - conda install --channel https://conda.binstar.org/omnia mdtraj --yes
-  - conda install --channel https://conda.binstar.org/richli pyfftw --yes
-  - conda install --channel https://conda.binstar.org/praxes fabio --yes
+  - sudo apt-get update
+  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
+      wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
+    else
+      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+    fi
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda
+  - conda info -a
 
 install:
+  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION binstar atlas numexpr numpy scipy matplotlib nose pytables pyyaml cython mdtraj fabio pyfftw
+#  - conda install --channel https://conda.binstar.org/omnia mdtraj --yes
+#  - conda install --channel https://conda.binstar.org/richli pyfftw --yes
+#  - conda install --channel https://conda.binstar.org/praxes fabio --yes
+  - source activate test-environment
   - python setup.py install
 
 env:
+  - TESTFOLDER=test
   - TESTFOLDER=test/scatter
   - TESTFOLDER=test/xray/test_xray.py
   - TESTFOLDER=test/xray/test_xray2.py
@@ -34,8 +39,4 @@ env:
 # Run tests
 script:
   - nosetests -v "$TESTFOLDER"
-# --with-cov --cov YOUR_PACKAGE_NAME_HERE --cov-config .coveragerc --logging-level=INFO
 
-# Calculate coverage
-#after_success:
-#  - coveralls --config_file .coveragerc
