@@ -18,8 +18,9 @@ from scipy import stats
 from scipy import optimize
 from scipy import spatial
 from scipy import special
+
 from scipy.misc import factorial
-from scipy.ndimage import filters, interpolation
+from scipy.ndimage import filters, interpolation, morphology
 from scipy.signal import fftconvolve
 from scipy.interpolate import interpn
  
@@ -64,6 +65,40 @@ def smooth(x, beta=10.0, window_size=11):
     smoothed = y[b:len(y)-b]
     
     return smoothed
+
+
+def find_local_maxima(arr):
+    """
+    Find local maxima in a multidimensional array `arr`.
+    
+    Parameters
+    ----------
+    arr : np.ndarray
+        The array to find maxima in
+    
+    Returns
+    -------
+    indices : tuple of np.ndarray
+        The indices of local maxima in `arr`
+    """
+    
+    # http://stackoverflow.com/questions/3684484/peak-detection-in-a-2d-array/3689710#3689710
+    
+    # neighborhood is simply a 3x3x3 array of True
+    neighborhood = morphology.generate_binary_structure(len(arr.shape), 2)
+    local_max = ( filters.maximum_filter(arr, footprint=neighborhood) == arr )
+    
+    # http://www.scipy.org/doc/api_docs/SciPy.ndimage.morphology.html#binary_erosion
+    background = ( arr == 0 )
+    eroded_background = morphology.binary_erosion(background,
+                                                  structure=neighborhood,
+                                                  border_value=1)
+        
+    # we obtain the final mask, containing only peaks, 
+    # by removing the background from the local_min mask
+    detected_max = local_max ^ eroded_background # ^ = XOR
+    
+    return np.where(detected_max)
 
 
 def arctan3(y, x):
@@ -252,177 +287,6 @@ def rand_rot(rands = None):
     return RU
 
 
-def Wigner3j(j1, j2, j3, m1, m2, m3):
-    """
-    Compute the Wigner 3j symbol using the Racah formula [1]. 
-    
-                         / j1 j2 j3 \
-                         |          |  
-                         \ m1 m2 m3 /
-     
-    Parameters
-    ----------
-    j : angular momentum quantum numbers
-    m : magnetic quantum numbers
-    
-    Returns
-    -------
-    wigner3j : float
-        The 3j symbol value.
-     
-    References
-    ----------
-    ..[1] Wigner 3j-Symbol entry of Eric Weinstein's Mathworld: 
-    http://mathworld.wolfram.com/Wigner3j-Symbol.html
-    
-    Notes
-    -----
-    Adapted from Wigner3j.m by David Terr, Raytheon, 6-17-04
-    """
-    
-    # Error checking
-    if ( ( 2*j1 != np.floor(2*j1) ) | ( 2*j2 != np.floor(2*j2) ) | ( 2*j3 != np.floor(2*j3) ) | ( 2*m1 != np.floor(2*m1) ) | ( 2*m2 != np.floor(2*m2) ) | ( 2*m3 != np.floor(2*m3) ) ):
-        raise ValueError('All arguments must be integers or half-integers.')
-        
-    # Additional check if the sum of the second row equals zero
-    if ( m1+m2+m3 != 0.0 ):
-        logger.debug('3j-Symbol unphysical')
-        return 0.0
-
-    if ( j1 - m1 != np.floor ( j1 - m1 ) ):
-        logger.debug('2*j1 and 2*m1 must have the same parity')
-        return 0.0
-
-    if ( j2 - m2 != np.floor ( j2 - m2 ) ):
-        logger.debug('2*j2 and 2*m2 must have the same parity')
-        return 0.0
-
-    if ( j3 - m3 != np.floor ( j3 - m3 ) ):
-        logger.debug('2*j3 and 2*m3 must have the same parity')
-        return 0.0
-
-    if ( j3 > j1 + j2)  | ( j3 < abs(j1 - j2) ):
-        logger.debug('j3 is out of bounds.')
-        return 0.0
-
-    if abs(m1) > j1:
-        logger.debug('m1 is out of bounds.')
-        return 0.0
-
-    if abs(m2) > j2:
-        logger.debug('m2 is out of bounds.')
-        return 0.0
-
-    if abs(m3) > j3:
-        logger.debug('m3 is out of bounds.')
-        return 0.0
-
-    t1 = j2 - m1 - j3
-    t2 = j1 + m2 - j3
-    t3 = j1 + j2 - j3
-    t4 = j1 - m1
-    t5 = j2 + m2
-
-    tmin = max( 0.0, max( t1, t2 ) )
-    tmax = min( t3, min( t4, t5 ) )
-    tvec = np.arange(tmin, tmax+1.0, 1.0)
-
-    wigner = 0.0
-
-    for t in tvec:
-        wigner += (-1.0)**t / float( factorial(t) * factorial(t-t1) * factorial(t-t2) *\
-                  factorial(t3-t) * factorial(t4-t) * factorial(t5-t) )
-
-    w3j = wigner * (-1)**(j1-j2-m3) * np.sqrt( factorial(j1+j2-j3) * \
-          factorial(j1-j2+j3) * factorial(-j1+j2+j3) / factorial(j1+j2+j3+1) * \
-          factorial(j1+m1) * factorial(j1-m1) * factorial(j2+m2) * \
-          factorial(j2-m2) * factorial(j3+m3) * factorial(j3-m3) )
-    
-    return w3j
-
-
-def assoc_legendre(l, m, x):
-    """
-    Compute and return the associated Legendre polynomial of degree l and order
-    m, evaluated at each point x. This is commonly written
-    
-        P_l^m (x)
-        l = 0, 1, 2, ...
-        m = -1, -l+1, ..., l
-        x in (-1, 1)
-        
-    Parameters
-    ----------
-    l : int
-        The polynomial degree
-        
-    m : int
-        The polynomial order
-        
-    x : np.ndarray, float
-        The points to evaluate the function at
-        
-    Returns
-    -------
-    P : np.ndarray, float
-        The polynomial evaluted at the appropriate values.
-    """
-    
-    if np.abs(m) > l:
-        raise ValueError('The associated Legendre polynomial is only defined'
-                         'for |m| < l')
-    
-    if m > 0:
-        prefix = np.power(-1, m) * np.product(np.arange(l-m+1, l+m+1))
-        m = -1 * m
-    else:
-        prefix = 1
-        
-    t1 = 1.0 / special.gamma(1.0-m)
-    
-    if m == 0:
-        t2 = np.ones_like(x)
-    elif m < 0:
-        t2 = 1.0 / (np.power((1.0+x) / (1.0-x), np.abs(m)/2.0) + 1e-16)
-    else:
-        t2 = np.power((1.0+x) / (1.0-x), m/2.0)
-    t2[ np.abs(t2) < (t2.max() * 1e-50) ] = 0.0 # avoid underflow
-    
-    t3 = special.hyp2f1(-l, l+1.0, 1.0-m, (1.0-x)/2.0)
-    
-    return prefix * t1 * t2 * t3
-
-
-def sph_harm(l, m, theta, phi):
-    """
-    Compute the spherical harmonic Y_lm(theta, phi).
-    """
-    
-    theta = np.array(theta)
-    phi   = np.array(phi)
-    
-    if np.any( np.isnan(theta) + np.isinf(theta) ):
-        raise ValueError('NaN or inf in theta -- must be floats in [0, pi]')
-    if np.any( np.isnan(phi) + np.isinf(phi) ):
-        raise ValueError('NaN or inf in phi -- must be floats in [0, 2pi]')
-    
-    # avoid P_lm(1.0) = inf
-    cos_theta = np.cos(theta)
-    cos_theta[(cos_theta >= 1.0)] = 1.0 - 1e-8
-    
-    N = np.sqrt( (2. * l + 1) * special.gamma(l-m+1) /
-                 ( 4. * np.pi * special.gamma(l+m+1) ) )
-    
-    Plm = assoc_legendre(l, m, cos_theta) 
-    
-    Ylm = N * np.exp( 1j * m * phi ) * Plm
-    
-    if (np.any(np.isnan(Ylm)) or (np.any(np.isinf(Ylm)))):
-        raise RuntimeError('Could not compute Ylm, l=%d/m=%d' % (l, m))
-    
-    return Ylm
-
-
 def kabsch(P, Q):
     """ 
     Employ the Kabsch algorithm to compute the rotation matrix U that when
@@ -514,74 +378,6 @@ def LDA_direction(positives, negatives):
     return w
 
 
-def interp_grid_to_spherical(grid, radii, num_phi, num_theta, 
-                             grid_origin=(0,0,0), return_spherical_coords=False):
-    """
-    Compute interpolated values in 3D spherical coordinates from a 3D square 
-    grid. The interpolated values lie equally spaced along the azumithal and
-    polar directions for a series of concentric spheres.
-    
-    Interpolation used is linear.
-    
-    Parameters
-    ----------
-    grid : np.ndarray, float
-        The 3D square grid of values definiting a scalar field
-    radii : np.ndarray, float
-        The radial values of the interpolant grid
-    num_theta : int
-        The number of points along the polar angle to interpolate
-    num_phi : int
-        The number of points along the azmuthal angle to interpolate
-    grid_origin : 3-tuple, floats
-        The origin of the grid, which forms the center of the interpolant 
-        spheres
-        
-    Optional Parameters
-    -------------------
-    return_spherical_coords : bool
-        If true, the spherical coordiantes used are also returned as an N x 3
-        array.
-        
-    Returns
-    -------
-    interpolated : np.ndarray
-        A 3D array of the interpolated values. The dimensions are 
-        (radial, polar [theta], azmuthal [phi]).
-    """
-    
-    # find the cartesian x,y,z values for each interpolant
-    xi = np.zeros( (len(radii) * num_theta * num_phi, 3), dtype=grid.dtype )
-    
-    thetas = np.arange(0.0, 2.0*np.pi, 2.0*np.pi / num_theta)
-    phis = np.arange(0.0, np.pi, np.pi / num_phi)
-    assert len(thetas) == num_theta, 'thetas len mistmatch %d %d' % (len(thetas), num_theta)
-    assert len(phis) == num_phi, 'phi len mistmatch %d %d' % (len(phis), num_phi)
-    
-    # the repeat rate will be important for the reshape, below
-    r = np.repeat(radii, num_theta * num_phi)            # radius, slowest
-    t = np.repeat( np.tile(thetas, num_phi), len(radii)) # theta
-    p = np.tile(phis, len(radii) * num_theta)            # phi, fastest
-    
-    xi[:,0] = r * np.sin(t) * np.cos(p) # x
-    xi[:,1] = r * np.sin(t) * np.sin(p) # y
-    xi[:,2] = r * np.cos(t)             # z
-    
-    xi += np.array(grid_origin)[None,:]
-    
-    # compute an interpolator for the rectangular grid
-    gi = [ np.arange(l) for l in grid.shape ]
-    interpolated = interpn(gi, grid, xi, bounds_error=False)
-    
-    res = interpolated.reshape(len(radii), num_theta, num_phi)
-    
-    if return_spherical_coords:
-        rtp = np.array([r, t, p])
-        return res, rtp
-    else:
-        return res
-        
-        
 class IncrementalVariance(object):
     """
     http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance

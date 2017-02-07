@@ -23,6 +23,8 @@ from scipy.ndimage import filters
 from scipy.ndimage import interpolation as ndinterp
 
 from thor import math2
+from thor import sphere
+from thor import structure
 from thor import utils
 from thor import scatter
 from thor import parse
@@ -42,8 +44,8 @@ try:
     logger.debug('pyfftw import successful -- constructing Rings._fft_correlate from pyfftw')
     PYFFTW_INSTALLED = True
 except ImportError as e:
-    logger.debug(e)
-    logger.debug('Could not import pyfftw -- constructing Rings._fft_correlate from np.fft')
+    logger.info(e)
+    logger.info('Could not import pyfftw -- constructing Rings._fft_correlate from np.fft')
     PYFFTW_INSTALLED = False
     
 FORCE_NO_FFTW = False # mostly for testing
@@ -1657,8 +1659,7 @@ class Shotset(object):
 
 
     @classmethod
-    def simulate(cls, traj, detector, num_molecules, num_shots, traj_weights=None,
-                 finite_photon=False, force_no_gpu=False, device_id=0):
+    def simulate(cls, traj, detector, num_molecules, num_shots, **kwargs):
         """
         Simulate a scattering 'shot', i.e. one exposure of x-rays to a sample, and
         return that as a Shot object (factory function).
@@ -1691,19 +1692,11 @@ class Shotset(object):
 
         Optional Parameters
         -------------------
-        traj_weights : ndarray, float
-            If `traj` contains many structures, an array that provides the Boltzmann
-            weight of each structure. Default: if traj_weights is None, weights
-            each structure equally.
-
-        finite_photon : bool
-            Use finite photon statistics in the simulation.
-
-        force_no_gpu : bool
-            Run the (slow) CPU version of this function.
-
-        device_id : int
-            The index of the GPU to run on.
+        kwargs : dict
+            Mimic of scatter.simulate_atomic kwarg interface. Kwargs include:
+            -- finite_photon, float : mean number of photons scattered per shot
+            -- ignore_hydrogens, bool : possible speedup at cost of small err
+            -- dont_rotate, bool : dont rotate each structure
 
         Returns
         -------
@@ -1714,14 +1707,12 @@ class Shotset(object):
         I = np.zeros((num_shots, detector.num_pixels))
 
         for i in range(num_shots):
-            I[i,:] = scatter.simulate_shot(traj, num_molecules, detector,
-                                           traj_weights=traj_weights,
-                                           finite_photon=finite_photon,
-                                           force_no_gpu=force_no_gpu,
-                                           device_id=device_id)
+            I[i,:] = np.square( np.abs( scatter.simulate_atomic(traj, 
+                                                                num_molecules, 
+                                                                detector,
+                                                                **kwargs) ))
                                            
-            logger.info(utils.logger_return + 'Finished simulating shot %d/%d'
-                       ' on device %d' % (i+1, num_shots, device_id) )
+            logger.info(utils.logger_return + 'Finished simulating shot %d/%d' % (i+1, num_shots) )
 
         ss = cls(I, detector)
 
@@ -2741,11 +2732,15 @@ class Rings(object):
             The cosine of psi, the angle between the scattering vectors.
         """
         
-        t1     = np.pi/2. + np.arcsin( q1 / (2.*self.k) ) # theta 1 in spherical coor
-        t2     = np.pi/2. + np.arcsin( q2 / (2.*self.k) ) # theta 2 in spherical coor
-        cospsi = np.cos(t1)*np.cos(t2) + np.sin(t1)*np.sin(t2) *\
-                 np.cos( self.phi_values )
-              
+        # this is the flag that psi = phi
+        if self.k == 0.0:
+            cospsi = np.cos(self.phi_values)
+        else:
+            t1     = np.pi/2. + np.arcsin( q1 / (2.*self.k) ) # theta 1 in spherical coor
+            t2     = np.pi/2. + np.arcsin( q2 / (2.*self.k) ) # theta 2 in spherical coor
+            cospsi = np.cos(t1)*np.cos(t2) + np.sin(t1)*np.sin(t2) *\
+                     np.cos( self.phi_values )
+        
         return cospsi
     
 
@@ -2797,6 +2792,10 @@ class Rings(object):
         ..[1] Hura et. al. J. Chem. Phys. 113, 9140 (2000); doi10.1063/1.1319614
         ..[2] Jackson. Classical Electrostatics.
         """
+        
+        if self.k == 0.0:
+            raise ValueError('Rings.k is 0.0, which indicates simulated data --'
+                             ' no polarization correction possible.')
         
         logger.info('Applying polarization correction w/P_y=%.3f' % yaxis_polarization)
         if (yaxis_polarization > 1.0) or (yaxis_polarization < 0.0):
@@ -3603,8 +3602,7 @@ class Rings(object):
 
     @classmethod
     def simulate(cls, traj, num_molecules, q_values, num_phi, num_shots,
-                 energy=10, traj_weights=None, force_no_gpu=False, 
-                 photons_scattered_per_shot=None, device_id=0):
+                 energy=10.0, **kwargs):
         """
         Simulate many scattering 'shot's, i.e. one exposure of x-rays to a
         sample, but onto a polar detector. Return that as a Rings object
@@ -3645,18 +3643,11 @@ class Rings(object):
         energy : float
             The energy, in keV
 
-        traj_weights : ndarray, float
-            If `traj` contains many structures, an array that provides the
-            Boltzmann weight of each structure. Default: if traj_weights is None
-            weights each structure equally.
-
-        force_no_gpu : bool
-            Run the (slow) CPU version of this function.
-
-        photons_scattered_per_shot : int
-            The number of photons scattered to the detector per shot. For use
-            with `finite_photon`. If "-1" (default), use continuous scattering
-            (infinite photon limit).
+        kwargs : dict
+            Mimic of scatter.simulate_atomic kwarg interface. Kwargs include:
+            -- finite_photon, float : mean number of photons scattered per shot
+            -- ignore_hydrogens, bool : possible speedup at cost of small err
+            -- dont_rotate, bool : dont rotate each structure
 
         Returns
         -------
@@ -3664,8 +3655,7 @@ class Rings(object):
             A Rings instance, containing the simulated shots.
         """
 
-        device_id = int(device_id)
-        beam = Beam(photons_scattered_per_shot, energy=energy)
+        beam = Beam(1, energy=energy)
         k = beam.k
         q_values = np.array(q_values)
 
@@ -3676,16 +3666,96 @@ class Rings(object):
         polar_intensities = np.zeros((num_shots, len(q_values), num_phi))
 
         for i in range(num_shots):
-            I = scatter.simulate_shot(traj, num_molecules, qxyz,
-                                      traj_weights=traj_weights,
-                                      finite_photon=photons_scattered_per_shot,
-                                      force_no_gpu=force_no_gpu,
-                                      device_id=device_id)
+            A = scatter.simulate_atomic(traj, num_molecules, qxyz, **kwargs)
+            I = np.square(np.abs(A))
             polar_intensities[i,:,:] = I.reshape(len(q_values), num_phi)
 
-            logger.info(utils.logger_return + 'Finished polar shot %d/%d on '
-                        'device %d' % (i+1, num_shots, device_id) )
+            logger.info(utils.logger_return + 'Finished polar shot %d/%d' % (i+1, num_shots) )
 
+        return cls(q_values, polar_intensities, k, polar_mask=None)
+
+
+    @classmethod
+    def simulate_density(cls, grid, grid_spacing, num_shots, q_values, num_phi,
+                         energy=10.0, pad=3):
+        """
+        Simulate many scattering 'shot's, i.e. one exposure of x-rays to a
+        sample, but onto a polar detector. Return that as a Rings object
+        (factory function).
+        
+        This function uses a grid-based representation of the structure 
+        (electron density) instead of the Rings.simulate() method, which 
+        employs an atomic model.
+        
+        Note: the simulation is preformed independent of energy, Rings.k will
+        be 0.0. This may change in the future if requested.
+        
+        Parameters
+        ----------
+        grid : np.ndarray
+            The rectangular grid of electron density
+            
+        grid_spacing: float
+            The distance between grid points, in Angstroms
+            
+        num_shots : int
+            The number of shots to simulate
+            
+        q_values : np.ndarray, float
+            A range of q-magnitudes to scatter on to.
+            
+        num_phi : int
+            The number of polar values to use in the range [0, 2pi)
+            
+        Optional Parameters
+        -------------------
+        energy : float
+            The energy, in keV
+            
+        pad : int
+            Pad the input grid with at least this many zeros before FFT.
+            
+        Returns
+        -------
+        rings : thor.xray.Rings
+            A Rings instance, containing the simulated shots.
+        """
+        
+        # compute the wavenumber, which dictates the angle of the cone
+        # on which we interpolate the reciprocal space grid (theta2)
+        beam = Beam(1, energy=energy)
+        k = beam.k
+        for q in q_values:
+            if q > (2.0 * k):
+                raise ValueError('At least one of `q_values` (%f) is greater '
+                                 'than 2*k, which is not theoretically possible.'
+                                 'Passed energy: %f keV.' % (q, energy))
+        
+        # fft to get intensities
+        grid = structure.pad_grid_to_square(grid, pad)
+        N = grid.shape[0]
+        assert grid.shape == (N,)*3
+        
+        Igrid = np.fft.fftshift( np.abs( np.fft.fftn(grid) ) )
+
+        origin = np.array(grid.shape) / 2.0
+        assert len(origin) == 3
+
+        polar_intensities = np.zeros((num_shots, len(q_values), num_phi))
+        
+        for i in range(num_shots):
+            R = math2.rand_rot()
+            for iq, q in enumerate(q_values):
+                theta2 = np.arccos(q / (2.0 * k))
+                r = q * (grid_spacing * N) / (2.0 * np.pi)
+                si = sphere.interp_grid_to_spherical(Igrid,
+                                                     np.array([r]), 
+                                                     num_phi, 1,
+                                                     grid_origin=origin,
+                                                     theta_offset=theta2,
+                                                     rotate=R)
+                polar_intensities[i,iq,:] = np.squeeze(si)             
+                                           
         return cls(q_values, polar_intensities, k, polar_mask=None)
 
 

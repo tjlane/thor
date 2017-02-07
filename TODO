@@ -1,0 +1,11 @@
+
+TODO for scattering code
+------------------------
+- store quaternions, not rands on GPU
+- pass through atomic form factors, not CM params
+- try and share as much code as possible between GPU + CPU
+- re-order loops
+- remove python wrapper code
+
+
+

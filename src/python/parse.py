@@ -34,10 +34,16 @@ from scipy.ndimage import interpolation
 import matplotlib.pyplot as plt
 import matplotlib.patches as plt_patches
 
+from thor import utils
+
 try:
-    import fabio
+    with utils.Capturing() as output:
+        import fabio
     FABIO_IMPORTED = True
 except ImportError as e:
+    logger.info(e)
+    logger.info('could not import FabIO library, will not be able to parse some'
+                ' data formats')
     FABIO_IMPORTED = False
 
 

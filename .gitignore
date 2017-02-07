@@ -9,6 +9,7 @@ src/python/installed.py
 src/interp/cyinterp.cpp
 src/scatter/gpuscatter_wrap.cpp
 src/scatter/cpuscatter_wrap.cpp
+src/scatter/cpp_scatter_wrap.cpp
 src/ring/ring_scatter.cpp
 src/corr/correlate.cpp
 

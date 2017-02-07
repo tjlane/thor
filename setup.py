@@ -2,32 +2,29 @@ u"""
 setup.py: Install THOR
 """
 
-import os, sys,re
+import os
+import sys
+import re
+import subprocess
 from os.path import join as pjoin
 from glob import glob
-
-#try:
-    #from setuptools import Extension, setup
-#except:
 
 from distutils.extension import Extension
 from distutils.core import setup
 
 from Cython.Distutils import build_ext
-
 import numpy
 
-import subprocess
-from subprocess import CalledProcessError
 
 # ------------------------------------------------------------------------------
 # HEADER
 # 
 
-VERSION     = "0.0.1"
-ISRELEASED  = False
-__author__  = "TJ Lane"
-__version__ = VERSION
+VERSION      = "0.0.1"
+ISRELEASED   = False
+DISABLE_CUDA = False
+__author__   = "TJ Lane"
+__version__  = VERSION
 
 metadata = {
     'name': 'thor',
@@ -76,12 +73,16 @@ def find_in_path(name, path):
     return None
     
 
-# Obtain the numpy include directory. This logic works across numpy versions.
-try:
-    numpy_include = numpy.get_include()
-except AttributeError:
-    numpy_include = numpy.get_numpy_include()
-
+def get_numpy_include():
+    """
+    Obtain the numpy include directory. This logic works across numpy versions.
+    """
+    try:
+        numpy_include = numpy.get_include()
+    except AttributeError:
+        numpy_include = numpy.get_numpy_include()
+    return numpy_include
+    
 
 def git_version():
     """
@@ -128,61 +129,62 @@ def locate_cuda():
     is based on finding 'nvcc' in the PATH.
     """
 
+    viable_nvcc_bins = []
+
     # first check if the CUDA_HOME or CUDA_ROOT env variable is in use
-    
-    CUDA_ENV_ = ['CUDA_HOME','CUDA_ROOT']
-    
-    found_config = False
-    for CUDA_ENV in CUDA_ENV_:
-        if CUDA_ENV in os.environ:
-            home = os.environ[CUDA_ENV].split(':')
-            nvcc = map( lambda x:pjoin(x, 'bin', 'nvcc'), home)
-        else:
-            # otherwise, search the PATH for NVCC
-            nvcc = find_in_path('nvcc', os.environ['PATH'])
-            if nvcc is None:
-                print_warning('The nvcc binary could not be located in your $PATH. '
-                              'add it to your path, or set $CUDA_HOME.')
-                return False
-                
-            home = os.path.dirname(os.path.dirname(nvcc))
-
-
-        cudaconfig_list=[{'home'   : home[x], 
-                          'nvcc'   : nvcc[x],
-                          'include': pjoin(home[x], 'include'),
-                          'lib64'  : pjoin(home[x], 'lib64')} \
-                          for x in xrange(len(home)) ]
-        
-        for cudaconfig in cudaconfig_list:
-            found_items = 0
-            for k, v in cudaconfig.iteritems():
-                if not os.path.exists(v):
-                    print_warning('The CUDA %s path could not be located in %s' % (k, v))
-                elif os.path.exists(v):
-                    found_items += 1
-            if found_items == len(cudaconfig):
-                found_config = True
-                break
-        if found_config:
-            break
-    if not found_config:
-        return False
+    if 'CUDA_HOME' in os.environ:
+        home = os.environ['CUDA_HOME'].split(':')
+        viable_nvcc_bins.extend( map( lambda x : pjoin(x, 'bin', 'nvcc'), home) )
+    elif 'CUDA_ROOT' in os.environ:
+        home = os.environ['CUDA_ROOT'].split(':')
+        viable_nvcc_bins.extend( map( lambda x : pjoin(x, 'bin', 'nvcc'), home) )
     else:
-        print "Found CUDA config:", cudaconfig
-        return cudaconfig
-    
-CUDA = locate_cuda()
-if CUDA == False:
-    CUDA_SUCCESS = False
-else:
-    CUDA_SUCCESS = True
+        nvcc_in_path = find_in_path('nvcc', os.environ['PATH'])
+        if nvcc_in_path is not None:
+            viable_nvcc_bins.append(nvcc_in_path)
 
-def customize_compiler_for_nvcc(self):
+    cudaconfig_found = False
+    for nvcc in viable_nvcc_bins:
+        print nvcc
+        home = os.path.dirname(os.path.dirname(nvcc))
+
+        cudaconfig = {
+                      'home'    : home,
+                      'nvcc'    : nvcc,
+                      'include' : pjoin(home, 'include'),
+                      'lib64'   : pjoin(home, 'lib64')
+                      }
+        
+        found_items = 0
+        for k, v in cudaconfig.iteritems():
+            if not os.path.exists(v):
+                print_warning('The CUDA %s path could not be located in %s' % (k, v))
+            elif os.path.exists(v):
+                found_items += 1
+                
+        if found_items == len(cudaconfig):
+            cudaconfig['enabled'] = True
+            cudaconfig_found      = True
+            print "Found CUDA config:", cudaconfig
+            break
+
+    if (cudaconfig_found is False) or DISABLE_CUDA:
+        print_warning('The nvcc binary could not be located in your $PATH. '
+                      'add it to your path, or set $CUDA_HOME.')
+        cudaconfig = {'enabled' : False,
+                      'home'    : '', 
+                      'nvcc'    : '',
+                      'include' : '',
+                      'lib64'   : ''}
+            
+    return cudaconfig
+    
+
+def customize_compiler_for_nvcc(compiler):
     """
     Inject deep into distutils to customize how the dispatch
     to gcc/nvcc works.
-
+    
     If you subclass UnixCCompiler, it's not trivial to get your subclass
     injected in, and still have the right customizations (i.e.
     distutils.sysconfig.customize_compiler) run on it. So instead of going
@@ -190,110 +192,116 @@ def customize_compiler_for_nvcc(self):
     subclassing going on.
     """
     
-    # tell the compiler it can processes .cu
-    self.src_extensions.append('.cu')
-
+    CUDA = locate_cuda()
+    if '.cu' not in compiler.src_extensions:
+        compiler.src_extensions.append('.cu')
+    
     # save references to the default compiler_so and _comple methods
-    default_compiler_so = self.compiler_so
-    super = self._compile
+    old_compile     = compiler._compile
+    old_compiler_so = compiler.compiler_so
 
-    # now redefine the _compile method. This gets executed for each
-    # object but distutils doesn't have the ability to change compilers
-    # based on source extension: we add it.
-    def _compile(obj, src, ext, cc_args, extra_postargs, pp_opts):
-        if os.path.splitext(src)[1] == '.cu':
-            # use the cuda for .cu files
-            self.set_executable('compiler_so', CUDA['nvcc'])
-            # use only a subset of the extra_postargs, which are 1-1 translated
-            # from the extra_compile_args in the Extension class
-            postargs = extra_postargs['nvcc']
+    def _new_compile(obj, src, ext, cc_args, postargs, pp_opts):
+        """
+        `postargs` is usually a list, but here we let it be a dict
+        as a sloppy way of choosing both the compiler and args for
+        that compiler...
+        """
+
+        if type(postargs) == dict:
+            if ('nvcc' in postargs.keys()) and CUDA['enabled']:
+                compiler.set_executable('compiler_so', CUDA['nvcc'])
+                postargs_list = postargs['nvcc']
+            else:
+                postargs_list = postargs[postargs.keys()[0]]
         else:
-            postargs = extra_postargs['gcc']
-
-        super(obj, src, ext, cc_args, postargs, pp_opts)
+            postargs_list = postargs
+            
+        # call the compile routine, then
         # reset the default compiler_so, which we might have changed for cuda
-        self.compiler_so = default_compiler_so
+        old_compile(obj, src, ext, cc_args, postargs_list, pp_opts)
+        compiler.compiler_so = old_compiler_so
 
     # inject our redefined _compile method into the class
-    self._compile = _compile
+    compiler._compile = _new_compile
 
 
-class custom_build_ext(build_ext):
+class custom_build_ext(build_ext, object):
     def build_extensions(self):
         customize_compiler_for_nvcc(self.compiler)
         build_ext.build_extensions(self)
+        
+        
+        
+def locate_open_mp():
+    # openmp support -- disabled by default
+    if '--enable-openmp' in sys.argv[2:]:
+        sys.argv.remove('--enable-openmp')
+        enabled     = True
+        omp_compile = ['-fopenmp']
+        omp_link    = ['-lgomp']
+        print_warning('set --enable-openmp, enabling OPENMP support')
+    else:
+        enabled = False
+        omp_compile = ['-DNO_OMP']
+        omp_link    = []
+        
+    OMP = {'enabled' : enabled,
+           'compile' : omp_compile,
+           'link'    : omp_link}
+        
+    return OMP
 
 # -----------------------------------------------------------------------------
 # INSTALL C/C++ EXTENSIONS
-# gpuscatter, cpuscatter, interp
 # 
 
+OMP  = locate_open_mp()
+CUDA = locate_cuda()
 
-# openmp
-if '--no-openmp' in sys.argv[2:]:
-    sys.argv.remove('--no-openmp')
-    omp_compile = ['-DNO_OMP']
-    omp_link    = []
-    print_warning('set --no-openmp, disabling OPENMP support')
+if CUDA['enabled']:
+    cppscatter = Extension('thor._cppscatter',
+                            sources=['src/scatter/cpp_scatter_wrap.pyx',
+                                     'src/scatter/cpp_scatter.cu'],
+                            extra_compile_args={'nvcc' : ['-use_fast_math', '-arch=sm_20', 
+                                                          '--ptxas-options=-v', '-c', '--shared',
+                                                          '-Xcompiler=-fPIC', '-Xcompiler=-Wall']},
+                            library_dirs=[CUDA['lib64']],
+                            libraries=['cudart'],
+                            runtime_library_dirs=['/usr/lib', '/usr/local/lib', CUDA['lib64']],
+                            extra_link_args = ['-lstdc++', '-lm'],
+                            include_dirs = [get_numpy_include(), CUDA['include']],
+                            language='c++')
 else:
-    omp_compile = ['-fopenmp']
-    omp_link    = ['-lgomp']
-
-
-if CUDA:
-    print "Attempting to install GPU functionality"
-    gpuscatter = Extension('thor._gpuscatter',
-                        sources=['src/scatter/gpuscatter_wrap.pyx', 'src/scatter/_gpuscatter.cu'],
-                        extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
-                                            'g++': ['-O3', '-fPIC', '-Wall'] + omp_compile,
-                                            'nvcc': ['-use_fast_math', '-arch=sm_20', '--ptxas-options=-v', 
-                                                     '-c', '--compiler-options', "'-fPIC'"]},
-                        library_dirs=[CUDA['lib64']],
-                        libraries=['cudart'],
-                        runtime_library_dirs=['/usr/lib', '/usr/local/lib', CUDA['lib64']],
-                        extra_link_args = ['-lstdc++', '-lm'] + omp_link,
-                        include_dirs = [numpy_include, 'src/scatter', CUDA['include']],
-                        language='c++')
-
-else:
-    gpuscatter = None
-
-cpuscatter = Extension('thor._cpuscatter',
-                    sources=['src/scatter/cpuscatter_wrap.pyx', 'src/scatter/_cpuscatter.cpp'],
-                    extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
-                                        'g++': ['-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] + omp_compile},
-                    runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
-                    extra_link_args = ['-lstdc++', '-lm'] + omp_link,
-                    include_dirs = [numpy_include, 'src/scatter'],
-                    language='c++')
-                    
+    cppscatter = Extension('thor._cppscatter',
+                           sources=['src/scatter/cpp_scatter_wrap.pyx',
+                                    'src/scatter/cpp_scatter.cpp'],
+                           extra_compile_args = { 'gcc': ['-O3', '-fPIC', '-Wall'],
+                                                  'g++': ['-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] },
+                           runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
+                           extra_link_args = ['-lstdc++', '-lm'],
+                           include_dirs = [get_numpy_include(), 'src/scatter'],
+                           language='c++')
 
 misc = Extension('thor.misc_ext',
-                    sources=['src/misc/misc_wrap.pyx', 'src/misc/solidangle.cpp'],
-                    extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
-                                        'g++': ['-O3', '-fPIC', '-Wall', '-mmacosx-version-min=10.6'] + omp_compile},
-                    runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
-                    extra_link_args = ['-lstdc++', '-lm'] + omp_link,
-                    include_dirs = [numpy_include, 'src/scatter'],
-                    language='c++')
+                 sources=['src/misc/misc_wrap.pyx', 'src/misc/solidangle.cpp'],
+                 extra_compile_args = ['-O3', '-fPIC', '-Wall'],
+                 runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
+                 extra_link_args = ['-lstdc++', '-lm'],
+                 include_dirs = [get_numpy_include(), 'src/misc'],
+                 language='c++')
 
 corr = Extension('thor.corr',
-                     sources=['src/corr/correlate.pyx', 'src/corr/corr.cpp'],
-                     extra_compile_args={'gcc': ['-O3', '-fPIC', '-Wall'] + omp_compile,
-                                         'g++': ['-O3', '-fPIC', '-Wall'] + omp_compile},
-                     runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
-                     extra_link_args = ['-lstdc++', '-lm'],
-                     include_dirs = [numpy_include, 'src/corr'],
-                     language='c++')
+                 sources=['src/corr/correlate.pyx', 'src/corr/corr.cpp'],
+                 extra_compile_args = ['-O3', '-fPIC', '-Wall'],
+                 runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
+                 extra_link_args = ['-lstdc++', '-lm'],
+                 include_dirs = [get_numpy_include(), 'src/corr'],
+                 language='c++')
 
 
 metadata['packages']     = ['thor']
 metadata['package_dir']  = {'thor' :         'src/python'}
-
-metadata['ext_modules']  = [cpuscatter, misc, corr]
-if gpuscatter:
-    metadata['ext_modules'].append(gpuscatter)
-    
+metadata['ext_modules']  = [cppscatter, misc, corr]
 metadata['scripts']      = [s for s in glob('scripts/*') if not s.endswith('__.py')]
 metadata['data_files']   = [('reference', glob('./reference/*'))]
 metadata['cmdclass']     = {'build_ext': custom_build_ext}
@@ -305,7 +313,7 @@ metadata['cmdclass']     = {'build_ext': custom_build_ext}
 
 def print_warnings():
         
-    if not CUDA_SUCCESS:
+    if not CUDA['enabled']:
         print 
         print '*'*65
         print '* WARNING : CUDA/GPU SUPPORT'

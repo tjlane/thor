@@ -4,12 +4,39 @@ Functions that are useful in various places, but have no common theme.
 """
 
 import functools
+import sys
 
+from cStringIO import StringIO
 from pprint import pprint
 from argparse import ArgumentParser
 
 import numpy as np
 
+
+class Capturing(list):
+    """
+    Context manager
+    http://stackoverflow.com/questions/16571150/how-to-capture-stdout-output-from-a-python-function-call
+    
+    >>> with Capturing() as output:
+    >>>    do_something(my_object)
+    """
+    
+    def __enter__(self):
+        self._stdout = sys.stdout
+        self._stderr = sys.stderr
+        
+        self._stringio = StringIO()
+        sys.stdout = self._stringio
+        sys.stderr = self._stringio
+        
+        return self
+        
+    def __exit__(self, *args):
+        self.extend(self._stringio.getvalue().splitlines())
+        sys.stdout = self._stdout
+        sys.stderr = self._stderr
+        
 
 class Parser(ArgumentParser):
     """

@@ -9,27 +9,67 @@ logger = logging.getLogger(__name__)
 #logger.setLevel('DEBUG')
 
 import numpy as np
-#np.seterr(all='raise')
-
 from scipy import misc
 from scipy import special
-from threading import Thread
 
-from thor import _cpuscatter
-from thor.math2 import arctan3, sph_harm
+from thor import _cppscatter
+from thor.math2 import arctan3
+from thor.sphere import sph_harm
 from thor.refdata import cromer_mann_params
+from thor.refdata import get_cromermann_parameters
 from thor.refdata import sph_quad_900
 
-try:
-    from thor import _gpuscatter
-    GPU = True
-except ImportError as e:
-    GPU = False
 
 
-def simulate_shot(traj, num_molecules, detector, traj_weights=None,
-                  finite_photon=False, ignore_hydrogens=False,
-                  dont_rotate=False, force_no_gpu=False, device_id=0):
+def _qxyz_from_detector(detector):
+    """
+    Attempt to interpret many possible detectory geometries & return a
+    2d array of the {xyz} coordinates for each q-vector on the detector
+    (in units of inverse angstroms).
+    """
+
+    # get the scattering vectors
+    if str(type(detector)).find('Detector') > -1:    
+        qxyz = detector.reciprocal
+        assert detector.num_pixels == qxyz.shape[0]
+    elif isinstance(detector, np.ndarray):
+        qxyz = detector
+    else:
+        raise ValueError('`detector` must be {thor.xray.Detector, np.ndarray}')
+
+    return qxyz
+
+
+def _sample_finite_photon_statistics(intensities, poisson_parameter):
+    
+    if not poisson_parameter > 0.0:
+        raise ValueError('`poisson_parameter` <= 0 (got: %f)' % poisson_parameter)
+        
+    n = np.random.poisson(poisson_parameter) # total scattered photons
+    p = intensities / intensities.sum()      # prob of going to each pixel
+    if not np.all( intensities > 0.0 ):
+        raise ValueError('negative intensities found')
+    
+    photons = np.random.multinomial(n, p)
+    assert np.all(photons >= 0), 'negative sample from np.random.multinomial'
+    
+    return photons
+    
+    
+class _NonRandomState(np.random.RandomState):
+    """
+    A mimic of np.random.RandomState that returns zeros, so that molecules
+    wont rotate
+    """
+        
+    def rand(self, *args):
+        return np.zeros(args)
+    
+
+def simulate_atomic(traj, num_molecules, detector, traj_weights=None,
+                    finite_photon=False, ignore_hydrogens=False, 
+                    dont_rotate=False, procs_per_node=1, 
+                    nodes=[], devices=[], random_state=None):
     """
     Simulate a scattering 'shot', i.e. one exposure of x-rays to a sample.
     
@@ -78,20 +118,15 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
         Don't apply a random rotation to the molecule before computing the
         scattering. Good for debugging and the like.
         
-    force_no_gpu : bool
-        Run the (slow) CPU version of this function.
-        
-    device_id : int
-        The index of the GPU device to run on.
-        
     Returns
     -------
-    intensities : ndarray, float
-        An array of the intensities at each pixel of the detector.
+    amplitudes : ndarray, complex128
+        A flat array of the simulated amplitudes, each position corresponding
+        to a scattering vector from `qxyz`.
         
     See Also
     --------
-    thor.xray.Shotset.simulate()
+    thor.xray.Shotset.simulate(), thor.xray.Rings.simulate()
         These are factory functions that call this function, and wrap the
         results into the Shotset class.
     """
@@ -99,43 +134,39 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
     
     logger.debug('Performing scattering simulation...')
     logger.debug('Simulating %d copies in the dilute limit' % num_molecules)
-
+    
+    
+    if dont_rotate:
+        random_state = _NonRandomState()
+    
+    
+    # sampling statistics for the trajectory
     if traj_weights == None:
         traj_weights = np.ones( traj.n_frames )
-    traj_weights /= traj_weights.sum()
-        
+    traj_weights /= traj_weights.sum()    
     num_per_shapshot = np.random.multinomial(num_molecules, traj_weights)
     
-        
-    # get the scattering vectors
-    if str(type(detector)).find('Detector') > -1:    
-        qxyz = detector.reciprocal
-        assert detector.num_pixels == qxyz.shape[0]
-    elif isinstance(detector, np.ndarray):
-        qxyz = detector
-    else:
-        raise ValueError('`detector` must be {thor.xray.Detector, np.ndarray}')
-    num_q = qxyz.shape[0]
+    
+    # extract the atomic numbers & CM parameters
+    atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
+    cromermann_parameters, atom_types = get_cromermann_parameters(atomic_numbers)
     
     
-    # figure out finite photon statistics
-    if finite_photon in [None, False]:
-        poisson_parameter = 0.0 # flag to downstream code to not use stats
-    elif finite_photon == True:
+    # decide what the poisson parameter is
+    if finite_photon is True:
         try:
-            poisson_parameter = float(detector.beam.photons_scattered_per_shot)
+            finite_photon = float(detector.beam.photons_scattered_per_shot)
         except:
             raise RuntimeError('`detector` object must have a beam attribute if'
                                ' finite photon statistics are to be computed')
+        logger.debug('Finite photon stats from detector')
     elif type(finite_photon) == float:
-        poisson_parameter = finite_photon
+        logger.debug('Finite photon param passed as float: %f' % finite_photon)
+    elif finite_photon in [None, False, 0]:
+        finite_photon = False
     else:
-        raise TypeError('Finite photon must be one of {True, False, float},'
-                        ' got: %s' % str(finite_photon))
-        
-    
-    # extract the atomic numbers
-    atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
+        raise TypeError('`finite_photon` must be of type {True, False, float}, '
+                        'got: %s' % type(finite_photon))
     
     
     # if we're getting a speedup by ignoring hydrogens, find em and slice em
@@ -147,83 +178,88 @@ def simulate_shot(traj, num_molecules, detector, traj_weights=None,
         logger.debug('Ignoring %d hydrogens (of %d atoms)' % (n_H, n_atoms))
     else:
         atoms_to_keep = np.ones(n_atoms, dtype=np.bool)
-
+        
     
-    # iterate over snapshots in the trajectory
-    intensities = np.zeros(num_q)
+    qxyz = _qxyz_from_detector(detector)
+    amplitudes = np.zeros(qxyz.shape[0], dtype=np.complex128)
+    
     for i,num in enumerate(num_per_shapshot):
         
-        num = int(num)
+        logger.debug('Running %d molc, snapshot %d' % (num, i))
+        rxyz = traj.xyz[i,atoms_to_keep,:] * 10.0 # convert nm --> Angstroms
         
-        # if we dont want to randomly rotate, pass an array of floats full of zeros
-        if dont_rotate:
-            rands = np.zeros((num, 3))
-        else:
-            rands = None # says make randoms to downstream code
-        
-        if num > 0: # else, we can just skip...
-        
-            # pull xyz coords
-            rxyz = traj.xyz[i,atoms_to_keep,:] * 10.0 # convert nm -> ang.
+        amplitudes += _cppscatter.parallel_cpp_scatter(num, rxyz, qxyz,
+                                                       atom_types,
+                                                       cromermann_parameters,
+                                                       procs_per_node=procs_per_node,
+                                                       nodes=nodes,
+                                                       devices=devices,
+                                                       random_state=random_state)
+                                                       
+    if finite_photon is not False:
+        intensities = np.square(np.abs(amplitudes))
+        r = _sample_finite_photon_statistics(intensities, finite_photon)
+    else:
+        r = amplitudes
+    
+    return r
 
-            # choose the number of molecules & divide work between CPU & GPU
-            # GPU is fast but can only do multiples of 512 molecules - run
-            # the remainder on the CPU
-            if force_no_gpu or (not GPU):
-                num_cpu = num
-                num_gpu = 0
-                bpg = 0
-                logger.debug('Forced "no GPU": running CPU-only computation')
-            else:
-                num_cpu = num % 512
-                num_gpu = num - num_cpu
-            
-            logger.debug('Running %d molc, snapshot %d, dev %d: %d CPU / %d GPU.' % (num, i, device_id, num_cpu, num_gpu))  
-
-            # multiprocessing cannot return values, so generate a helper function
-            # that will dump returned values into a shared array
-            threads = []
-            def multi_helper(compute_device, fargs):
-                """ a helper function that performs either CPU or GPU calcs """
-                if compute_device == 'cpu':
-                    func = _cpuscatter.simulate
-                elif compute_device == 'gpu':
-                    func = _gpuscatter.simulate
-                else:
-                    raise ValueError('`compute_device` should be one of {"cpu",\
-                     "gpu"}, was: %s' % compute_device)
-                intensities[:] += func(*fargs)
-                return
-
-            # run dat shit
-            if num_cpu > 0:
-                logger.debug('Running CPU scattering code (%d/%d)...' % (num_cpu, num))
-                cpu_args = (num_cpu, qxyz, rxyz, atomic_numbers, rands)
-                t_cpu = Thread(target=multi_helper, args=('cpu', cpu_args))
-                t_cpu.start()
-                threads.append(t_cpu)                
-
-            if num_gpu > 0:
-                logger.debug('Sending calc to GPU dev: %d' % device_id)
-                gpu_args = (num_gpu, qxyz, rxyz, atomic_numbers, device_id, rands)
-                t_gpu = Thread(target=multi_helper, args=('gpu', gpu_args))
-                t_gpu.start()
-                threads.append(t_gpu)
-                
-            # ensure child processes have finished
-            for t in threads:
-                t.join()
-        
-        
-    # if we're using finite photons, sample those stats
-    if poisson_parameter > 0.0:
-        n = np.random.poisson(poisson_parameter)
-        p = intensities / intensities.sum()
-        intensities = np.random.multinomial(n, p)
-        
-        
-    return intensities
-        
+    
+def simulate_density(grid, grid_spacing, num_molecules, detector,
+                     finite_photon=False, dont_rotate=False,
+                     reshape_output=False, procs_per_node=1, nodes=[], 
+                     devices=[], random_state=None):
+    """
+    
+    Optional Parameters
+    -------------------
+    reshape_output : bool
+        If `True`, put the output back in square grid form, such that it is the
+        same shape as `grid`. Can only be used if the detector is the same
+        number of pixels as the `grid` has points. Useful for comparing results
+        to straight up 3D FFTs (testing). Default: False.
+    
+    Returns
+    -------
+    amplitudes : ndarray, complex128
+        A flat array of the simulated amplitudes, each position corresponding
+        to a scattering vector from `qxyz`.
+    """
+    
+    if dont_rotate:
+        random_state = _NonRandomState()
+    
+    if len(grid.shape) != 3:
+        raise ValueError('`grid` must be a square 3d grid. Got a %dd grid.'
+                         '' % len(grid.shape))
+    
+    # the below operations is equiv to flattening x/y/z individually
+    gs = grid.shape
+    rxyz = np.mgrid[:gs[0],:gs[1],:gs[2]].reshape(3, -1).T * grid_spacing
+    
+    qxyz = _qxyz_from_detector(detector)
+    
+    # the 9th Cromer-Mann parameter is a constant -- for a point density
+    # scalar field, set this to be the density value
+    atom_types = np.arange( np.product(gs) )
+    cromermann_parameters = np.zeros(np.product(gs) * 9)
+    cromermann_parameters[8::9] = grid.flatten()
+    
+    amplitudes = _cppscatter.parallel_cpp_scatter(num_molecules,
+                                                  rxyz, qxyz,
+                                                  atom_types,
+                                                  cromermann_parameters,
+                                                  procs_per_node=procs_per_node,
+                                                  nodes=nodes,
+                                                  devices=devices,
+                                                  random_state=random_state)
+    
+    # put the output back in sq grid form if requested
+    if reshape_output:
+        amplitudes = amplitudes.T.reshape(*gs)
+    
+    return amplitudes
+    
         
 def atomic_formfactor(atomic_Z, q_mag):
     """
@@ -253,7 +289,7 @@ def atomic_formfactor(atomic_Z, q_mag):
     return fi
     
     
-def atomic_electrondens(atomic_Z, r_mag):
+def atomic_electrondens(atomic_Z, r_mag, radial_cutoff=None):
     """
     Evaluate the contribution of the electron density due to a particular atom
     at distance `r_mag`. This function employs an isotropic sum-of-Gaussians
@@ -293,20 +329,46 @@ def atomic_electrondens(atomic_Z, r_mag):
     This function employs the numerical inverse FT of a Gaussian to compute
     the atomic contribution to the electron density. Let x = |r - r_0|,
 
-        phi[x] = [SUM 4*a_i*SQRT{pi^3/b_i} * EXP{-16/b_i * x^2}]
+        phi[x] = [SUM a_i * {4pi/b_i}^(3/2) * EXP{- (4pi^2 / b_i) * x^2}]
                  i=1,4
+                 
+    References
+    ----------
+    ..[1] Afonine and Urzhumtsev, Acta Cryst (2004) A60 19-32.
     """
 
-    xo = np.power(4.0 * r_mag, 2)
-    cromermann = cromer_mann_params[(atomic_Z,0)]
+    # OLD --->
+    # xo = np.power(4.0 * r_mag, 2)
+    # cromermann = cromer_mann_params[(atomic_Z,0)]
+    # 
+    # # retain constant term (?)
+    # phi = cromermann[8] * np.ones_like(r_mag) # retain
+    # #phi = np.zeros_like(r_mag)               # discard
+    # 
+    # for i in range(4):
+    #     phi = 4.0 * cromermann[i] * np.sqrt(np.power(np.pi,3) / cromermann[i+4]) *\
+    #           np.exp( - xo / cromermann[i+4])
+    # END OLD <---
+    
+    # NEW code is based on Formulae given in [1], differs in some coefficients
+    # I am currently IGNORING the constant term. It is usually pretty small...
 
-    # retain constant term (?)
-    phi = cromermann[8] * np.ones_like(r_mag) # retain
-    #phi = np.zeros_like(r_mag)               # discard
+    phi = np.zeros_like(r_mag)
+    
+    if radial_cutoff is not None:
+        inds = (r_mag < radial_cutoff)
+        if np.sum(inds) == 0:
+            raise ValueError('No grid points contained in radial cutoff!')
+    else:
+        inds = np.ones(r_mag.shape, dtype=np.bool)
+    
+    xo = 4.0 * (np.pi ** 2) * np.power(r_mag[inds], 2)
+    cromermann = cromer_mann_params[(atomic_Z,0)]
     
     for i in range(4):
-        phi = 4.0 * cromermann[i] * np.sqrt(np.power(np.pi,3) / cromermann[i+4]) *\
-              np.exp( - xo / cromermann[i+4])
+        phi[inds] = cromermann[i] * \
+                    np.power(4.0 * np.pi / cromermann[i+4], 1.5) * \
+                    np.exp( - xo / cromermann[i+4] )
 
     return phi
 
@@ -384,8 +446,8 @@ def sph_harm_coefficients(trajectory, q_values, weights=None,
             logger.info('Computing coefficients for q=%f\t(%d/%d)' % (q, iq+1, num_q_mags))
             
             # compute S, the single molecule scattering intensity
-            S_q = simulate_shot(trajectory[i], 1, q * sph_quad_900[:,:3],
-                                force_no_gpu=True)
+            A_q = simulate_atomic(trajectory[i], 1, q * sph_quad_900[:,:3])
+            S_q = np.square(np.abs(A_q))
 
             # project S onto the spherical harmonics using spherical quadrature
             for il,l in enumerate(l_vals):                
@@ -428,5 +490,6 @@ def sph_harm_coefficients(trajectory, q_values, weights=None,
     
     return sph_coefficients
 
-        
+    
+    
         
