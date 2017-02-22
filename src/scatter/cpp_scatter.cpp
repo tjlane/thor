@@ -280,7 +280,7 @@ void cpu_kernel( int   const n_q,
                 
                 qr = ax*qx + ay*qy + az*qz;
                 
-				// FIXME :: swap cos and sin???? e^i*t = cos(t) + i sin(t)
+                // FIXME :: swap cos and sin???? e^i*t = cos(t) + i sin(t)
                 q_sum_real += fi * sinf(qr);
                 q_sum_imag += fi * cosf(qr);
                 
@@ -355,10 +355,10 @@ void cpudiffuse(int   n_q,
                 ) {
                       
     /* CPU code for computing a scattering simulation, including the possibility
-	 * of Gaussian diffuse scatter encoded in the MVN correlation matrix V_ij.
+     * of Gaussian diffuse scatter encoded in the MVN correlation matrix V_ij.
      *
-	 * ONLY for a single orientation/molecule
-	 * 				
+     * ONLY for a single orientation/molecule
+     *              
      * Arguments
      * ---------
      * n_q / q_{x,y,z}     : the number and xyz positions of momentum q-vectors
@@ -366,8 +366,8 @@ void cpudiffuse(int   n_q,
      * n_atom_types        : the number of unique atom types (formfactors)
      * atom_types          : the atom "type", which is an arbitrary index
      * cromermann          : 9 params specifying formfactor for each atom type 
-	 * V        		   : 4d array of the correlation between atom i and j 
-	 *				         in xyz [i,j,i_x,j_x]
+     * V                   : 4d array of the correlation between atom i and j 
+     *                       in xyz [i,j,i_x,j_x]
      *
      * Output
      * ------
@@ -378,14 +378,14 @@ void cpudiffuse(int   n_q,
     // private variables
     float qx, qy, qz;             // extracted q vector
     float mq, qo, fi;             // mag of q, formfactor for atom i
-	float dx, dy, dz;             // difference r_i - r_j for {x,y,z}
+    float dx, dy, dz;             // difference r_i - r_j for {x,y,z}
     float q_sum_real, q_sum_imag; // partial sum of real and imaginary amplitude
     float qr;                     // dot product of q and r
-	float qVq;					  // matrix product qT * V_ab * q (atoms a & b)
+    float qVq;                    // matrix product qT * V_ab * q (atoms a & b)
     
     // we will use a small array to store form factors
     float * formfactors = (float *) malloc(n_atom_types * sizeof(float));
-	
+    
     // ---> main loop (3 nested loops)
     // for each q vector (1st nested loop)
     for( int iq = 0; iq < n_q; iq++ ) {
@@ -419,49 +419,49 @@ void cpudiffuse(int   n_q,
 
         // for each atom in molecule [again] (2nd nested loop)
         for( int a = 0; a < n_atoms; a++ ) {
-			
-			int id_a = atom_types[a];
-			float fa = formfactors[id_a];
+            
+            int id_a = atom_types[a];
+            float fa = formfactors[id_a];
             int ab_idx;
             
             // for each atom in molecule [again], a != b (3rd nested loop)
             for( int b = 0; b < a; b++ ) {
-				
-				int id_b = atom_types[b];
-				float fb = formfactors[id_b];
+                
+                int id_b = atom_types[b];
+                float fb = formfactors[id_b];
 
-				// iqr [structure factor]      
-				dx = r_x[a] - r_x[b];
-				dy = r_y[a] - r_y[b];
-				dz = r_z[a] - r_z[b];
+                // iqr [structure factor]      
+                dx = r_x[a] - r_x[b];
+                dy = r_y[a] - r_y[b];
+                dz = r_z[a] - r_z[b];
 
                 qr = dx*qx + dy*qy + dz*qz;
 
-				// qVq [disorder factor]
-				// longhand matrix multiplication of 3x3 symmetric matrix
-				
-				ab_idx = n_atoms * a + b;
-				qVq  =     qx * qx * V[9*ab_idx + 0];
-				qVq +=     qy * qy * V[9*ab_idx + 4];
-				qVq +=     qz * qz * V[9*ab_idx + 8];
-				qVq += 2 * qx * qy * V[9*ab_idx + 1];
-				qVq += 2 * qx * qz * V[9*ab_idx + 2];
-				qVq += 2 * qy * qz * V[9*ab_idx + 5];
-				
-				// accumulate (for atom pair a/b)
+                // qVq [disorder factor]
+                // longhand matrix multiplication of 3x3 symmetric matrix
+                
+                ab_idx = n_atoms * a + b;
+                qVq  =     qx * qx * V[9*ab_idx + 0];
+                qVq +=     qy * qy * V[9*ab_idx + 4];
+                qVq +=     qz * qz * V[9*ab_idx + 8];
+                qVq += 2 * qx * qy * V[9*ab_idx + 1];
+                qVq += 2 * qx * qz * V[9*ab_idx + 2];
+                qVq += 2 * qy * qz * V[9*ab_idx + 5];
+                
+                // accumulate (for atom pair a/b)
                 q_sum_real += 2 * fa * fb * cosf(qr) * exp(qVq);
-				//q_sum_imag += fa * fb * (sinf(qr) + sinf(-1 * qr)) * exp(qVq);
+                //q_sum_imag += fa * fb * (sinf(qr) + sinf(-1 * qr)) * exp(qVq);
  
             } // finished one atom (3rd loop)
 
             // do diagonal elements (a == b)
-			ab_idx = n_atoms * a + a;
-			qVq  =     qx * qx * V[ab_idx + 0];
-			qVq +=     qy * qy * V[ab_idx + 4];
-			qVq +=     qz * qz * V[ab_idx + 8];
-			qVq += 2 * qx * qy * V[ab_idx + 1];
-			qVq += 2 * qx * qz * V[ab_idx + 2];
-			qVq += 2 * qy * qz * V[ab_idx + 5];
+            ab_idx = n_atoms * a + a;
+            qVq  =     qx * qx * V[ab_idx + 0];
+            qVq +=     qy * qy * V[ab_idx + 4];
+            qVq +=     qz * qz * V[ab_idx + 8];
+            qVq += 2 * qx * qy * V[ab_idx + 1];
+            qVq += 2 * qx * qz * V[ab_idx + 2];
+            qVq += 2 * qy * qz * V[ab_idx + 5];
             q_sum_real += fa * fa * exp(qVq);
 
         } // finished 2nd atom (2nd loop)
@@ -473,7 +473,7 @@ void cpudiffuse(int   n_q,
     } // finished one q vector (1st loop)
     
     free(formfactors);
-	//free(V_ab);
+    //free(V_ab);
     
 }
 
@@ -544,9 +544,9 @@ int main() {
 
     int nQ_ = 10000;
     int nAtoms_ = 1000;
-	
-	std::cout << nQ_ << " q-vectors :: " << nAtoms_ << " atoms\n";
-	std::cout << "remember: linear in q-vectors, quadratic in atoms\n";
+    
+    std::cout << nQ_ << " q-vectors :: " << nAtoms_ << " atoms\n";
+    std::cout << "remember: linear in q-vectors, quadratic in atoms\n";
 
     int n_atom_types_ = 10;
 
@@ -583,8 +583,8 @@ int main() {
                     atom_types_,
                     cromermann_,
 
-					// correlation matrix
-					V,
+                    // correlation matrix
+                    V,
 
                     // output
                     h_outQ_R,
