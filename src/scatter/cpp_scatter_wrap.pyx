@@ -83,7 +83,25 @@ cdef extern from "cpp_scatter.hh":
 
                     float * q_out_real,
                     float * q_out_imag ) except +
-                    
+
+    void cpudiffuse(int   n_q,
+                    float * q_x, 
+                    float * q_y, 
+                    float * q_z, 
+
+                    int   n_atoms,
+                    float * r_x, 
+                    float * r_y, 
+                    float * r_z,
+
+                    int   n_atom_types,
+                    int   * atom_types,
+                    float * cromermann,
+
+                    float * V,
+
+                    float * q_out_real,
+                    float * q_out_imag ) except +                    
 
 
 
@@ -361,8 +379,106 @@ def cpp_scatter(n_molecules,
     amplitudes = real_amplitudes + 1j * imag_amplitudes
     
     return amplitudes
-    
 
+    
+def cpp_scatter_diffuse(np.ndarray rxyz,
+                        np.ndarray qxyz,
+                        np.ndarray atom_types,
+                        np.ndarray cromermann_parameters,
+                        np.ndarray V):
+        """
+        A python interface to the C++ code implementing the MVN diffuse scatter
+        model.
+    
+        Parameters
+        ----------
+        qxyz : ndarray, float
+            An n x 3 array of the (x,y,z) positions of each q-vector describing
+            the detector.
+    
+        rxyz : ndarray, float
+            An m x 3 array of the (x,y,z) positions of each atom in the molecule.
+    
+        atom_types : ndarray, int
+            A length-m one dim array of the ID of each atom telling the code which
+            Cromer-Mann parameter to use. See below.
+        
+        cromermann_parameters : ndarray, float
+            A one-d array of length 9 * the number of unique `atom_types`,
+            specifying the 9 Cromer-Mann parameters for each atom type.
+            
+        V : ndarray, float
+            A 4-d array of shape (n_atoms, n_atoms, 3, 3) representing the
+            anisotropic Gaussian correlation between atoms. The value
+            V[i,j,a,b] is the correlation between atom i in the a direction with
+            j in the b direction, where a & b are one of {x/y/z}.
+    
+        Returns
+        -------
+        intensities : ndarray, float64
+            A flat array of the simulated intensities, each position corresponding
+            to a scattering vector from `qxyz`.
+        """
+    
+        # check input sanity
+        num_atom_types = len(np.unique(atom_types))
+        if not len(cromermann_parameters) == num_atom_types * 9:
+            raise ValueError('input array `cromermann_parameters` should be len '
+                             '9 * num of unique `atom_types`')
+                             
+        num_atoms = rxyz.shape[0]
+        if not (V.shape[0] == num_atoms) and (V.shape[1] == num_atoms):
+            raise ValueError('shape of V incorrect, first 2 dims should be '
+                             'number of atoms -- got shape:')
+        if not (V.shape[2] == 3) and (V.shape[3] == 3):
+            raise ValueError('shape of V incorrect, last 2 dims should be '
+                             'size 3 -- got shape:')
+    
+    
+        # A NOTE ABOUT ARRAY ORDERING
+        # In what follows, for multi-dimensional arrays I often take the transpose
+        # somewhat mysteriously. This is because the way C++ will loop over arrays
+        # in c-order, but Thor's arrays in python land are in "fortran" order
+    
+        # extract arrays from input  
+        cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_qxyz
+        cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_rxyz
+        cdef np.ndarray[ndim=1, dtype=np.float32_t] c_cromermann
+        cdef np.ndarray[ndim=4, dtype=np.float32_t, mode="c"] c_V
+    
+        c_qxyz = np.ascontiguousarray(qxyz.T, dtype=np.float32)
+        c_rxyz = np.ascontiguousarray(rxyz.T, dtype=np.float32)
+        c_cromermann = np.ascontiguousarray(cromermann_parameters, dtype=np.float32)
+        c_V = np.ascontiguousarray(V.T, dtype=np.float32)
+    
+        # for some reason "memoryview" syntax necessary for int arrays...
+        cdef int[::1] c_atom_types = np.ascontiguousarray(atom_types, dtype=np.int32)
+
+        # initialize output arrays
+        cdef np.ndarray[ndim=1, dtype=np.float32_t] real_intensities
+        cdef np.ndarray[ndim=1, dtype=np.float32_t] imag_intensities
+        real_intensities = np.zeros(qxyz.shape[0], dtype=np.float32)
+        imag_intensities = np.zeros(qxyz.shape[0], dtype=np.float32)
+    
+    
+        # --- call the actual C++ code
+        cpudiffuse(qxyz.shape[0], &c_qxyz[0,0], &c_qxyz[1,0], &c_qxyz[2,0],
+                   rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
+                   num_atom_types, &c_atom_types[0], &c_cromermann[0],
+                   &c_V[0,0,0,0],
+                   &real_intensities[0], &imag_intensities[0])
+                                   
+        # deal with the output
+        output_sanity_check(real_intensities)
+        output_sanity_check(imag_intensities)
+    
+        # make sure imaginary component is small (we have already taken ||^2)
+        print 'imag content:', np.sum(np.abs(imag_intensities))
+        #assert np.sum(np.abs(imag_intensities)) < 1e-6, 'large imaginary comp'
+    
+        return real_intensities
+        
+        
 
 # FIND OUT IF A GPU IS AVAILABLE
 global GPU_ENABLED

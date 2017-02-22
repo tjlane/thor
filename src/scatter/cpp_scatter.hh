@@ -53,6 +53,28 @@ void cpuscatter(
                 float * q_out_imag
                 );
 
+
+void cpudiffuse(
+                int   n_q,
+                float * q_x,
+                float * q_y,
+                float * q_z,
+
+                int   n_atoms,
+                float * r_x,
+                float * r_y,
+                float * r_z,
+
+                int   n_atom_types,
+                int   * atom_types,
+                float * cromermann,
+
+				float * V,
+
+                float * q_out_real,
+                float * q_out_imag
+                );
+
 // guarenteed interface between cpp_scatter.cu and cpp_scatter.cpp
 void _gpuscatter(int device_id,
 

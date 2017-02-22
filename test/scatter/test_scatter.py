@@ -308,7 +308,7 @@ class TestCppScatter(object):
                        err_msg='scatter: c-cpu/cpu reference mismatch')
         assert not np.all( cpu_A == 0.0 )
         assert not np.sum( cpu_A == np.nan )
-    
+
     def test_gpu_scatter(self):
 
         if not GPU: raise SkipTest
@@ -363,7 +363,51 @@ class TestCppScatter(object):
         # assert_allclose(out2, self.ref_A, rtol=1e-2, atol=1.0,
         #                 err_msg='error in 2 thread cpu')
         
-        
+
+
+class TestDiffuseScatter(object):
+
+    def setup(self):
+
+        self.nq = 5  # number of detector vectors to do
+        self.nr = 10 # number of atoms to use
+
+        xyzZ = np.loadtxt(ref_file('512_atom_benchmark.xyz'))
+        self.xyzlist = xyzZ[:self.nr,:3] * 10.0 # nm -> ang.
+        self.atomic_numbers = xyzZ[:self.nr,3].flatten()
+
+        self.q_grid = np.loadtxt(ref_file('512_q.xyz'))[:self.nq]
+
+        self.num_molecules = 512
+        self.ref_A = ref_simulate_shot(self.xyzlist, self.atomic_numbers,
+                                       self.num_molecules, self.q_grid,
+									   dont_rotate=True)
+
+
+    def test_cpu_diffuse_no_variance(self):
+
+        print "testing diffuse no variance..."
+
+        cromermann_parameters, atom_types = get_cromermann_parameters(self.atomic_numbers)
+
+        V = np.zeros(( self.xyzlist.shape[0], self.xyzlist.shape[0], 3, 3 )) # no correlation...
+        cpu_I = _cppscatter.cpp_scatter_diffuse(self.xyzlist,
+                                                self.q_grid,
+                                                atom_types,
+                                                cromermann_parameters,
+                                                V)
+
+        ref_I = np.square(np.abs(self.ref_A))
+        ref_I /= ref_I.max()
+        cpu_I /= cpu_I.max()
+
+        assert_allclose(cpu_I, ref_I, rtol=1e-3, atol=1e-4,
+                       err_msg='scatter: c-cpu-diffuse/cpu reference mismatch')
+        assert not np.all( cpu_I == 0.0 )
+        assert not np.sum( cpu_I == np.nan )
+
+
+
 class TestSimulateAtomic(object):
     """ tests for src/python/scatter.py """
     

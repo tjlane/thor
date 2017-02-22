@@ -1,9 +1,10 @@
-/*! 
+ /*! 
  *  Code for computing the Thompson diffraction from an atomic structure,
  *  both on the GPU and CPU.
  *
  *  First version: YTZ 2012
  *  Updated TJL 2012, 2014
+ *  Added Diffuse: 2017
  */
 
 #include <stdio.h>
@@ -279,6 +280,7 @@ void cpu_kernel( int   const n_q,
                 
                 qr = ax*qx + ay*qy + az*qz;
                 
+				// FIXME :: swap cos and sin???? e^i*t = cos(t) + i sin(t)
                 q_sum_real += fi * sinf(qr);
                 q_sum_imag += fi * cosf(qr);
                 
@@ -329,33 +331,179 @@ void cpuscatter(  int  n_q,
                 q_out_real, q_out_imag );
 }
 
+
+// void cpu_diffuse_kernel( int   const n_q,
+
+void cpudiffuse(int   n_q,
+                 float * q_x,
+                 float * q_y,
+                 float * q_z,
+
+                 int    n_atoms,
+                 float  * r_x,
+                 float  * r_y,
+                 float  * r_z,
+
+                 int    n_atom_types,
+                 int    * atom_types,
+                 float  * cromermann,
+
+                 float * V,
+
+                 float * q_out_real, // <-- not const 
+                 float * q_out_imag  // <-- not const 
+                ) {
+                      
+    /* CPU code for computing a scattering simulation, including the possibility
+	 * of Gaussian diffuse scatter encoded in the MVN correlation matrix V_ij.
+     *
+	 * ONLY for a single orientation/molecule
+	 * 				
+     * Arguments
+     * ---------
+     * n_q / q_{x,y,z}     : the number and xyz positions of momentum q-vectors
+     * n_atoms / r_{x,y,z} : the number and xyz positions of atomic positions
+     * n_atom_types        : the number of unique atom types (formfactors)
+     * atom_types          : the atom "type", which is an arbitrary index
+     * cromermann          : 9 params specifying formfactor for each atom type 
+	 * V        		   : 4d array of the correlation between atom i and j 
+	 *				         in xyz [i,j,i_x,j_x]
+     *
+     * Output
+     * ------
+     * q_out_ints : the total scattering intensity
+     *
+     */
+
+    // private variables
+    float qx, qy, qz;             // extracted q vector
+    float mq, qo, fi;             // mag of q, formfactor for atom i
+	float dx, dy, dz;             // difference r_i - r_j for {x,y,z}
+    float q_sum_real, q_sum_imag; // partial sum of real and imaginary amplitude
+    float qr;                     // dot product of q and r
+	float qVq;					  // matrix product qT * V_ab * q (atoms a & b)
+    
+    // we will use a small array to store form factors
+    float * formfactors = (float *) malloc(n_atom_types * sizeof(float));
+	
+    // ---> main loop (3 nested loops)
+    // for each q vector (1st nested loop)
+    for( int iq = 0; iq < n_q; iq++ ) {
+        
+        qx = q_x[iq];
+        qy = q_y[iq];
+        qz = q_z[iq];
+        
+        // Cromer-Mann computation, precompute for this value of q
+        mq = qx*qx + qy*qy + qz*qz;
+        qo = mq / (16*M_PI*M_PI); // qo is (sin(theta)/lambda)^2
+
+        // accumulant: real and imaginary amplitudes for this q vector
+        q_sum_real = 0;
+        q_sum_imag = 0;
+    
+        // precompute atomic form factors for each atom type
+        int tind;
+        for (int type = 0; type < n_atom_types; type++) {
+                        
+            tind = type * 9;
+            fi =  cromermann[tind]   * exp(-cromermann[tind+4]*qo);
+            fi += cromermann[tind+1] * exp(-cromermann[tind+5]*qo);
+            fi += cromermann[tind+2] * exp(-cromermann[tind+6]*qo);
+            fi += cromermann[tind+3] * exp(-cromermann[tind+7]*qo);
+            fi += cromermann[tind+8];
+            
+            formfactors[type] = fi;
+
+        }
+
+        // for each atom in molecule [again] (2nd nested loop)
+        for( int a = 0; a < n_atoms; a++ ) {
+			
+			int id_a = atom_types[a];
+			float fa = formfactors[id_a];
+            int ab_idx;
+            
+            // for each atom in molecule [again], a != b (3rd nested loop)
+            for( int b = 0; b < a; b++ ) {
+				
+				int id_b = atom_types[b];
+				float fb = formfactors[id_b];
+
+				// iqr [structure factor]      
+				dx = r_x[a] - r_x[b];
+				dy = r_y[a] - r_y[b];
+				dz = r_z[a] - r_z[b];
+
+                qr = dx*qx + dy*qy + dz*qz;
+
+				// qVq [disorder factor]
+				// longhand matrix multiplication of 3x3 symmetric matrix
+				
+				ab_idx = n_atoms * a + b;
+				qVq  =     qx * qx * V[9*ab_idx + 0];
+				qVq +=     qy * qy * V[9*ab_idx + 4];
+				qVq +=     qz * qz * V[9*ab_idx + 8];
+				qVq += 2 * qx * qy * V[9*ab_idx + 1];
+				qVq += 2 * qx * qz * V[9*ab_idx + 2];
+				qVq += 2 * qy * qz * V[9*ab_idx + 5];
+				
+				// accumulate (for atom pair a/b)
+                q_sum_real += 2 * fa * fb * cosf(qr) * exp(qVq);
+				//q_sum_imag += fa * fb * (sinf(qr) + sinf(-1 * qr)) * exp(qVq);
+ 
+            } // finished one atom (3rd loop)
+
+            // do diagonal elements (a == b)
+			ab_idx = n_atoms * a + a;
+			qVq  =     qx * qx * V[ab_idx + 0];
+			qVq +=     qy * qy * V[ab_idx + 4];
+			qVq +=     qz * qz * V[ab_idx + 8];
+			qVq += 2 * qx * qy * V[ab_idx + 1];
+			qVq += 2 * qx * qz * V[ab_idx + 2];
+			qVq += 2 * qy * qz * V[ab_idx + 5];
+            q_sum_real += fa * fa * exp(qVq);
+
+        } // finished 2nd atom (2nd loop)
+        
+        // add the output to the total intensity array
+        q_out_real[iq] = q_sum_real;
+        //q_out_imag[iq] = q_sum_imag; // should be ~zero when done
+        
+    } // finished one q vector (1st loop)
+    
+    free(formfactors);
+	//free(V_ab);
+    
+}
+
 // This is a meaningless test, for speed only...
 #ifndef __CUDACC__
 int main() {
-    
+
     int nQ_ = 1000;
     int nAtoms_ = 1000;
     int n_atom_types_ = 10;
     int nRot_ = 1000;
-    
+
     float * h_qx_ = new float[nQ_];
     float * h_qy_ = new float[nQ_];
     float * h_qz_ = new float[nQ_];
-    
+
     float * h_rx_ = new float[nAtoms_];
     float * h_ry_ = new float[nAtoms_];
     float * h_rz_ = new float[nAtoms_];
-    
+
     int   * atom_types_ = new int[nAtoms_];
     float * cromermann_ = new float[n_atom_types_ * 9];
-    
+
     float * h_rand1_ = new float[nRot_];
     float * h_rand2_ = new float[nRot_];
     float * h_rand3_ = new float[nRot_];
-    
+
     float * h_outQ_R = new float[nQ_];
-    float * h_outQ_I = new float[nQ_];    
-   
+    float * h_outQ_I = new float[nQ_];
+
     cpuscatter    ( // q vectors
                     nQ_,
                     h_qx_,
@@ -391,3 +539,58 @@ int main() {
 }
 #endif
 
+// #ifndef __CUDACC__
+// int main() {
+//
+//     int nQ_ = 1000;
+//     int nAtoms_ = 1000;
+//
+//     int n_atom_types_ = 10;
+//
+//     float * h_qx_ = new float[nQ_];
+//     float * h_qy_ = new float[nQ_];
+//     float * h_qz_ = new float[nQ_];
+//
+//     float * h_rx_ = new float[nAtoms_];
+//     float * h_ry_ = new float[nAtoms_];
+//     float * h_rz_ = new float[nAtoms_];
+//
+//     int   * atom_types_ = new int[nAtoms_];
+//     float * cromermann_ = new float[n_atom_types_ * 9];
+//
+//     float * V = new float[nAtoms_ * nAtoms_ * 3 * 3];
+//
+//     float * h_outQ_R = new float[nQ_];
+//     float * h_outQ_I = new float[nQ_];
+//
+//     cpudiffuse   ( // q vectors
+//                     nQ_,
+//                     h_qx_,
+//                     h_qy_,
+//                     h_qz_,
+//
+//                     // atomic positions, ids
+//                     nAtoms_,
+//                     h_rx_,
+//                     h_ry_,
+//                     h_rz_,
+//
+//                     // formfactor info
+//                     n_atom_types_,
+//                     atom_types_,
+//                     cromermann_,
+//
+// 					// correlation matrix
+// 					V,
+//
+//                     // output
+//                     h_outQ_R,
+//                     h_outQ_I );
+//
+//     printf("CPP OUTPUT:\n");
+//     printf("%f\n", h_outQ_R[0]);
+//     printf("%f\n", h_outQ_I[0]);
+//
+//     return 0;
+// }
+// #endif
