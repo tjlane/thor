@@ -407,6 +407,38 @@ class TestDiffuseScatter(object):
         assert not np.sum( cpu_I == np.nan )
 
 
+    def test_python_interface(self):
+
+        nq = 100 # number of detector vectors to do
+        q_grid = np.loadtxt(ref_file('512_q.xyz'))[:nq]
+
+        traj = mdtraj.load(ref_file('ala2.pdb'))
+        atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
+        rxyz = traj.xyz[0] * 10.0
+
+        ref_A = ref_simulate_shot(rxyz,
+                                  atomic_numbers,
+                                  1, # num molecules
+                                  q_grid,
+                                  dont_rotate=True)
+
+
+        V = np.zeros(( rxyz.shape[0], rxyz.shape[0], 3, 3 )) # no correlation...
+        cpu_I = scatter.simulate_diffuse(traj,
+                                         q_grid,
+                                         V,
+										 ignore_hydrogens=False)
+
+        ref_I = np.square(np.abs(ref_A))
+        ref_I /= ref_I.max()
+        cpu_I /= cpu_I.max()
+
+        assert_allclose(cpu_I, ref_I, rtol=1e-3, atol=1e-4,
+                       err_msg='scatter: c-cpu-diffuse/cpu reference mismatch')
+        assert not np.all( cpu_I == 0.0 )
+        assert not np.sum( cpu_I == np.nan )
+
+
 
 class TestSimulateAtomic(object):
     """ tests for src/python/scatter.py """

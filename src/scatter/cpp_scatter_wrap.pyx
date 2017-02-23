@@ -385,7 +385,8 @@ def cpp_scatter_diffuse(np.ndarray rxyz,
                         np.ndarray qxyz,
                         np.ndarray atom_types,
                         np.ndarray cromermann_parameters,
-                        np.ndarray V):
+                        np.ndarray V,
+                        device_id='CPU'):
         """
         A python interface to the C++ code implementing the MVN diffuse scatter
         model.
@@ -462,19 +463,27 @@ def cpp_scatter_diffuse(np.ndarray rxyz,
     
     
         # --- call the actual C++ code
-        cpudiffuse(qxyz.shape[0], &c_qxyz[0,0], &c_qxyz[1,0], &c_qxyz[2,0],
-                   rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
-                   num_atom_types, &c_atom_types[0], &c_cromermann[0],
-                   &c_V[0,0,0,0],
-                   &real_intensities[0], &imag_intensities[0])
+        if device_id == 'GPU':
+            device_id = 0 # default GPU
+
+        if device_id == 'CPU':
+            cpudiffuse(qxyz.shape[0], &c_qxyz[0,0], &c_qxyz[1,0], &c_qxyz[2,0],
+                       rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
+                       num_atom_types, &c_atom_types[0], &c_cromermann[0],
+                       &c_V[0,0,0,0],
+                       &real_intensities[0], &imag_intensities[0])
+        elif type(device_id) is int:
+            raise NotImplementedError('no GPU yet')
+        else:
+            raise ValueError('uninterpretable device_id: %s' % str(device_id))
                                    
         # deal with the output
         output_sanity_check(real_intensities)
         output_sanity_check(imag_intensities)
     
         # make sure imaginary component is small (we have already taken ||^2)
-        print 'imag content:', np.sum(np.abs(imag_intensities))
-        #assert np.sum(np.abs(imag_intensities)) < 1e-6, 'large imaginary comp'
+        #print 'imag content:', np.sum(np.abs(imag_intensities))
+        assert np.sum(np.abs(imag_intensities)) / qxyz.shape[0] < 1e-6, 'large imaginary comp'
     
         return real_intensities
         
