@@ -524,7 +524,7 @@ class TestDiffuseScatter(object):
         assert not np.all( cpu_pI == 0.0 )
         assert not np.sum( cpu_pI == np.nan )
 
-    def test_python_interface(self):
+    def test_python_interface_noV(self):
 
         nq = 100 # number of detector vectors to do
         q_grid = np.loadtxt(ref_file('512_q.xyz'))[:nq]
@@ -544,7 +544,7 @@ class TestDiffuseScatter(object):
         cpu_I = scatter.simulate_diffuse(traj,
                                          q_grid,
                                          V,
-										 ignore_hydrogens=False)
+                                         ignore_hydrogens=False)
 
         ref_I = np.square(np.abs(ref_A))
         ref_I /= ref_I.max()
@@ -555,6 +555,43 @@ class TestDiffuseScatter(object):
         assert not np.all( cpu_I == 0.0 )
         assert not np.sum( cpu_I == np.nan )
 
+    def test_python_interface_isotropic(self):
+        nq = 100 # number of detector vectors to do
+        q_grid = np.loadtxt(ref_file('512_q.xyz'))[:nq]
+
+        traj = mdtraj.load(ref_file('ala2.pdb'))
+        atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
+        rxyz = traj.xyz[0] * 10.0
+
+        V = np.random.randn(rxyz.shape[0], rxyz.shape[0])
+        V += V.T
+        ref_I = ref_diffuse_scatter(rxyz, atomic_numbers, q_grid, V)
+        tst_I = scatter.simulate_diffuse(traj, q_grid, V)
+
+        assert_allclose(tst_I, ref_I, rtol=1e-3, atol=1e-4,
+                       err_msg='scatter: python-diffuse/cpu reference mismatch')
+        assert not np.all( tst_I == 0.0 )
+        assert not np.sum( tst_I == np.nan )
+
+    def test_python_interface_anisotropic(self):
+        nq = 100 # number of detector vectors to do
+        q_grid = np.loadtxt(ref_file('512_q.xyz'))[:nq]
+
+        traj = mdtraj.load(ref_file('ala2.pdb'))
+        atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
+        rxyz = traj.xyz[0] * 10.0
+
+        V = np.random.randn(rxyz.shape[0], rxyz.shape[0], 3, 3)
+        V += np.transpose(V, (1,0,2,3))
+        V += np.transpose(V, (0,1,3,2)) # should be symmetric
+
+        ref_I = ref_diffuse_scatter(rxyz, atomic_numbers, q_grid, V)
+        tst_I = scatter.simulate_diffuse(traj, q_grid, V)
+
+        assert_allclose(tst_I, ref_I, rtol=1e-3, atol=1e-4,
+                       err_msg='scatter: python-diffuse/cpu reference mismatch')
+        assert not np.all( tst_I == 0.0 )
+        assert not np.sum( tst_I == np.nan )
 
 
 class TestSimulateAtomic(object):

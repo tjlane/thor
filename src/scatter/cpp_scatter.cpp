@@ -332,8 +332,6 @@ void cpuscatter(  int  n_q,
 }
 
 
-// void cpu_diffuse_kernel( int   const n_q,
-
 void cpudiffuse(int   n_q,
                  float * q_x,
                  float * q_y,
@@ -447,22 +445,22 @@ void cpudiffuse(int   n_q,
                 qVq += 2 * qx * qy * V[9*ab_idx + 1];
                 qVq += 2 * qx * qz * V[9*ab_idx + 2];
                 qVq += 2 * qy * qz * V[9*ab_idx + 5];
-                
+
                 // accumulate (for atom pair a/b)
-                q_sum_real += 2 * fa * fb * cosf(qr) * exp(qVq);
+                q_sum_real += 2 * fa * fb * cosf(qr) * exp(-0.5 * qVq);
                 //q_sum_imag += fa * fb * (sinf(qr) + sinf(-1 * qr)) * exp(qVq);
  
             } // finished one atom (3rd loop)
 
             // do diagonal elements (a == b)
             ab_idx = n_atoms * a + a;
-            qVq  =     qx * qx * V[ab_idx + 0];
-            qVq +=     qy * qy * V[ab_idx + 4];
-            qVq +=     qz * qz * V[ab_idx + 8];
-            qVq += 2 * qx * qy * V[ab_idx + 1];
-            qVq += 2 * qx * qz * V[ab_idx + 2];
-            qVq += 2 * qy * qz * V[ab_idx + 5];
-            q_sum_real += fa * fa * exp(qVq);
+			qVq  =     qx * qx * V[9*ab_idx + 0];
+			qVq +=     qy * qy * V[9*ab_idx + 4];
+			qVq +=     qz * qz * V[9*ab_idx + 8];
+			qVq += 2 * qx * qy * V[9*ab_idx + 1];
+			qVq += 2 * qx * qz * V[9*ab_idx + 2];
+			qVq += 2 * qy * qz * V[9*ab_idx + 5];
+            q_sum_real += fa * fa * exp(-0.5 * qVq);
 
         } // finished 2nd atom (2nd loop)
         
@@ -473,7 +471,6 @@ void cpudiffuse(int   n_q,
     } // finished one q vector (1st loop)
     
     free(formfactors);
-    //free(V_ab);
     
 }
 

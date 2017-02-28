@@ -330,8 +330,9 @@ def simulate_diffuse(traj, detector, covariance_tensor,
     # lower level interface
     n_atoms = len(atoms_to_keep)
     if covariance_tensor.shape == (n_atoms, n_atoms):
-        # expand
-        pass
+        # expand -- should have the same value on the 3x3 diagonals
+        e = np.diag((1,1,1))
+        covariance_tensor = covariance_tensor[:,:,None,None] * e[None,None,:,:]
     elif covariance_tensor.shape == (n_atoms, n_atoms, 3, 3):
         # correctly sized full tensor
         pass

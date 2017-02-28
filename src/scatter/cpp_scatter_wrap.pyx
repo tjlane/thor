@@ -445,12 +445,12 @@ def cpp_scatter_diffuse(np.ndarray rxyz,
         cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_qxyz
         cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_rxyz
         cdef np.ndarray[ndim=1, dtype=np.float32_t] c_cromermann
-        cdef np.ndarray[ndim=4, dtype=np.float32_t, mode="c"] c_V
+        cdef np.ndarray[ndim=1, dtype=np.float32_t, mode="c"] c_V
     
         c_qxyz = np.ascontiguousarray(qxyz.T, dtype=np.float32)
         c_rxyz = np.ascontiguousarray(rxyz.T, dtype=np.float32)
         c_cromermann = np.ascontiguousarray(cromermann_parameters, dtype=np.float32)
-        c_V = np.ascontiguousarray(V.T, dtype=np.float32)
+        c_V = np.ascontiguousarray(V.flatten(), dtype=np.float32)
     
         # for some reason "memoryview" syntax necessary for int arrays...
         cdef int[::1] c_atom_types = np.ascontiguousarray(atom_types, dtype=np.int32)
@@ -469,8 +469,7 @@ def cpp_scatter_diffuse(np.ndarray rxyz,
         if device_id == 'CPU':
             cpudiffuse(qxyz.shape[0], &c_qxyz[0,0], &c_qxyz[1,0], &c_qxyz[2,0],
                        rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
-                       num_atom_types, &c_atom_types[0], &c_cromermann[0],
-                       &c_V[0,0,0,0],
+                       num_atom_types, &c_atom_types[0], &c_cromermann[0], &c_V[0],
                        &real_intensities[0], &imag_intensities[0])
         elif type(device_id) is int:
             raise NotImplementedError('no GPU yet')
