@@ -24,5 +24,3 @@ Contributors
 * Yutong Zhao
 * Gundolf Scheck
 * Jonas Sellberg
-
-
