@@ -100,8 +100,8 @@ cdef extern from "cpp_scatter.hh":
 
                     float * V,
 
-                    float * q_out_real,
-                    float * q_out_imag ) except +                    
+                    float * q_out_bragg,
+                    float * q_out_diffuse ) except +                    
 
 
 
@@ -456,10 +456,10 @@ def cpp_scatter_diffuse(np.ndarray rxyz,
         cdef int[::1] c_atom_types = np.ascontiguousarray(atom_types, dtype=np.int32)
 
         # initialize output arrays
-        cdef np.ndarray[ndim=1, dtype=np.float32_t] real_intensities
-        cdef np.ndarray[ndim=1, dtype=np.float32_t] imag_intensities
-        real_intensities = np.zeros(qxyz.shape[0], dtype=np.float32)
-        imag_intensities = np.zeros(qxyz.shape[0], dtype=np.float32)
+        cdef np.ndarray[ndim=1, dtype=np.float32_t] bragg_intensities
+        cdef np.ndarray[ndim=1, dtype=np.float32_t] diffuse_intensities
+        bragg_intensities = np.zeros(qxyz.shape[0], dtype=np.float32)
+        diffuse_intensities = np.zeros(qxyz.shape[0], dtype=np.float32)
     
     
         # --- call the actual C++ code
@@ -470,21 +470,21 @@ def cpp_scatter_diffuse(np.ndarray rxyz,
             cpudiffuse(qxyz.shape[0], &c_qxyz[0,0], &c_qxyz[1,0], &c_qxyz[2,0],
                        rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
                        num_atom_types, &c_atom_types[0], &c_cromermann[0], &c_V[0],
-                       &real_intensities[0], &imag_intensities[0])
+                       &bragg_intensities[0], &diffuse_intensities[0])
         elif type(device_id) is int:
             raise NotImplementedError('no GPU yet')
         else:
             raise ValueError('uninterpretable device_id: %s' % str(device_id))
                                    
         # deal with the output
-        output_sanity_check(real_intensities)
-        output_sanity_check(imag_intensities)
+        output_sanity_check(bragg_intensities)
+        output_sanity_check(diffuse_intensities)
     
         # make sure imaginary component is small (we have already taken ||^2)
-        #print 'imag content:', np.sum(np.abs(imag_intensities))
-        assert np.sum(np.abs(imag_intensities)) / qxyz.shape[0] < 1e-6, 'large imaginary comp'
+        #assert np.sum(np.abs(bragg_intensities)) / qxyz.shape[0] < 1e-6, 'bragg: large imaginary comp'
+        #assert np.sum(np.abs(diffuse_intensities)) / qxyz.shape[0] < 1e-6, 'diffuse: large imaginary comp'
     
-        return real_intensities
+        return bragg_intensities, diffuse_intensities
         
         
 

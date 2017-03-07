@@ -110,6 +110,36 @@ void rotate(float x, float y, float z,
 
 
 
+void qVq_product(float * V,
+				 int i, 
+				 int j,
+				 int n_atoms,
+				 
+				 float qx, 
+				 float qy, 
+				 float qz,
+				 
+				 float &o_qVq
+                 
+				 ){
+
+    // compute < q | V_ij | q >
+
+    float qVq;
+	int ab_idx;
+	
+	ab_idx = n_atoms * i + j;
+	qVq  =     qx * qx * V[9*ab_idx + 0];
+	qVq +=     qy * qy * V[9*ab_idx + 4];
+	qVq +=     qz * qz * V[9*ab_idx + 8];
+	qVq += 2 * qx * qy * V[9*ab_idx + 1];
+	qVq += 2 * qx * qz * V[9*ab_idx + 2];
+	qVq += 2 * qy * qz * V[9*ab_idx + 5];
+
+    o_qVq = qVq;
+
+}
+
 /******************************************************************************
  * Hybrid CPU/GPU Code
  * decides whether to try and call GPU code or raise an exception, depending
@@ -332,7 +362,7 @@ void cpuscatter(  int  n_q,
 }
 
 
-void cpudiffuse(int   n_q,
+void cpudiffuse( int   n_q,
                  float * q_x,
                  float * q_y,
                  float * q_z,
@@ -348,8 +378,8 @@ void cpudiffuse(int   n_q,
 
                  float * V,
 
-                 float * q_out_real, // <-- not const 
-                 float * q_out_imag  // <-- not const 
+                 float * q_out_bragg,   // <-- not const 
+                 float * q_out_diffuse  // <-- not const 
                 ) {
                       
     /* CPU code for computing a scattering simulation, including the possibility
@@ -377,9 +407,11 @@ void cpudiffuse(int   n_q,
     float qx, qy, qz;             // extracted q vector
     float mq, qo, fi;             // mag of q, formfactor for atom i
     float dx, dy, dz;             // difference r_i - r_j for {x,y,z}
-    float q_sum_real, q_sum_imag; // partial sum of real and imaginary amplitude
+    float q_sum_bragg;			  // partial sum of ordered term
+	float q_sum_diffuse;          // partial sum of disordered term
     float qr;                     // dot product of q and r
-    float qVq;                    // matrix product qT * V_ab * q (atoms a & b)
+    float qVaaq, qVabq, qVbbq;    // matrix product qT * V_ab * q (atoms a & b)
+	float W;					  // intermediate result
     
     // we will use a small array to store form factors
     float * formfactors = (float *) malloc(n_atom_types * sizeof(float));
@@ -397,8 +429,8 @@ void cpudiffuse(int   n_q,
         qo = mq / (16*M_PI*M_PI); // qo is (sin(theta)/lambda)^2
 
         // accumulant: real and imaginary amplitudes for this q vector
-        q_sum_real = 0;
-        q_sum_imag = 0;
+        q_sum_bragg   = 0;
+        q_sum_diffuse = 0;
     
         // precompute atomic form factors for each atom type
         int tind;
@@ -420,7 +452,14 @@ void cpudiffuse(int   n_q,
             
             int id_a = atom_types[a];
             float fa = formfactors[id_a];
-            int ab_idx;
+
+            // do diagonal elements (a == b)
+			// TODO cache qVaaq for use as qVbbq later
+            qVq_product(V, a, a, n_atoms, qx, qy, qz, qVaaq);
+            W = 1 * fa * fa;
+            q_sum_bragg   += W * exp(-1 * qVaaq);
+			//std::cout << a << " " << a << " " << W << " " << exp(-1 * qVaaq) <<  "\n";
+            q_sum_diffuse += W * (1 - exp(-1 * qVaaq));
             
             // for each atom in molecule [again], a != b (3rd nested loop)
             for( int b = 0; b < a; b++ ) {
@@ -437,36 +476,23 @@ void cpudiffuse(int   n_q,
 
                 // qVq [disorder factor]
                 // longhand matrix multiplication of 3x3 symmetric matrix
-                
-                ab_idx = n_atoms * a + b;
-                qVq  =     qx * qx * V[9*ab_idx + 0];
-                qVq +=     qy * qy * V[9*ab_idx + 4];
-                qVq +=     qz * qz * V[9*ab_idx + 8];
-                qVq += 2 * qx * qy * V[9*ab_idx + 1];
-                qVq += 2 * qx * qz * V[9*ab_idx + 2];
-                qVq += 2 * qy * qz * V[9*ab_idx + 5];
+				//qVq_product(V, a, a, n_atoms, qx, qy, qz, qVaaq);
+				qVq_product(V, a, b, n_atoms, qx, qy, qz, qVabq);
+				qVq_product(V, b, b, n_atoms, qx, qy, qz, qVbbq);
 
                 // accumulate (for atom pair a/b)
-                q_sum_real += 2 * fa * fb * cosf(qr) * exp(-0.5 * qVq);
-                //q_sum_imag += fa * fb * (sinf(qr) + sinf(-1 * qr)) * exp(qVq);
+				W = 2 * fa * fb * cosf(qr) * exp(- 0.5 * qVaaq - 0.5 * qVbbq);
+                q_sum_bragg   += W;
+				//std::cout << a << " " << b << " " << W << " " << exp(- 0.5 * qVaaq - 0.5 * qVbbq) << "\n";
+                q_sum_diffuse += W * ( exp( qVabq ) - 1 );
  
             } // finished one atom (3rd loop)
-
-            // do diagonal elements (a == b)
-            ab_idx = n_atoms * a + a;
-			qVq  =     qx * qx * V[9*ab_idx + 0];
-			qVq +=     qy * qy * V[9*ab_idx + 4];
-			qVq +=     qz * qz * V[9*ab_idx + 8];
-			qVq += 2 * qx * qy * V[9*ab_idx + 1];
-			qVq += 2 * qx * qz * V[9*ab_idx + 2];
-			qVq += 2 * qy * qz * V[9*ab_idx + 5];
-            q_sum_real += fa * fa * exp(-0.5 * qVq);
 
         } // finished 2nd atom (2nd loop)
         
         // add the output to the total intensity array
-        q_out_real[iq] = q_sum_real;
-        //q_out_imag[iq] = q_sum_imag; // should be ~zero when done
+        q_out_bragg[iq]   = q_sum_bragg;  
+        q_out_diffuse[iq] = q_sum_diffuse;
         
     } // finished one q vector (1st loop)
     
@@ -539,8 +565,8 @@ void cpudiffuse(int   n_q,
 #ifndef __CUDACC__
 int main() {
 
-    int nQ_ = 10000;
-    int nAtoms_ = 1000;
+    int nQ_ = 100;
+    int nAtoms_ = 1500;
     
     std::cout << nQ_ << " q-vectors :: " << nAtoms_ << " atoms\n";
     std::cout << "remember: linear in q-vectors, quadratic in atoms\n";

@@ -71,8 +71,8 @@ void cpudiffuse(
 
 				float * V,
 
-                float * q_out_real,
-                float * q_out_imag
+                float * q_out_bragg,
+                float * q_out_diffuse
                 );
 
 // guarenteed interface between cpp_scatter.cu and cpp_scatter.cpp
