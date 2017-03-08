@@ -430,99 +430,43 @@ class TestCppScatter(object):
 class TestDiffuseScatter(object):
 
     def setup(self):
-
-        self.nq = 5  # number of detector vectors to do
-        self.nr = 10 # number of atoms to use
-
-        xyzZ = np.loadtxt(ref_file('512_atom_benchmark.xyz'))
-        self.xyzlist = xyzZ[:self.nr,:3] * 10.0 # nm -> ang.
-        self.atomic_numbers = xyzZ[:self.nr,3].flatten()
-        self.q_grid = np.loadtxt(ref_file('512_q.xyz'))[:self.nq]
-
-        self.num_molecules = 512
-        self.ref_A = ref_simulate_shot(self.xyzlist, self.atomic_numbers,
-                                       self.num_molecules, self.q_grid,
-                                       dont_rotate=True)
-
-        # loading relevant information for pentagon test case
-        pentagon = mdtraj.load(ref_file('pentagon.pdb'))
-        self.p_atomic_numbers = np.array([ a.element.atomic_number for a in pentagon.topology.atoms ])
-        self.p_xyzlist = np.squeeze(pentagon.xyz * 10.0, axis = 0)
-
-        # setting up q_vectors at which to compute I(q)
+        
+        self.nq = 5
+        
         p_qbins = np.linspace(-5, 5, 51)
         self.p_q_grid = np.array(list(itertools.product(p_qbins, p_qbins, p_qbins)))[:self.nq]
         
-        # setting up three test cases: 1. anisotropic correlations, 2. debye only, 3. zero V matrix
-        self.p_anisoV = np.load(ref_file('anisoV.npy'))
-        self.p_debyeV = np.zeros(self.p_anisoV.shape)
-        adps = np.array([0.1, 0.06, 0.09, 0.1, 0.1])
-        for i in range(5):
-            self.p_debyeV[i][i] = adps[i]*np.eye(3)
-        self.p_noV = np.zeros(self.p_anisoV.shape)
-
-        self.ref_aniso_pIb, self.ref_aniso_pId = ref_diffuse_scatter(self.p_xyzlist, 
-                                                                     self.p_atomic_numbers, 
-                                                                     self.p_q_grid, 
-                                                                     self.p_anisoV)
-        self.ref_debye_pIb, self.ref_debye_pId = ref_diffuse_scatter(self.p_xyzlist, 
-                                                                     self.p_atomic_numbers, 
-                                                                     self.p_q_grid, 
-                                                                     self.p_debyeV)
-        self.ref_nocorr_pIb, self.ref_nocorr_pId = ref_diffuse_scatter(self.p_xyzlist, 
-                                                                       self.p_atomic_numbers, 
-                                                                       self.p_q_grid, 
-                                                                       self.p_noV) 
-        self.p_noV = np.zeros(self.p_anisoV.shape)
-
-        self.ref_aniso_pI = ref_diffuse_scatter(self.p_xyzlist, self.p_atomic_numbers, 
-                                               self.p_q_grid, self.p_anisoV)
-        self.ref_nocorr_pI = ref_diffuse_scatter(self.p_xyzlist, self.p_atomic_numbers,
-                                                self.p_q_grid, self.p_noV) # ref implementation check
-        self.ref_pA = ref_simulate_shot(self.p_xyzlist, self.p_atomic_numbers,
-                                        1, self.p_q_grid,
-                                        dont_rotate=True) # for completeness, also check against Thor
+        # loading relevant information for pentagon test case
+        self.pentagon = mdtraj.load(ref_file('pentagon.pdb'))
+        self.p_atomic_numbers = np.array([ a.element.atomic_number for a in self.pentagon.topology.atoms ])
+        self.p_xyzlist = np.squeeze(self.pentagon.xyz * 10.0, axis = 0)
+        
+        self.cromermann_parameters, self.atom_types = get_cromermann_parameters(self.p_atomic_numbers)
+        
+        self.V_shape = (self.pentagon.n_atoms, self.pentagon.n_atoms, 3, 3)
+        
 
         return
 
 
-    def test_cpu_diffuse_no_variance(self):
-
-        print "testing diffuse no variance..."
-
-        cromermann_parameters, atom_types = get_cromermann_parameters(self.atomic_numbers)
-
-        V = np.zeros(( self.xyzlist.shape[0], self.xyzlist.shape[0], 3, 3 )) # no correlation...
-        cpu_Ib, cpu_Id = _cppscatter.cpp_scatter_diffuse(self.xyzlist,
-                                                         self.q_grid,
-                                                         atom_types, 
-                                                         cromermann_parameters, 
-                                                         V)
-
-        ref_I = np.square(np.abs(self.ref_A))
-        ref_I /= ref_I.max()
-        cpu_Ib /= cpu_Ib.max()
-
-        assert_allclose(cpu_Ib, ref_I, rtol=1e-3, atol=1e-4,
-                       err_msg='scatter: c-cpu-diffuse/cpu reference mismatch')
-        assert not np.all( cpu_Ib == 0.0 )
-        assert not np.sum( cpu_Ib == np.nan )
-        assert np.all( cpu_Id == 0.0 )
-
-    def test_cpu_diffuse_with_no_variance_pentagon(self):
-
-        print "testing diffuse with no variance using pentagon example..."
-
-        cromermann_parameters, atom_types = get_cromermann_parameters(self.p_atomic_numbers)
+    def test_cpu_diffuse_with_no_variance(self):
+        # todo
+        
+        p_noV = np.zeros(self.V_shape)
+        
+        ref_nocorr_pIb, ref_nocorr_pId = ref_diffuse_scatter(self.p_xyzlist, 
+                                                             self.p_atomic_numbers, 
+                                                             self.p_q_grid, 
+                                                             p_noV) 
 
         cpu_pIb, cpu_pId = _cppscatter.cpp_scatter_diffuse(self.p_xyzlist, 
                                                            self.p_q_grid, 
-                                                           atom_types, 
-                                                           cromermann_parameters, 
-                                                           self.p_noV)
+                                                           self.atom_types, 
+                                                           self.cromermann_parameters, 
+                                                           p_noV)
 
         # checking against python ref_diffuse_scatter implementation
-        ref_pI_v1 = self.ref_nocorr_pIb / self.ref_nocorr_pIb.max()
+        ref_pI_v1 = ref_nocorr_pIb / ref_nocorr_pIb.max()
         cpu_pIb /= cpu_pIb.max()
 
         assert_allclose(cpu_pIb, ref_pI_v1, rtol=1e-3, atol=1e-4,
@@ -532,50 +476,65 @@ class TestDiffuseScatter(object):
         assert np.all( cpu_pId == 0.0 )
 
         # checking against python ref_simulate_shot implementation
-        ref_pI_v2 = np.square(np.abs(self.ref_pA)) 
+        ref_pI_v2 = ref_simulate_shot(self.p_xyzlist, self.p_atomic_numbers,
+                                      1, self.p_q_grid, dont_rotate=True)
+        ref_pI_v2 = np.square(np.abs(ref_pI_v2))
         ref_pI_v2 /= ref_pI_v2.max()
         
         assert_allclose(cpu_pIb, ref_pI_v2, rtol=1e-3, atol=1e-4,
                         err_msg='scatter: c-cpu-diffuse/cpu reference mismatch')
 
     def test_cpu_diffuse_with_debye(self):
-
-        print "testing diffuse with debye-waller factors..."
-
-        cromermann_parameters, atom_types = get_cromermann_parameters(self.p_atomic_numbers)
+        
+        p_debyeV = np.zeros(self.V_shape)
+        adps = np.array([0.1, 0.06, 0.09, 0.1, 0.1])
+        for i in range(5):
+            p_debyeV[i][i] = adps[i]*np.eye(3)
+            
+        ref_debye_pIb, ref_debye_pId = ref_diffuse_scatter(self.p_xyzlist, 
+                                                           self.p_atomic_numbers, 
+                                                           self.p_q_grid, 
+                                                           p_debyeV)
 
         cpu_pIb, cpu_pId = _cppscatter.cpp_scatter_diffuse(self.p_xyzlist, 
                                                            self.p_q_grid,
-                                                           atom_types,
-                                                           cromermann_parameters,
-                                                           self.p_debyeV)
+                                                           self.atom_types,
+                                                           self.cromermann_parameters,
+                                                           p_debyeV)
 
-        ref_pIb = self.ref_debye_pIb / self.ref_debye_pIb.max()
-        ref_pId = self.ref_debye_pId / self.ref_debye_pId.max()
+        ref_pIb = ref_debye_pIb / ref_debye_pIb.max()
+        ref_pId = ref_debye_pId / ref_debye_pId.max()
         cpu_pIb /= cpu_pIb.max()
         cpu_pId /= cpu_pId.max()
 
         assert_allclose(cpu_pIb, ref_pIb, rtol=1e-3, atol=1e-4)
-        return
 
-    def test_cpu_diffuse_with_no_variance_pentagon(self):
+    def test_cpu_diffuse_with_isotropic_variance(self):
+        
+        p_isoV = np.zeros(self.V_shape)
+        V = np.abs(np.random.randn(*self.V_shape[:2])) / 10.0
+        V += V.T
+        for i in range(V.shape[0]):
+            for j in range(V.shape[1]):
+                p_isoV[i,j,:,:] = V[i,j] * np.eye(3)
 
-        print "testing diffuse with no variance using pentagon example..."
+        ref_iso_pIb, ref_iso_pId = ref_diffuse_scatter(self.p_xyzlist,
+                                                       self.p_atomic_numbers,
+                                                       self.p_q_grid,
+                                                       p_isoV)
 
-        cromermann_parameters, atom_types = get_cromermann_parameters(self.p_atomic_numbers)
+        cpu_pIb, cpu_pId = _cppscatter.cpp_scatter_diffuse(self.p_xyzlist,
+                                                           self.p_q_grid,
+                                                           self.atom_types,
+                                                           self.cromermann_parameters,
+                                                           p_isoV)
 
-        cpu_pI = _cppscatter.cpp_scatter_diffuse(self.p_xyzlist,
-                                                 self.p_q_grid,
-                                                 atom_types,
-                                                 cromermann_parameters,
-                                                 self.p_noV)
-        #np.save("cpu_no_corr_pI.npy", cpu_pI)
+        ref_pIb = ref_iso_pIb / ref_iso_pIb.max()
+        ref_pId = ref_iso_pId / ref_iso_pId.max()
+        cpu_pIb /= cpu_pIb.max()
+        cpu_pId /= cpu_pId.max()
 
-        # checking against python ref_diffuse_scatter implementation
-        ref_pI_v1 = self.ref_nocorr_pI / self.ref_nocorr_pI.max()
-        cpu_pI /= cpu_pI.max()
-
-        assert_allclose(cpu_pI, ref_pI_v1, rtol=1e-3, atol=1e-4,
+        assert_allclose(cpu_pIb, ref_pIb, rtol=1e-3, atol=1e-4,
                         err_msg='scatter: c-cpu-diffuse/cpu reference mismatch')
         assert not np.all( cpu_pIb == 0.0 )
         assert not np.sum( cpu_pIb == np.nan )
@@ -585,38 +544,23 @@ class TestDiffuseScatter(object):
         assert not np.all( cpu_pId == 0.0 )
         assert not np.sum( cpu_pId == np.nan )
 
-        return
-
-    def test_cpu_diffuse_with_correlations(self):
-        # checking against python ref_simulate_shot implementation
-
-        cromermann_parameters, atom_types = get_cromermann_parameters(self.p_atomic_numbers)
-
-        cpu_pI = _cppscatter.cpp_scatter_diffuse(self.p_xyzlist,
-                                                 self.p_q_grid,
-                                                 atom_types,
-                                                 cromermann_parameters,
-                                                 self.p_noV)
-        
-        ref_pI_v2 = np.square(np.abs(self.ref_pA)) 
-        ref_pI_v2 /= ref_pI_v2.max()
-        
-        assert_allclose(cpu_pI, ref_pI_v2, rtol=1e-3, atol=1e-4,
-                        err_msg='scatter: c-cpu-diffuse/cpu reference mismatch')
-
     def test_cpu_diffuse_with_anisotropic_variance(self):
-        print "testing diffuse with correlations..."
 
-        cromermann_parameters, atom_types = get_cromermann_parameters(self.p_atomic_numbers)
+        p_anisoV = np.load(ref_file('anisoV.npy'))
+
+        ref_aniso_pIb, ref_aniso_pId = ref_diffuse_scatter(self.p_xyzlist, 
+                                                           self.p_atomic_numbers, 
+                                                           self.p_q_grid, 
+                                                           p_anisoV)
 
         cpu_pIb, cpu_pId = _cppscatter.cpp_scatter_diffuse(self.p_xyzlist,
                                                            self.p_q_grid,
-                                                           atom_types,
-                                                           cromermann_parameters,
-                                                           self.p_anisoV)
+                                                           self.atom_types,
+                                                           self.cromermann_parameters,
+                                                           p_anisoV)
 
-        ref_pIb = self.ref_aniso_pIb / self.ref_aniso_pIb.max()
-        ref_pId = self.ref_aniso_pId / self.ref_aniso_pId.max()
+        ref_pIb = ref_aniso_pIb / ref_aniso_pIb.max()
+        ref_pId = ref_aniso_pId / ref_aniso_pId.max()
         cpu_pIb /= cpu_pIb.max()
         cpu_pId /= cpu_pId.max()
 
@@ -624,15 +568,6 @@ class TestDiffuseScatter(object):
                         err_msg='scatter: c-cpu-diffuse/cpu reference mismatch')
         assert not np.all( cpu_pIb == 0.0 )
         assert not np.sum( cpu_pIb == np.nan )
-        cpu_pI = _cppscatter.cpp_scatter_diffuse(self.p_xyzlist,
-                                                 self.p_q_grid,
-                                                 atom_types,
-                                                 cromermann_parameters,
-                                                 self.p_anisoV)
-        #np.save("cpu_pI.npy", cpu_pI)
-
-        ref_pI = self.ref_aniso_pI / self.ref_aniso_pI.max()
-        cpu_pI /= cpu_pI.max()
 
         assert_allclose(cpu_pId, ref_pId, rtol=1e-3, atol=1e-4,
                         err_msg='scatter: c-cpu-diffuse/cpu reference mismatch')
