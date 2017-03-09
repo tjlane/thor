@@ -199,13 +199,10 @@ void __global__ gpu_diffuse_kernel(int   const n_q,
     float mq, qo, fi;             // mag of q, formfactor for atom i
     float dx, dy, dz;             // difference r_i - r_j for {x,y,z}
 	
-    float q_sum_bragg;			  // partial sum of ordered term
-	float q_sum_diffuse;          // partial sum of disordered term
-	
     float qr;                     // dot product of q and r
 	float W;					  // intermediate result
 	
-    float qVabq;                  // matrix product qT * V_ab * q (atoms a & b)
+    float qVabq, qVaaq, qVbbq;    // matrix product qT * V_ab * q (atoms a & b)
     
     // ---> main loop (3 nested loops)
     // for each q vector (1st nested loop)
@@ -214,8 +211,10 @@ void __global__ gpu_diffuse_kernel(int   const n_q,
         // workspace for cm calcs -- static size, but hopefully big enough
         float formfactors[MAX_NUM_TYPES];
 		
-		// cache for V_ii's
-		float qViiq_cache[n_atoms];
+		// -- cache for V_ii's
+        // NOT using cache for GPU... too much memory for each thread
+        // to have it's own cache
+		//float qViiq_cache[n_atoms];
        
         // determine the rotated locations
         qx = q_x[gid];
@@ -256,10 +255,10 @@ void __global__ gpu_diffuse_kernel(int   const n_q,
             fa   = formfactors[id_a];
 
             // do diagonal elements (a == b)
-            qVq_product(V, a, a, n_atoms, qx, qy, qz, qViiq_cache[a]);
+            qVq_product(V, a, a, n_atoms, qx, qy, qz, qVaaq);
             W = fa * fa;
-            q_sum_bragg   += W * exp(-1 * qViiq_cache[a]);
-            q_sum_diffuse += W * (1 - exp(-1 * qViiq_cache[a]));
+            q_sum.x += W * exp(-1 * qVaaq);
+            q_sum.y += W * (1 - exp(-1 * qVaaq));
     
             // for each atom in molecule [again], a != b (3rd nested loop)
             for( int b = 0; b < a; b++ ) {
@@ -275,9 +274,10 @@ void __global__ gpu_diffuse_kernel(int   const n_q,
 				
                 // qVq [disorder factor]
 				qVq_product(V, a, b, n_atoms, qx, qy, qz, qVabq);
+                qVq_product(V, b, b, n_atoms, qx, qy, qz, qVbbq);
 
                 // accumulate (for atom pair a/b)
-				W = 2 * fa * fb * cosf(qr) * exp(- 0.5 * qViiq_cache[a] - 0.5 * qViiq_cache[b]);
+				W = 2 * fa * fb * cosf(qr) * exp(- 0.5 * qVaaq - 0.5 * qVbbq);
                 q_sum.x += W;
                 q_sum.y += W * ( exp( qVabq ) - 1 );
 				
@@ -285,8 +285,8 @@ void __global__ gpu_diffuse_kernel(int   const n_q,
         } // finished 2nd atom (2nd loop)
         
         // put q 
-        q_out_real[gid] = q_sum.x;
-        q_out_imag[gid] = q_sum.y;
+        q_out_bragg[gid]   = q_sum.x;
+        q_out_diffuse[gid] = q_sum.y;
 
         // syncthreads are important here!
         __syncthreads();
@@ -301,7 +301,7 @@ void __global__ gpu_diffuse_kernel(int   const n_q,
 
 void deviceMalloc( void ** ptr, int bytes ) {
     cudaError_t err = cudaMalloc(ptr, (size_t) bytes);
-    assert(err == 0);
+    // assert(err == 0);
 }
 
 
@@ -596,8 +596,7 @@ void _gpudiffuse(int device_id,
     int   *d_id;         deviceMalloc( (void **) &d_id, id_size);
     float *d_cm;         deviceMalloc( (void **) &d_cm, cm_size);
     
-    float *d_V;          deviceMalloc( (void **) &d_V, quat_size);
-    
+    float *d_V;          deviceMalloc( (void **) &d_V, V_size);
     float *d_q_out_bragg;   deviceMalloc( (void **) &d_q_out_bragg,   q_size);
     float *d_q_out_diffuse; deviceMalloc( (void **) &d_q_out_diffuse, q_size);
     
@@ -669,8 +668,8 @@ void _gpudiffuse(int device_id,
     
     cudaFree(d_V);
     
-    cudaFree(d_q_out_real);
-    cudaFree(d_q_out_imag);
+    cudaFree(d_q_out_bragg);
+    cudaFree(d_q_out_diffuse);
 
     err = cudaGetLastError();
     if (err != cudaSuccess) {
@@ -753,8 +752,8 @@ void _gpudiffuse(int device_id,
 
 int main() {
 
-    int nQ_ = 100;
-    int nAtoms_ = 15000;
+    int nQ_ = 100000;
+    int nAtoms_ = 1500;
     int n_atom_types_ = 10;
 
     float * h_qx_ = new float[nQ_];
@@ -768,7 +767,7 @@ int main() {
     int   * atom_types_ = new int[nAtoms_];
     float * cromermann_ = new float[n_atom_types_ * 9];
 
-    float * V = new float[nAtoms_ * nAtoms_ * 3 * 3];
+    float * h_V_ = new float[nAtoms_ * nAtoms_ * 3 * 3];
 
     float * h_outQ_R = new float[nQ_];
     float * h_outQ_I = new float[nQ_];

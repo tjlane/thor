@@ -577,6 +577,9 @@ class TestDiffuseScatter(object):
 
 class TestDiffuseScatterPython(object):
 
+    def setup(self):
+        self.device = 'CPU'
+
     def test_python_interface_noV(self):
 
         nq = 100 # number of detector vectors to do
@@ -597,7 +600,8 @@ class TestDiffuseScatterPython(object):
         cpu_Ib, cpu_Id = scatter.simulate_diffuse(traj,
                                                   q_grid,
                                                   V,
-                                                  ignore_hydrogens=False)
+                                                  ignore_hydrogens=False,
+                                                  device_id=self.device)
 
         ref_I = np.square(np.abs(ref_A))
         ref_I /= ref_I.max()
@@ -621,7 +625,7 @@ class TestDiffuseScatterPython(object):
         V = np.random.randn(rxyz.shape[0], rxyz.shape[0])
         V += V.T
         ref_Ib, ref_Id = ref_diffuse_scatter(rxyz, atomic_numbers, q_grid, V)
-        tst_Ib, tst_Id = scatter.simulate_diffuse(traj, q_grid, V)
+        tst_Ib, tst_Id = scatter.simulate_diffuse(traj, q_grid, V, device_id=self.device)
 
         assert_allclose(tst_Ib, ref_Ib, rtol=1e-3, atol=1e-4,
                        err_msg='scatter: python-diffuse/cpu reference mismatch (bragg)')
@@ -641,12 +645,19 @@ class TestDiffuseScatterPython(object):
         V += np.transpose(V, (0,1,3,2)) # should be symmetric
 
         ref_Ib, ref_Id = ref_diffuse_scatter(rxyz, atomic_numbers, q_grid, V)
-        tst_Ib, tst_Id = scatter.simulate_diffuse(traj, q_grid, V)
+        tst_Ib, tst_Id = scatter.simulate_diffuse(traj, q_grid, V, device_id=self.device)
 
         assert_allclose(tst_Ib, ref_Ib, rtol=1e-3, atol=1e-4,
                        err_msg='scatter: python-diffuse/cpu reference mismatch (bragg)')
         assert_allclose(tst_Id, ref_Id, rtol=1e-3, atol=1e-4,
                                err_msg='scatter: python-diffuse/cpu reference mismatch (diffuse)')
+
+
+class TestDiffuseScatterPythonGPU(TestDiffuseScatterPython):
+
+    def setup(self):
+        self.device = 0
+
 
 class TestSimulateAtomic(object):
     """ tests for src/python/scatter.py """

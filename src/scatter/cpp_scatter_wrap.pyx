@@ -103,6 +103,26 @@ cdef extern from "cpp_scatter.hh":
                     float * q_out_bragg,
                     float * q_out_diffuse ) except +                    
 
+    void gpudiffuse(int device_id,
+
+                    int   n_q,
+                    float * q_x,
+                    float * q_y,
+                    float * q_z,
+
+                    int   n_atoms,
+                    float * r_x,
+                    float * r_y,
+                    float * r_z,
+
+                    int   n_atom_types,
+                    int   * atom_types,
+                    float * cromermann,
+
+                    float * V,
+
+                    float * q_out_bragg,
+                    float * q_out_diffuse ) except +
 
 
 
@@ -472,17 +492,17 @@ def cpp_scatter_diffuse(np.ndarray rxyz,
                        num_atom_types, &c_atom_types[0], &c_cromermann[0], &c_V[0],
                        &bragg_intensities[0], &diffuse_intensities[0])
         elif type(device_id) is int:
-            raise NotImplementedError('no GPU yet')
+            gpudiffuse(device_id,
+                       qxyz.shape[0], &c_qxyz[0,0], &c_qxyz[1,0], &c_qxyz[2,0],
+                       rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0],
+                       num_atom_types, &c_atom_types[0], &c_cromermann[0], &c_V[0],
+                       &bragg_intensities[0], &diffuse_intensities[0])
         else:
             raise ValueError('uninterpretable device_id: %s' % str(device_id))
                                    
         # deal with the output
         output_sanity_check(bragg_intensities)
         output_sanity_check(diffuse_intensities)
-    
-        # make sure imaginary component is small (we have already taken ||^2)
-        #assert np.sum(np.abs(bragg_intensities)) / qxyz.shape[0] < 1e-6, 'bragg: large imaginary comp'
-        #assert np.sum(np.abs(diffuse_intensities)) / qxyz.shape[0] < 1e-6, 'diffuse: large imaginary comp'
     
         return bragg_intensities, diffuse_intensities
         

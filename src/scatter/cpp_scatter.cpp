@@ -112,7 +112,7 @@ void rotate(float x, float y, float z,
 #ifdef __CUDACC__
     __host__ __device__ 
 #endif
-void qVq_product(float * V,
+void qVq_product(float const * const V,
 				 int i, 
 				 int j,
 				 int n_atoms,
@@ -225,7 +225,7 @@ void gpudiffuse (int device_id_,
         _gpudiffuse( device_id_,
                      n_q, h_qx, h_qy, h_qz,
                      n_atoms, h_rx, h_ry, h_rz,
-                     n_atom_types, h_atom_types, h_cromermann, h_V
+                     n_atom_types, h_atom_types, h_cromermann, h_V,
                      h_q_out_bragg, h_q_out_diffuse);
     #else
         #warning ("Warning : gpudiffuse DISABLED")
