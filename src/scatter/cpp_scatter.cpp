@@ -407,12 +407,16 @@ void cpudiffuse( int   n_q,
     float qx, qy, qz;             // extracted q vector
     float mq, qo, fi;             // mag of q, formfactor for atom i
     float dx, dy, dz;             // difference r_i - r_j for {x,y,z}
+	
     float q_sum_bragg;			  // partial sum of ordered term
 	float q_sum_diffuse;          // partial sum of disordered term
+	
     float qr;                     // dot product of q and r
-    float qVaaq, qVabq, qVbbq;    // matrix product qT * V_ab * q (atoms a & b)
 	float W;					  // intermediate result
-    
+	
+    float qVabq;                  // matrix product qT * V_ab * q (atoms a & b)
+	float * qViiq_cache = (float *) malloc(n_atoms * sizeof(float)); // V_aa's
+	
     // we will use a small array to store form factors
     float * formfactors = (float *) malloc(n_atom_types * sizeof(float));
     
@@ -454,12 +458,10 @@ void cpudiffuse( int   n_q,
             float fa = formfactors[id_a];
 
             // do diagonal elements (a == b)
-			// TODO cache qVaaq for use as qVbbq later
-            qVq_product(V, a, a, n_atoms, qx, qy, qz, qVaaq);
-            W = 1 * fa * fa;
-            q_sum_bragg   += W * exp(-1 * qVaaq);
-			//std::cout << a << " " << a << " " << W << " " << exp(-1 * qVaaq) <<  "\n";
-            q_sum_diffuse += W * (1 - exp(-1 * qVaaq));
+            qVq_product(V, a, a, n_atoms, qx, qy, qz, qViiq_cache[a]);
+            W = fa * fa;
+            q_sum_bragg   += W * exp(-1 * qViiq_cache[a]);
+            q_sum_diffuse += W * (1 - exp(-1 * qViiq_cache[a]));
             
             // for each atom in molecule [again], a != b (3rd nested loop)
             for( int b = 0; b < a; b++ ) {
@@ -471,19 +473,14 @@ void cpudiffuse( int   n_q,
                 dx = r_x[a] - r_x[b];
                 dy = r_y[a] - r_y[b];
                 dz = r_z[a] - r_z[b];
-
                 qr = dx*qx + dy*qy + dz*qz;
 
                 // qVq [disorder factor]
-                // longhand matrix multiplication of 3x3 symmetric matrix
-				//qVq_product(V, a, a, n_atoms, qx, qy, qz, qVaaq);
 				qVq_product(V, a, b, n_atoms, qx, qy, qz, qVabq);
-				qVq_product(V, b, b, n_atoms, qx, qy, qz, qVbbq);
 
                 // accumulate (for atom pair a/b)
-				W = 2 * fa * fb * cosf(qr) * exp(- 0.5 * qVaaq - 0.5 * qVbbq);
+				W = 2 * fa * fb * cosf(qr) * exp(- 0.5 * qViiq_cache[a] - 0.5 * qViiq_cache[b]);
                 q_sum_bragg   += W;
-				//std::cout << a << " " << b << " " << W << " " << exp(- 0.5 * qVaaq - 0.5 * qVbbq) << "\n";
                 q_sum_diffuse += W * ( exp( qVabq ) - 1 );
  
             } // finished one atom (3rd loop)
