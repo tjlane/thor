@@ -109,7 +109,9 @@ void rotate(float x, float y, float z,
 }
 
 
-
+#ifdef __CUDACC__
+    __host__ __device__ 
+#endif
 void qVq_product(float * V,
 				 int i, 
 				 int j,
@@ -187,6 +189,47 @@ void gpuscatter (int device_id_,
     #else
         #warning ("Warning : gpuscatter DISABLED")
         throw std::runtime_error("gpuscatter called but cpp_scatter.cpp not compiled w/nvcc!");
+    #endif
+
+}
+
+
+void gpudiffuse (int device_id_,
+            
+                 // scattering q-vectors
+                 int     n_q,
+                 float * h_qx,
+                 float * h_qy,
+                 float * h_qz,
+        
+                 // atomic positions, ids
+                 int     n_atoms,
+                 float * h_rx,
+                 float * h_ry,
+                 float * h_rz,
+
+                 // cromer-mann parameters
+                 int     n_atom_types,
+                 int   * h_atom_types,
+                 float * h_cromermann,
+
+                 // covariance mtx
+                 float * h_V,
+
+                 // output
+                 float * h_q_out_bragg,
+                 float * h_q_out_diffuse
+                ) {
+
+    #ifdef __CUDACC__
+        _gpudiffuse( device_id_,
+                     n_q, h_qx, h_qy, h_qz,
+                     n_atoms, h_rx, h_ry, h_rz,
+                     n_atom_types, h_atom_types, h_cromermann, h_V
+                     h_q_out_bragg, h_q_out_diffuse);
+    #else
+        #warning ("Warning : gpudiffuse DISABLED")
+        throw std::runtime_error("gpudiffuse called but cpp_scatter.cpp not compiled w/nvcc!");
     #endif
 
 }
