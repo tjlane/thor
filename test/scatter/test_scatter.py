@@ -656,6 +656,8 @@ class TestDiffuseScatterPython(object):
 class TestDiffuseScatterPythonGPU(TestDiffuseScatterPython):
 
     def setup(self):
+        if not GPU:
+            raise SkipTest
         self.device = 0
 
 
