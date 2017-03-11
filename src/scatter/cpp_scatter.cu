@@ -145,7 +145,7 @@ void __global__ gpu_kernel(int   const n_q,
                 
                 q_sum.x += fi*__sinf(qr);
                 q_sum.y += fi*__cosf(qr);
-				
+                
             } // finished one atom (3rd loop)
         } // finished one molecule (2nd loop)
         
@@ -164,24 +164,24 @@ void __global__ gpu_kernel(int   const n_q,
 
 template<unsigned int blockSize>
 void __global__ gpu_diffuse_kernel(int   const n_q,
-		                           float const * const __restrict__ q_x, 
-		                           float const * const __restrict__ q_y, 
-		                           float const * const __restrict__ q_z, 
+                                   float const * const __restrict__ q_x, 
+                                   float const * const __restrict__ q_y, 
+                                   float const * const __restrict__ q_z, 
              
-		                           int   const n_atoms,
-		                           float const * const __restrict__ r_x, 
-		                           float const * const __restrict__ r_y, 
-		                           float const * const __restrict__ r_z,
+                                   int   const n_atoms,
+                                   float const * const __restrict__ r_x, 
+                                   float const * const __restrict__ r_y, 
+                                   float const * const __restrict__ r_z,
              
-		                           int   const n_atom_types,
-		                           int   const * const __restrict__ atom_types,
-		                           float const * const __restrict__ cromermann,
+                                   int   const n_atom_types,
+                                   int   const * const __restrict__ atom_types,
+                                   float const * const __restrict__ cromermann,
              
-		                           float const * const __restrict__ V,
+                                   float const * const __restrict__ V,
              
-		                           float * q_out_bragg,   // <-- not const 
-		                           float * q_out_diffuse  // <-- not const 
-		                          ) {
+                                   float * q_out_bragg,   // <-- not const 
+                                   float * q_out_diffuse  // <-- not const 
+                                  ) {
                               
     /* On-device kernel for scattering simulation
      * 
@@ -198,10 +198,10 @@ void __global__ gpu_diffuse_kernel(int   const n_q,
     float qx, qy, qz;             // extracted q vector
     float mq, qo, fi;             // mag of q, formfactor for atom i
     float dx, dy, dz;             // difference r_i - r_j for {x,y,z}
-	
+    
     float qr;                     // dot product of q and r
-	float W;					  // intermediate result
-	
+    float W;                      // intermediate result
+    
     float qVabq, qVaaq, qVbbq;    // matrix product qT * V_ab * q (atoms a & b)
     
     // ---> main loop (3 nested loops)
@@ -210,11 +210,11 @@ void __global__ gpu_diffuse_kernel(int   const n_q,
        
         // workspace for cm calcs -- static size, but hopefully big enough
         float formfactors[MAX_NUM_TYPES];
-		
-		// -- cache for V_ii's
+        
+        // -- cache for V_ii's
         // NOT using cache for GPU... too much memory for each thread
         // to have it's own cache
-		//float qViiq_cache[n_atoms];
+        //float qViiq_cache[n_atoms];
        
         // determine the rotated locations
         qx = q_x[gid];
@@ -229,7 +229,7 @@ void __global__ gpu_diffuse_kernel(int   const n_q,
         float2 q_sum;
         q_sum.x = 0; // x=bragg
         q_sum.y = 0; // y=diffuse
-		
+        
         // precompute atomic form factors for each atom type
         int tind;
         for (int type = 0; type < n_atom_types; type++) {
@@ -244,13 +244,13 @@ void __global__ gpu_diffuse_kernel(int   const n_q,
             formfactors[type] = fi;
 
         }
-		
-		int id_a, id_b;
-		float fa, fb;
+        
+        int id_a, id_b;
+        float fa, fb;
 
         // for each atom in molecule [again] (2nd nested loop)
         for( int a = 0; a < n_atoms; a++ ) {
-			
+            
             id_a = atom_types[a];
             fa   = formfactors[id_a];
 
@@ -265,22 +265,22 @@ void __global__ gpu_diffuse_kernel(int   const n_q,
 
                 id_b = atom_types[b];
                 fb   = formfactors[id_b];
-				
+                
                 // iqr [structure factor]      
                 dx = r_x[a] - r_x[b];
                 dy = r_y[a] - r_y[b];
                 dz = r_z[a] - r_z[b];
                 qr = dx*qx + dy*qy + dz*qz;
-				
+                
                 // qVq [disorder factor]
-				qVq_product(V, a, b, n_atoms, qx, qy, qz, qVabq);
+                qVq_product(V, a, b, n_atoms, qx, qy, qz, qVabq);
                 qVq_product(V, b, b, n_atoms, qx, qy, qz, qVbbq);
 
                 // accumulate (for atom pair a/b)
-				W = 2 * fa * fb * cosf(qr) * exp(- 0.5 * qVaaq - 0.5 * qVbbq);
+                W = 2 * fa * fb * cosf(qr) * exp(- 0.5 * qVaaq - 0.5 * qVbbq);
                 q_sum.x += W;
                 q_sum.y += W * ( exp( qVabq ) - 1 );
-				
+                
             } // finished one atom (3rd loop)
         } // finished 2nd atom (2nd loop)
         
@@ -630,9 +630,9 @@ void _gpudiffuse(int device_id,
 
     // execute the kernel
     gpu_diffuse_kernel<tpb> <<<bpg, tpb>>> (n_q, d_qx, d_qy, d_qz, 
-                						    n_atoms, d_rx, d_ry, d_rz,
-											n_atom_types, d_id, d_cm, d_V,
-											d_q_out_bragg, d_q_out_diffuse);
+                                            n_atoms, d_rx, d_ry, d_rz,
+                                            n_atom_types, d_id, d_cm, d_V,
+                                            d_q_out_bragg, d_q_out_diffuse);
     cudaThreadSynchronize();
     err = cudaGetLastError();
     if (err != cudaSuccess) {
