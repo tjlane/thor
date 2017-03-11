@@ -23,7 +23,7 @@
 #include "cpp_scatter.cpp"
 
 
-#define GBLTPB 128        // global threads per block
+#define GBLTPB 256        // global threads per block
 #define MAX_NUM_TYPES 10  // maximum number of atom types
 
 using namespace std;
