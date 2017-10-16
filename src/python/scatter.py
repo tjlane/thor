@@ -186,6 +186,8 @@ def simulate_atomic(traj, num_molecules, detector, traj_weights=None,
     for i,num in enumerate(num_per_shapshot):
         
         logger.debug('Running %d molc, snapshot %d' % (num, i))
+        if num == 0: continue
+        
         rxyz = traj.xyz[i,atoms_to_keep,:] * 10.0 # convert nm --> Angstroms
         
         amplitudes += _cppscatter.parallel_cpp_scatter(num, rxyz, qxyz,
