@@ -693,6 +693,11 @@ class TestSimulateAtomic(object):
                                     
         assert_allclose(A, self.cpp_A, rtol=1e-4, err_msg='doesnt match cpp ref')
         assert_allclose(A, self.ref_A, rtol=1e-3, err_msg='doesnt match py ref')
+
+    def test_multimodel(self):
+        """ regression test """
+        t =  mdtraj.load(ref_file('3LYZ_x2.pdb'))
+        A = scatter.simulate_atomic(t, 1, self.q_grid)
         
     def test_dont_rotate_atomic(self):
         A1 = scatter.simulate_atomic(self.traj, self.num_molecules, self.q_grid,
