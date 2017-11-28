@@ -364,10 +364,11 @@ class TestCppScatter(object):
         self.q_grid = np.loadtxt(ref_file('512_q.xyz'))[:self.nq]
         
         self.num_molecules = 512
-        self.iso_U = np.random.rand(self.nr)
+        self.iso_U = np.random.rand(self.nr) / 8.0
         self.aniso_U = np.abs(np.random.randn(self.nr, 3, 3))
         for i in range(self.nr):
             self.aniso_U[i] += self.aniso_U[i].T
+        self.aniso_U /= 30.0
         
         self.ref_A = ref_simulate_shot(self.xyzlist, self.atomic_numbers, 
                                        self.num_molecules, self.q_grid)
