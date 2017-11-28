@@ -167,7 +167,7 @@ def form_factor_reference(qvector, atomz):
 
     
 def ref_simulate_shot(xyzlist, atomic_numbers, num_molecules, q_grid,
-                      dont_rotate=False):
+                      dont_rotate=False, Bfactors=None):
     """
     Simulate a single x-ray scattering shot off an ensemble of identical
     molecules.
@@ -191,6 +191,10 @@ def ref_simulate_shot(xyzlist, atomic_numbers, num_molecules, q_grid,
     rfloats : ndarray, float, n x 3
         A bunch of random floats, uniform on [0,1] to be used to seed the 
         quaternion computation.
+
+    B_factors : ndarray, float, 1d or 2d
+        An n x 1 or n x 3 x 3 array of B-factors for isotropic and anisotropic 
+        cases, respectively.
         
     Returns
     -------
@@ -206,6 +210,12 @@ def ref_simulate_shot(xyzlist, atomic_numbers, num_molecules, q_grid,
     else:
         rs = np.random.RandomState(RANDOM_SEED)
         rfs = rs.rand(3, num_molecules)
+
+    # convert B factors in PDB file to V matrix
+    if Bfactors is not None:
+        V = Bfactors/(8*np.square(np.pi))
+    else:
+        V = np.zeros(xyzlist.shape[0])
     
     for i,qvector in enumerate(q_grid):    
         for n in range(num_molecules):
@@ -218,8 +228,14 @@ def ref_simulate_shot(xyzlist, atomic_numbers, num_molecules, q_grid,
                 q_mag = np.linalg.norm(qvector)
                 fi = scatter.atomic_formfactor(atomic_numbers[j], q_mag)
                 r = rotated_xyzlist[j,:]
-                A[i] +=      fi * np.sin( np.dot(qvector, r) )
-                A[i] += 1j * fi * np.cos( np.dot(qvector, r) )
+
+                if len(V.shape) == 1:
+                    qVq = np.square(q_mag)*V[j]
+                else:
+                    qVq = np.dot(np.dot(qvector, V[j]), qvector)
+
+                A[i] +=      fi * np.sin( np.dot(qvector, r) ) * np.exp(- 0.5 * qVq)
+                A[i] += 1j * fi * np.cos( np.dot(qvector, r) ) * np.exp(- 0.5 * qVq)
 
     return A
 
@@ -347,9 +363,20 @@ class TestCppScatter(object):
         
         self.q_grid = np.loadtxt(ref_file('512_q.xyz'))[:self.nq]
         
-        self.num_molecules = 512        
+        self.num_molecules = 512
+        self.iso_B = 10.0*np.random.rand(self.nr)
+        self.aniso_B = 10.0*np.abs(np.random.randn(self.nr, 3, 3))
+        for i in range(self.nr):
+            self.aniso_B[i] += self.aniso_B[i].T
+        
         self.ref_A = ref_simulate_shot(self.xyzlist, self.atomic_numbers, 
                                        self.num_molecules, self.q_grid)
+        self.ref_A_isoB = ref_simulate_shot(self.xyzlist, self.atomic_numbers,
+                                            self.num_molecules, self.q_grid,
+                                            Bfactors=self.iso_B)
+        self.ref_A_anisoB = ref_simulate_shot(self.xyzlist, self.atomic_numbers,
+                                              self.num_molecules, self.q_grid, 
+                                              Bfactors=self.aniso_B)
                                                                               
     def test_cpu_scatter(self):
         
@@ -371,6 +398,44 @@ class TestCppScatter(object):
         assert not np.all( cpu_A == 0.0 )
         assert not np.sum( cpu_A == np.nan )
 
+    def test_cpu_scatter_isoB(self):
+        
+        cromermann_parameters, atom_types = get_cromermann_parameters(self.atomic_numbers)
+        
+        print 'num_molecules:', self.num_molecules
+        cpu_A_isoB = _cppscatter.cpp_scatter(self.num_molecules,
+                                             self.xyzlist,
+                                             self.q_grid,
+                                             atom_types,
+                                             cromermann_parameters,
+                                             device_id='CPU',
+                                             random_state=np.random.RandomState(RANDOM_SEED),
+                                             Bfactors=self.iso_B)
+
+        assert_allclose(cpu_A_isoB, self.ref_A_isoB, rtol=1e-3, atol=1.0,
+                        err_msg='scatter: c-cpu/cpu reference mismatch with isotropic B factors')
+        assert not np.all( cpu_A_isoB == 0.0 )
+        assert not np.sum( cpu_A_isoB == np.nan )
+
+    def test_cpu_scatter_anisoB(self):
+
+        cromermann_parameters, atom_types = get_cromermann_parameters(self.atomic_numbers)
+        
+        print 'num_molecules:', self.num_molecules
+        cpu_A_anisoB = _cppscatter.cpp_scatter(self.num_molecules,
+                                               self.xyzlist,
+                                               self.q_grid,
+                                               atom_types,
+                                               cromermann_parameters,
+                                               device_id='CPU',
+                                               random_state=np.random.RandomState(RANDOM_SEED),
+                                               Bfactors=self.aniso_B)
+
+        assert_allclose(cpu_A_anisoB, self.ref_A_anisoB, rtol=1e-3, atol=1.0,
+                        err_msg='scatter: c-cpu/cpu reference mismatch with anisotropic B factors')
+        assert not np.all( cpu_A_anisoB == 0.0 )
+        assert not np.sum( cpu_A_anisoB == np.nan )
+
     def test_gpu_scatter(self):
 
         if not GPU: raise SkipTest
@@ -389,8 +454,51 @@ class TestCppScatter(object):
         assert_allclose(gpu_A, self.ref_A, rtol=1e-3, atol=1.0,
                         err_msg='scatter: cuda-gpu/cpu reference mismatch')
         assert not np.all( gpu_A == 0.0 )
-        assert not np.sum( gpu_A == np.nan )
-                        
+        assert not np.sum( gpu_A == np.nan )                        
+
+    def test_gpu_scatter_isoB(self):
+        
+        if not GPU: raise SkipTest
+        
+        cromermann_parameters, atom_types = get_cromermann_parameters(self.atomic_numbers)
+        
+        print 'num_molecules:', self.num_molecules
+        gpu_A_isoB = _cppscatter.cpp_scatter(self.num_molecules,
+                                             self.xyzlist,
+                                             self.q_grid,
+                                             atom_types,
+                                             cromermann_parameters,
+                                             device_id=0,
+                                             random_state=np.random.RandomState(RANDOM_SEED),
+                                             Bfactors=self.iso_B)
+
+        assert_allclose(gpu_A_isoB, self.ref_A_isoB, rtol=1e-3, atol=1.0,
+                        err_msg='scatter: cuda-gpu/cpu reference mismatch with isotropic B factors')
+        assert not np.all( gpu_A_isoB == 0.0 )
+        assert not np.sum( gpu_A_isoB == np.nan )
+
+    def test_gpu_scatter_anisoB(self):
+        
+        if not GPU: raise SkipTest
+        
+        cromermann_parameters, atom_types = get_cromermann_parameters(self.atomic_numbers)
+
+        print 'num_molecules:', self.num_molecules
+        gpu_A_anisoB = _cppscatter.cpp_scatter(self.num_molecules,
+                                               self.xyzlist,
+                                               self.q_grid,
+                                               atom_types,
+                                               cromermann_parameters,
+                                               device_id=0,
+                                               random_state=np.random.RandomState(RANDOM_SEED),
+                                               Bfactors=self.aniso_B)
+
+        assert_allclose(gpu_A_anisoB, self.ref_A_anisoB, rtol=1e-3, atol=1.0,
+                        err_msg='scatter: cuda-gpu/cpu reference mismatch with anisotropic B factors')
+        assert not np.all( gpu_A_anisoB == 0.0 )
+        assert not np.sum( gpu_A_anisoB == np.nan )
+                                             
+
     def test_parallel_interface(self):
         
         cp, at = get_cromermann_parameters(self.atomic_numbers)
