@@ -195,8 +195,8 @@ def ref_simulate_shot(xyzlist, atomic_numbers, num_molecules, q_grid,
     U : ndarray, float, 1d or 2d
         An n x 1 or n x 3 x 3 array of atomic displacement parameters for 
         isotropic and anisotropic cases, respectively. Related to B factors
-        listed in PDBs by factors of 8*pi^2 in the isotropic case, and 10^4
-        in the anisotropic case.
+        listed in PDB files by factors of 8*pi^2 in the isotropic case, and 
+        10^4 in the anisotropic case.
         
     Returns
     -------
@@ -213,7 +213,6 @@ def ref_simulate_shot(xyzlist, atomic_numbers, num_molecules, q_grid,
         rs = np.random.RandomState(RANDOM_SEED)
         rfs = rs.rand(3, num_molecules)
 
-    # convert B factors in PDB file to V matrix
     if U is None:
         U = np.zeros(xyzlist.shape[0])
     
@@ -229,6 +228,7 @@ def ref_simulate_shot(xyzlist, atomic_numbers, num_molecules, q_grid,
                 fi = scatter.atomic_formfactor(atomic_numbers[j], q_mag)
                 r = rotated_xyzlist[j,:]
 
+                # compute the Debye-Waller factor
                 if len(U.shape) == 1:
                     qUq = np.square(q_mag)*U[j]
                 else:
