@@ -64,6 +64,7 @@ void __global__ gpu_kernel(int   const n_q,
                            int   const n_atom_types,
                            int   const * const __restrict__ atom_types,
                            float const * const __restrict__ cromermann,
+			   float const * const __restrict__ U,
              
                            int   const n_rotations,
                            float const * const __restrict__ q0,
@@ -91,7 +92,7 @@ void __global__ gpu_kernel(int   const n_q,
     float ax, ay, az;             // rotated r vector
     float mq, qo, fi;             // mag of q, formfactor for atom i
     float qr;                     // dot product of q and r
-    
+    float qUq;                    // matrix product of qT * U_ii * q
     
     while(gid < n_q) {
        
@@ -143,8 +144,10 @@ void __global__ gpu_kernel(int   const n_q,
         
                 qr = ax*qx + ay*qy + az*qz;
                 
-                q_sum.x += fi*__sinf(qr);
-                q_sum.y += fi*__cosf(qr);
+		qUq_product(U, a, qx, qy, qz, qUq);
+
+                q_sum.x += fi*__sinf(qr) * exp(- 0.5 * qUq);
+                q_sum.y += fi*__cosf(qr) * exp(- 0.5 * qUq);
                 
             } // finished one atom (3rd loop)
         } // finished one molecule (2nd loop)
@@ -324,6 +327,9 @@ void _gpuscatter(int device_id,
                  int   * h_atom_types,
                  float * h_cromermann,
 
+		 // atomic displacement parameters
+		 float * h_U,
+
                  // random numbers for rotations
                  int     n_rotations,
                  float * rand1,
@@ -371,7 +377,7 @@ void _gpuscatter(int device_id,
     const unsigned int id_size          = n_atoms * sizeof(int);
     const unsigned int cm_size          = 9 * n_atom_types * sizeof(float);
     const unsigned int quat_size        = n_rotations * sizeof(float);
-
+    const unsigned int U_size           = n_atoms * 9 * sizeof(float);
 
     err = cudaGetLastError();
     if (err != cudaSuccess) {
@@ -390,7 +396,8 @@ void _gpuscatter(int device_id,
     
     int   *d_id;         deviceMalloc( (void **) &d_id, id_size);
     float *d_cm;         deviceMalloc( (void **) &d_cm, cm_size);
-    
+    float *d_U;          deviceMalloc( (void **) &d_U, U_size);
+
     float *d_q0;         deviceMalloc( (void **) &d_q0, quat_size);
     float *d_q1;         deviceMalloc( (void **) &d_q1, quat_size);
     float *d_q2;         deviceMalloc( (void **) &d_q2, quat_size);
@@ -428,7 +435,8 @@ void _gpuscatter(int device_id,
     
     cudaMemcpy(d_id, &h_atom_types[0], id_size, cudaMemcpyHostToDevice);
     cudaMemcpy(d_cm, &h_cromermann[0], cm_size, cudaMemcpyHostToDevice);
-    
+    cudaMemcpy(d_U, &h_U[0], U_size, cudaMemcpyHostToDevice);    
+
     cudaMemcpy(d_q0, &h_q0[0], quat_size, cudaMemcpyHostToDevice);
     cudaMemcpy(d_q1, &h_q1[0], quat_size, cudaMemcpyHostToDevice);
     cudaMemcpy(d_q2, &h_q2[0], quat_size, cudaMemcpyHostToDevice);
@@ -444,7 +452,7 @@ void _gpuscatter(int device_id,
     // execute the kernel
     gpu_kernel<tpb> <<<bpg, tpb>>> (n_q, d_qx, d_qy, d_qz, 
                                     n_atoms, d_rx, d_ry, d_rz,
-                                    n_atom_types, d_id, d_cm,
+                                    n_atom_types, d_id, d_cm, d_U,
                                     n_rotations, d_q0, d_q1, d_q2, d_q3,
                                     d_q_out_real, d_q_out_imag);
     cudaThreadSynchronize();
@@ -479,6 +487,7 @@ void _gpuscatter(int device_id,
     
     cudaFree(d_id);
     cudaFree(d_cm);
+    cudaFree(d_U);
     
     cudaFree(d_q0);
     cudaFree(d_q1);

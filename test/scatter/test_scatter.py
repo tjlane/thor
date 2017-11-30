@@ -402,6 +402,7 @@ class TestCppScatter(object):
     def test_cpu_scatter_isoU(self):
         
         cromermann_parameters, atom_types = get_cromermann_parameters(self.atomic_numbers)
+        self.iso_U = self.iso_U[:,None,None] * np.eye(3)[None,None,:]
         
         print 'num_molecules:', self.num_molecules
         cpu_A_isoU = _cppscatter.cpp_scatter(self.num_molecules,

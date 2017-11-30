@@ -20,6 +20,8 @@ void gpuscatter(int   device_id,
                 int   * atom_types,
                 float * cromermann,
 
+		float * U,
+
                 int   n_rotations,
                 float * randN1, 
                 float * randN2, 
@@ -43,6 +45,8 @@ void cpuscatter(
                 int   n_atom_types,
                 int   * atom_types,
                 float * cromermann,
+
+		float * U,
 
                 int   n_rotations,
                 float * randN1, 
@@ -116,6 +120,9 @@ void _gpuscatter(int device_id,
                  int     n_atom_types,
                  int   * h_atom_types,
                  float * h_cromermann,
+
+		 // atomic displacement parameters
+		 float * h_U,
 
                  // random numbers for rotations
                  int     n_rotations,

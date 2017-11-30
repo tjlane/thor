@@ -69,7 +69,7 @@ class _NonRandomState(np.random.RandomState):
 def simulate_atomic(traj, num_molecules, detector, traj_weights=None,
                     finite_photon=False, ignore_hydrogens=False, 
                     dont_rotate=False, procs_per_node=1, 
-                    nodes=[], devices=[], random_state=None):
+                    nodes=[], devices=[], random_state=None, U=None):
     """
     Simulate a scattering 'shot', i.e. one exposure of x-rays to a sample.
     
@@ -117,6 +117,10 @@ def simulate_atomic(traj, num_molecules, detector, traj_weights=None,
     dont_rotate : bool
         Don't apply a random rotation to the molecule before computing the
         scattering. Good for debugging and the like.
+
+    U : ndarray, float
+        Atomic displacement parameters, either a 1d n_atoms array [isotropic case]
+        or 3d (n_atoms, 3, 3,) tensor.
         
     Returns
     -------
@@ -180,6 +184,21 @@ def simulate_atomic(traj, num_molecules, detector, traj_weights=None,
         atoms_to_keep = np.ones(n_atoms, dtype=np.bool)
         
     
+    # if a 1d U matrix is passed, expand to 3d; if no U matrix is input,
+    # set all elements to zero
+    n_atoms = len(atoms_to_keep)
+    if U is None:
+        U = np.zeros((n_atoms, 3, 3))
+    elif U.shape == (n_atoms,):
+        e = np.eye(3)
+        U = U[:,None,None] * e[None,None,:]
+    elif U.shape == (n_atoms, 3, 3):
+        # correctly sized for lower level interface
+        pass
+    else:
+        raise TypeError("U matrix has invalide shape.")
+
+
     qxyz = _qxyz_from_detector(detector)
     amplitudes = np.zeros(qxyz.shape[0], dtype=np.complex128)
     
@@ -196,7 +215,8 @@ def simulate_atomic(traj, num_molecules, detector, traj_weights=None,
                                                        procs_per_node=procs_per_node,
                                                        nodes=nodes,
                                                        devices=devices,
-                                                       random_state=random_state)
+                                                       random_state=random_state,
+                                                       U=U)
                                                        
     if finite_photon is not False:
         intensities = np.square(np.abs(amplitudes))
@@ -254,7 +274,8 @@ def simulate_density(grid, grid_spacing, num_molecules, detector,
                                                   procs_per_node=procs_per_node,
                                                   nodes=nodes,
                                                   devices=devices,
-                                                  random_state=random_state)
+                                                  random_state=random_state,
+                                                  U=None)
     
     # put the output back in sq grid form if requested
     if reshape_output:
