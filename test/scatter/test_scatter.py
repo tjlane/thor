@@ -402,7 +402,7 @@ class TestCppScatter(object):
     def test_cpu_scatter_isoU(self):
         
         cromermann_parameters, atom_types = get_cromermann_parameters(self.atomic_numbers)
-        self.iso_U = self.iso_U[:,None,None] * np.eye(3)[None,None,:]
+        iso_U = self.iso_U[:,None,None] * np.eye(3)[None,None,:]
         
         print 'num_molecules:', self.num_molecules
         cpu_A_isoU = _cppscatter.cpp_scatter(self.num_molecules,
@@ -412,7 +412,7 @@ class TestCppScatter(object):
                                              cromermann_parameters,
                                              device_id='CPU',
                                              random_state=np.random.RandomState(RANDOM_SEED),
-                                             U=self.iso_U)
+                                             U=iso_U)
 
         assert_allclose(cpu_A_isoU, self.ref_A_isoU, rtol=1e-3, atol=1.0,
                         err_msg='scatter: c-cpu/cpu reference mismatch with isotropic B factors')
@@ -463,6 +463,7 @@ class TestCppScatter(object):
         if not GPU: raise SkipTest
         
         cromermann_parameters, atom_types = get_cromermann_parameters(self.atomic_numbers)
+        iso_U = self.iso_U[:,None,None] * np.eye(3)[None,None,:]
         
         print 'num_molecules:', self.num_molecules
         gpu_A_isoU = _cppscatter.cpp_scatter(self.num_molecules,
@@ -472,7 +473,7 @@ class TestCppScatter(object):
                                              cromermann_parameters,
                                              device_id=0,
                                              random_state=np.random.RandomState(RANDOM_SEED),
-                                             U=self.iso_U)
+                                             U=iso_U)
 
         assert_allclose(gpu_A_isoU, self.ref_A_isoU, rtol=1e-3, atol=1.0,
                         err_msg='scatter: cuda-gpu/cpu reference mismatch with isotropic B factors')
