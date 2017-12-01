@@ -536,6 +536,99 @@ class TestCppScatter(object):
         #                 err_msg='error in 2 thread cpu')
         
 
+class TestCppScatterPython(object):
+
+    def setup(self):
+        self.device = 'CPU'
+
+    def test_python_interface_noU(self):
+
+        nq = 100 # number of detector vectors to do
+        q_grid = np.loadtxt(ref_file('512_q.xyz'))[:nq]
+
+        traj = mdtraj.load(ref_file('ala2.pdb'))
+        atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
+        rxyz = traj.xyz[0] * 10.0
+
+        ref_A = ref_simulate_shot(rxyz,
+                                  atomic_numbers,
+                                  1,
+                                  q_grid,
+                                  dont_rotate=True)
+
+        cpu_A = scatter.simulate_atomic(traj,
+                                        1,
+                                        q_grid,
+                                        ignore_hydrogens=False,
+                                        dont_rotate=True)
+
+        assert_allclose(cpu_A, ref_A, rtol=1e-3, atol=1.0,
+                        err_msg='scatter: c-cpu/cpu reference mismatch')
+        assert not np.all( cpu_A == 0.0 )
+        assert not np.sum( cpu_A == np.nan )
+
+    def test_python_interface_isoU(self):
+        
+        nq = 100 # number of detector vectors to do 
+        q_grid = np.loadtxt(ref_file('512_q.xyz'))[:nq]
+
+        traj = mdtraj.load(ref_file('ala2.pdb'))
+        atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
+        rxyz = traj.xyz[0] * 10.0
+
+        iso_U = np.random.rand(rxyz.shape[0]) / 10.0
+
+        ref_A = ref_simulate_shot(rxyz,
+                                  atomic_numbers,
+                                  1,
+                                  q_grid,
+                                  dont_rotate=True,
+                                  U=iso_U)
+
+        cpu_A = scatter.simulate_atomic(traj,
+                                        1,
+                                        q_grid,
+                                        ignore_hydrogens=False,
+                                        dont_rotate=True,
+                                        U=iso_U)
+
+        assert_allclose(cpu_A, ref_A, rtol=1e-3, atol=1.0,
+                        err_msg='scatter: c-cpu/cpu reference mismatch')
+        assert not np.all( cpu_A == 0.0 )
+        assert not np.sum( cpu_A == np.nan )
+
+    def test_python_interface_anisoU(self):
+
+        nq = 100 # number of detector vectors to do   
+        q_grid = np.loadtxt(ref_file('512_q.xyz'))[:nq]
+
+        traj = mdtraj.load(ref_file('ala2.pdb'))
+        atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
+        rxyz = traj.xyz[0] * 10.0
+
+        aniso_U = np.random.rand(rxyz.shape[0], 3, 3)
+        for i in range(rxyz.shape[0]):
+            aniso_U[i] += aniso_U[i].T
+        aniso_U /= 20.0
+
+        ref_A = ref_simulate_shot(rxyz,
+                                  atomic_numbers,
+                                  1,
+                                  q_grid,
+                                  dont_rotate=True,
+                                  U=aniso_U)
+
+        cpu_A = scatter.simulate_atomic(traj,
+                                        1,
+                                        q_grid,
+                                        ignore_hydrogens=False,
+                                        dont_rotate=True,
+                                        U=aniso_U)
+
+        assert_allclose(cpu_A, ref_A, rtol=1e-3, atol=1.0,
+                        err_msg='scatter: c-cpu/cpu reference mismatch')
+        assert not np.all( cpu_A == 0.0 )
+        assert not np.sum( cpu_A == np.nan )
 
 class TestDiffuseScatter(object):
 
