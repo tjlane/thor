@@ -564,7 +564,7 @@ class TestCppScatterPython(object):
                                         dont_rotate=True)
 
         assert_allclose(cpu_A, ref_A, rtol=1e-3, atol=1.0,
-                        err_msg='scatter: c-cpu/cpu reference mismatch')
+                        err_msg='scatter: python/cpu reference mismatch')
         assert not np.all( cpu_A == 0.0 )
         assert not np.sum( cpu_A == np.nan )
 
@@ -594,7 +594,7 @@ class TestCppScatterPython(object):
                                         U=iso_U)
 
         assert_allclose(cpu_A, ref_A, rtol=1e-3, atol=1.0,
-                        err_msg='scatter: c-cpu/cpu reference mismatch')
+                        err_msg='scatter: python/cpu reference mismatch')
         assert not np.all( cpu_A == 0.0 )
         assert not np.sum( cpu_A == np.nan )
 
@@ -627,7 +627,7 @@ class TestCppScatterPython(object):
                                         U=aniso_U)
 
         assert_allclose(cpu_A, ref_A, rtol=1e-3, atol=1.0,
-                        err_msg='scatter: c-cpu/cpu reference mismatch')
+                        err_msg='scatter: python/cpu reference mismatch')
         assert not np.all( cpu_A == 0.0 )
         assert not np.sum( cpu_A == np.nan )
 
