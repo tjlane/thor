@@ -324,10 +324,10 @@ void cpu_kernel( int   const n_q,
     float mq, qo, fi;             // mag of q, formfactor for atom i
     float q_sum_real, q_sum_imag; // partial sum of real and imaginary amplitude
     float qr;                     // dot product of q and r
-    float qUq;                    // Debye Waller factor, qT * U_ii * q
     
-    // we will use a small array to store form factors
+    // we will use a small array to store form factors and Debye-Waller factors
     float * formfactors = (float *) malloc(n_atom_types * sizeof(float));
+    float * qUq = (float *) malloc(n_atoms * sizeof(float));
     
     // pre-compute rotation quaternions    
     float * q0 = (float *) malloc(n_rotations * sizeof(float));
@@ -372,6 +372,11 @@ void cpu_kernel( int   const n_q,
 
         }
 
+	// precompute Debye-Waller factors for each atom
+	for( int a = 0; a < n_atoms; a++ ) {
+	  qUq_product(U, a, qx, qy, qz, qUq[a]);
+	}
+
         // for each molecule (2nd nested loop)
         for( int im = 0; im < n_rotations; im++ ) {
             
@@ -388,11 +393,10 @@ void cpu_kernel( int   const n_q,
                        ax, ay, az);
                 
                 qr = ax*qx + ay*qy + az*qz;
-		qUq_product(U, a, qx, qy, qz, qUq);
 
                 // FIXME :: swap cos and sin???? e^i*t = cos(t) + i sin(t)
-                q_sum_real += fi * sinf(qr) * exp(- 0.5 * qUq);
-                q_sum_imag += fi * cosf(qr) * exp(- 0.5 * qUq);
+                q_sum_real += fi * sinf(qr) * exp(- 0.5 * qUq[a]);
+                q_sum_imag += fi * cosf(qr) * exp(- 0.5 * qUq[a]);
                 
             } // finished one atom (3rd loop)
         } // finished one molecule (2nd loop)
@@ -408,6 +412,7 @@ void cpu_kernel( int   const n_q,
     free(q1);
     free(q2);
     free(q3);
+    free(qUq);
     
 }
 
@@ -580,77 +585,13 @@ void cpudiffuse( int   n_q,
 }
 
 // This is a meaningless test, for speed only...
-// #ifndef __CUDACC__
-// int main() {
-//
-//     int nQ_ = 1000;
-//     int nAtoms_ = 1000;
-//     int n_atom_types_ = 10;
-//     int nRot_ = 1000;
-//
-//     float * h_qx_ = new float[nQ_];
-//     float * h_qy_ = new float[nQ_];
-//     float * h_qz_ = new float[nQ_];
-//
-//     float * h_rx_ = new float[nAtoms_];
-//     float * h_ry_ = new float[nAtoms_];
-//     float * h_rz_ = new float[nAtoms_];
-//
-//     int   * atom_types_ = new int[nAtoms_];
-//     float * cromermann_ = new float[n_atom_types_ * 9];
-//
-//     float * h_rand1_ = new float[nRot_];
-//     float * h_rand2_ = new float[nRot_];
-//     float * h_rand3_ = new float[nRot_];
-//
-//     float * h_outQ_R = new float[nQ_];
-//     float * h_outQ_I = new float[nQ_];
-//
-//     cpuscatter    ( // q vectors
-//                     nQ_,
-//                     h_qx_,
-//                     h_qy_,
-//                     h_qz_,
-//
-//                     // atomic positions, ids
-//                     nAtoms_,
-//                     h_rx_,
-//                     h_ry_,
-//                     h_rz_,
-//
-//                     // formfactor info
-//                     n_atom_types_,
-//                     atom_types_,
-//                     cromermann_,
-//
-//                     // random numbers for rotations
-//                     nRot_,
-//                     h_rand1_,
-//                     h_rand2_,
-//                     h_rand3_,
-//
-//                     // output
-//                     h_outQ_R,
-//                     h_outQ_I );
-//
-//     printf("CPP OUTPUT:\n");
-//     printf("%f\n", h_outQ_R[0]);
-//     printf("%f\n", h_outQ_I[0]);
-//
-//     return 0;
-// }
-// #endif
-
 #ifndef __CUDACC__
 int main() {
 
-    int nQ_ = 100;
-    int nAtoms_ = 1500;
-    
-    std::cout << nQ_ << " q-vectors :: " << nAtoms_ << " atoms\n";
-    std::cout << "remember: linear in q-vectors, quadratic in atoms\n";
-
+    int nQ_ = 1000;
+    int nAtoms_ = 1000;
     int n_atom_types_ = 10;
+    int nRot_ = 1000;
 
     float * h_qx_ = new float[nQ_];
     float * h_qy_ = new float[nQ_];
@@ -662,13 +603,16 @@ int main() {
 
     int   * atom_types_ = new int[nAtoms_];
     float * cromermann_ = new float[n_atom_types_ * 9];
+    float * U = new float[nAtoms_ * 3 * 3];
 
-    float * V = new float[nAtoms_ * nAtoms_ * 3 * 3];
+    float * h_rand1_ = new float[nRot_];
+    float * h_rand2_ = new float[nRot_];
+    float * h_rand3_ = new float[nRot_];
 
     float * h_outQ_R = new float[nQ_];
     float * h_outQ_I = new float[nQ_];
 
-    cpudiffuse   ( // q vectors
+    cpuscatter    ( // q vectors
                     nQ_,
                     h_qx_,
                     h_qy_,
@@ -685,8 +629,14 @@ int main() {
                     atom_types_,
                     cromermann_,
 
-                    // correlation matrix
-                    V,
+		    // ADP info
+		    U,
+
+                    // random numbers for rotations
+                    nRot_,
+                    h_rand1_,
+                    h_rand2_,
+                    h_rand3_,
 
                     // output
                     h_outQ_R,
@@ -699,3 +649,62 @@ int main() {
     return 0;
 }
 #endif
+
+// #ifndef __CUDACC__
+// int main() {
+// 
+//     int nQ_ = 100;
+//     int nAtoms_ = 1500;
+//     
+//     std::cout << nQ_ << " q-vectors :: " << nAtoms_ << " atoms\n";
+//     std::cout << "remember: linear in q-vectors, quadratic in atoms\n";
+// 
+//     int n_atom_types_ = 10;
+// 
+//     float * h_qx_ = new float[nQ_];
+//     float * h_qy_ = new float[nQ_];
+//     float * h_qz_ = new float[nQ_];
+// 
+//     float * h_rx_ = new float[nAtoms_];
+//     float * h_ry_ = new float[nAtoms_];
+//     float * h_rz_ = new float[nAtoms_];
+// 
+//     int   * atom_types_ = new int[nAtoms_];
+//     float * cromermann_ = new float[n_atom_types_ * 9];
+// 
+//     float * V = new float[nAtoms_ * nAtoms_ * 3 * 3];
+// 
+//     float * h_outQ_R = new float[nQ_];
+//     float * h_outQ_I = new float[nQ_];
+// 
+//     cpudiffuse   ( // q vectors
+//                     nQ_,
+//                     h_qx_,
+//                     h_qy_,
+//                     h_qz_,
+// 
+//                     // atomic positions, ids
+//                     nAtoms_,
+//                     h_rx_,
+//                     h_ry_,
+//                     h_rz_,
+// 
+//                     // formfactor info
+//                     n_atom_types_,
+//                     atom_types_,
+//                     cromermann_,
+// 
+//                     // correlation matrix
+//                     V,
+// 
+//                     // output
+//                     h_outQ_R,
+//                     h_outQ_I );
+// 
+//     printf("CPP OUTPUT:\n");
+//     printf("%f\n", h_outQ_R[0]);
+//     printf("%f\n", h_outQ_I[0]);
+// 
+//     return 0;
+// }
+// #endif
