@@ -54,6 +54,8 @@ cdef extern from "cpp_scatter.hh":
                     int   * atom_types,
                     float * cromermann,
 
+		    float * U,
+
                     int   n_rotations,
                     float * randN1, 
                     float * randN2, 
@@ -75,6 +77,8 @@ cdef extern from "cpp_scatter.hh":
                     int   n_atom_types,
                     int   * atom_types,
                     float * cromermann,
+
+		    float * U,
 
                     int   n_rotations,
                     float * randN1, 
@@ -172,6 +176,7 @@ def parallel_cpp_scatter(n_molecules,
                          nodes=[],
                          devices=[],
                          random_state=None,
+			 U=None,
                          ignore_gpu_check=False):
     """
     Multi-threaded interface to `cpp_scatter`. Specify the devices the
@@ -245,7 +250,7 @@ def parallel_cpp_scatter(n_molecules,
             continue
         print('CPU Thread %d :: %d shots' % (cpu_thread, num))
         cpu_args = (num, rxyz, qxyz, atom_types, cromermann_parameters, 
-                    'CPU', random_state)
+                    'CPU', random_state, U)
         t_cpu = Thread(target=t_fxn, args=cpu_args)
         t_cpu.start()
         threads.append(t_cpu)                
@@ -256,7 +261,7 @@ def parallel_cpp_scatter(n_molecules,
             continue
         print('GPU Device %d :: %d shots' % (gpu_device, num))
         gpu_args = (num, rxyz, qxyz, atom_types, cromermann_parameters, 
-                    gpu_device, random_state)
+                    gpu_device, random_state, U)
         t_gpu = Thread(target=t_fxn, args=gpu_args)
         t_gpu.start()
         threads.append(t_gpu)
@@ -274,7 +279,8 @@ def cpp_scatter(n_molecules,
                 np.ndarray atom_types,
                 np.ndarray cromermann_parameters,
                 device_id='CPU',
-                random_state=None):
+                random_state=None,
+		U=None):
     """
     A python interface to the C++ and CUDA scattering code. The idea here is to
     mirror that interface closely, but in a pythonic fashion.
@@ -307,7 +313,11 @@ def cpp_scatter(n_molecules,
         
     random_state : np.random.RandomState
         Seed the random state. For testing only.
-    
+
+    U : ndarray, float
+        An n x 3 x 3 array of the mean-square atomic displacement parameters of 
+	each atom.    
+
     Returns
     -------
     amplitudes : ndarray, complex128
@@ -339,7 +349,7 @@ def cpp_scatter(n_molecules,
     cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_qxyz
     cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_rxyz
     cdef np.ndarray[ndim=1, dtype=np.float32_t] c_cromermann
-    
+
     c_qxyz = np.ascontiguousarray(qxyz.T, dtype=np.float32)
     c_rxyz = np.ascontiguousarray(rxyz.T, dtype=np.float32)
     c_cromermann = np.ascontiguousarray(cromermann_parameters, dtype=np.float32)
@@ -358,6 +368,13 @@ def cpp_scatter(n_molecules,
     cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_rfloats
     c_rfloats = np.ascontiguousarray( random_state.rand(3, n_molecules), 
                                       dtype=np.float32 )
+				     
+    # generate U matrix of zeros if no ADPs input
+    num_atoms = rxyz.shape[0]
+    if U is None:
+        U = np.zeros((num_atoms, 3, 3))
+    cdef np.ndarray[ndim=1, dtype=np.float32_t, mode="c"] c_U
+    c_U = np.ascontiguousarray(U.flatten(), dtype=np.float32)
 
     # initialize output arrays
     cdef np.ndarray[ndim=1, dtype=np.float32_t] real_amplitudes
@@ -371,7 +388,7 @@ def cpp_scatter(n_molecules,
     if device_id == 'CPU':
         cpuscatter(qxyz.shape[0], &c_qxyz[0,0], &c_qxyz[1,0], &c_qxyz[2,0],
                    rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
-                   num_atom_types, &c_atom_types[0], &c_cromermann[0],
+                   num_atom_types, &c_atom_types[0], &c_cromermann[0], &c_U[0],
                    n_molecules, &c_rfloats[0,0], &c_rfloats[1,0], &c_rfloats[2,0],
                    &real_amplitudes[0], &imag_amplitudes[0])
     
@@ -383,7 +400,7 @@ def cpp_scatter(n_molecules,
         gpuscatter(device_id,
                    qxyz.shape[0], &c_qxyz[0,0], &c_qxyz[1,0], &c_qxyz[2,0],
                    rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
-                   num_atom_types, &c_atom_types[0], &c_cromermann[0],
+                   num_atom_types, &c_atom_types[0], &c_cromermann[0], &c_U[0],
                    n_molecules, &c_rfloats[0,0], &c_rfloats[1,0], &c_rfloats[2,0],
                    &real_amplitudes[0], &imag_amplitudes[0])
         
