@@ -550,18 +550,18 @@ class TestCppScatterPython(object):
         traj = mdtraj.load(ref_file('ala2.pdb'))
         atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
         rxyz = traj.xyz[0] * 10.0
+        rs = np.random.RandomState(RANDOM_SEED)
 
         ref_A = ref_simulate_shot(rxyz,
                                   atomic_numbers,
                                   1,
-                                  q_grid,
-                                  dont_rotate=True)
+                                  q_grid)
 
         cpu_A = scatter.simulate_atomic(traj,
                                         1,
                                         q_grid,
                                         ignore_hydrogens=False,
-                                        dont_rotate=True)
+                                        random_state=rs,)
 
         assert_allclose(cpu_A, ref_A, rtol=1e-3, atol=1.0,
                         err_msg='scatter: python/cpu reference mismatch')
@@ -578,19 +578,19 @@ class TestCppScatterPython(object):
         rxyz = traj.xyz[0] * 10.0
 
         iso_U = np.random.rand(rxyz.shape[0]) / 10.0
+        rs = np.random.RandomState(RANDOM_SEED)
 
         ref_A = ref_simulate_shot(rxyz,
                                   atomic_numbers,
                                   1,
                                   q_grid,
-                                  dont_rotate=True,
                                   U=iso_U)
 
         cpu_A = scatter.simulate_atomic(traj,
                                         1,
                                         q_grid,
                                         ignore_hydrogens=False,
-                                        dont_rotate=True,
+                                        random_state=rs,
                                         U=iso_U)
 
         assert_allclose(cpu_A, ref_A, rtol=1e-3, atol=1.0,
@@ -606,6 +606,7 @@ class TestCppScatterPython(object):
         traj = mdtraj.load(ref_file('ala2.pdb'))
         atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
         rxyz = traj.xyz[0] * 10.0
+        rs = np.random.RandomState(RANDOM_SEED)
 
         aniso_U = np.random.rand(rxyz.shape[0], 3, 3)
         for i in range(rxyz.shape[0]):
@@ -616,14 +617,13 @@ class TestCppScatterPython(object):
                                   atomic_numbers,
                                   1,
                                   q_grid,
-                                  dont_rotate=True,
                                   U=aniso_U)
 
         cpu_A = scatter.simulate_atomic(traj,
                                         1,
                                         q_grid,
                                         ignore_hydrogens=False,
-                                        dont_rotate=True,
+                                        random_state=rs,
                                         U=aniso_U)
 
         assert_allclose(cpu_A, ref_A, rtol=1e-3, atol=1.0,
