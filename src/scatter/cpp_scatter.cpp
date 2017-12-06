@@ -324,10 +324,10 @@ void cpu_kernel( int   const n_q,
     float mq, qo, fi;             // mag of q, formfactor for atom i
     float q_sum_real, q_sum_imag; // partial sum of real and imaginary amplitude
     float qr;                     // dot product of q and r
-    float qUq;                    // Debye Waller factor, qT * U_ii * q
     
-    // we will use a small array to store form factors
+    // we will use a small array to store form factors and Debye-Waller factors
     float * formfactors = (float *) malloc(n_atom_types * sizeof(float));
+    float * qUq = (float *) malloc(n_atoms * sizeof(float));
     
     // pre-compute rotation quaternions    
     float * q0 = (float *) malloc(n_rotations * sizeof(float));
@@ -372,6 +372,11 @@ void cpu_kernel( int   const n_q,
 
         }
 
+	// precompute Debye-Waller factors for each atom
+	for( int a = 0; a < n_atoms; a++ ) {
+	  qUq_product(U, a, qx, qy, qz, qUq[a]);
+	}
+
         // for each molecule (2nd nested loop)
         for( int im = 0; im < n_rotations; im++ ) {
             
@@ -388,11 +393,10 @@ void cpu_kernel( int   const n_q,
                        ax, ay, az);
                 
                 qr = ax*qx + ay*qy + az*qz;
-		qUq_product(U, a, qx, qy, qz, qUq);
 
                 // FIXME :: swap cos and sin???? e^i*t = cos(t) + i sin(t)
-                q_sum_real += fi * sinf(qr) * exp(- 0.5 * qUq);
-                q_sum_imag += fi * cosf(qr) * exp(- 0.5 * qUq);
+                q_sum_real += fi * sinf(qr) * exp(- 0.5 * qUq[a]);
+                q_sum_imag += fi * cosf(qr) * exp(- 0.5 * qUq[a]);
                 
             } // finished one atom (3rd loop)
         } // finished one molecule (2nd loop)
@@ -408,6 +412,7 @@ void cpu_kernel( int   const n_q,
     free(q1);
     free(q2);
     free(q3);
+    free(qUq);
     
 }
 
@@ -598,8 +603,8 @@ int main() {
 
     int   * atom_types_ = new int[nAtoms_];
     float * cromermann_ = new float[n_atom_types_ * 9];
-	
-	float * U_ = new float[nAtoms_ * 3];
+    float * U_ = new float[nAtoms_ * 3 * 3];
+
 
     float * h_rand1_ = new float[nRot_];
     float * h_rand2_ = new float[nRot_];
@@ -625,9 +630,9 @@ int main() {
                     atom_types_,
                     cromermann_,
 					
-					// ADPs
-					U_,
-
+					          // ADP info
+                    U_,
+      
                     // random numbers for rotations
                     nRot_,
                     h_rand1_,
@@ -646,6 +651,7 @@ int main() {
 }
 #endif
 
+// Testing speed of diffuse calculation
 // #ifndef __CUDACC__
 // int main() {
 //
@@ -684,11 +690,12 @@ int main() {
 //                     h_rx_,
 //                     h_ry_,
 //                     h_rz_,
-//
+// 
 //                     // formfactor info
 //                     n_atom_types_,
 //                     atom_types_,
 //                     cromermann_,
+//
 //
 //                     // correlation matrix
 //                     V,
