@@ -284,7 +284,7 @@ void cpu_kernel( int   const n_q,
                  int   const * const __restrict__ atom_types,
                  float const * const __restrict__ cromermann,
                  
-		 float const * const __restrict__ U,
+                 float const * const __restrict__ U,
 
                  int   const n_rotations,
                  float const * const __restrict__ randN1, 
@@ -430,7 +430,7 @@ void cpuscatter(  int  n_q,
                   int   * atom_types,
                   float * cromermann,
 
-		  float * U,
+		          float * U,
 
                   int   n_rotations,
                   float * randN1, 
@@ -603,7 +603,8 @@ int main() {
 
     int   * atom_types_ = new int[nAtoms_];
     float * cromermann_ = new float[n_atom_types_ * 9];
-    float * U = new float[nAtoms_ * 3 * 3];
+    float * U_ = new float[nAtoms_ * 3 * 3];
+
 
     float * h_rand1_ = new float[nRot_];
     float * h_rand2_ = new float[nRot_];
@@ -628,10 +629,10 @@ int main() {
                     n_atom_types_,
                     atom_types_,
                     cromermann_,
-
-		    // ADP info
-		    U,
-
+					
+					          // ADP info
+                    U_,
+      
                     // random numbers for rotations
                     nRot_,
                     h_rand1_,
@@ -650,39 +651,40 @@ int main() {
 }
 #endif
 
+// Testing speed of diffuse calculation
 // #ifndef __CUDACC__
 // int main() {
-// 
+//
 //     int nQ_ = 100;
 //     int nAtoms_ = 1500;
-//     
+//
 //     std::cout << nQ_ << " q-vectors :: " << nAtoms_ << " atoms\n";
 //     std::cout << "remember: linear in q-vectors, quadratic in atoms\n";
-// 
+//
 //     int n_atom_types_ = 10;
-// 
+//
 //     float * h_qx_ = new float[nQ_];
 //     float * h_qy_ = new float[nQ_];
 //     float * h_qz_ = new float[nQ_];
-// 
+//
 //     float * h_rx_ = new float[nAtoms_];
 //     float * h_ry_ = new float[nAtoms_];
 //     float * h_rz_ = new float[nAtoms_];
-// 
+//
 //     int   * atom_types_ = new int[nAtoms_];
 //     float * cromermann_ = new float[n_atom_types_ * 9];
-// 
+//
 //     float * V = new float[nAtoms_ * nAtoms_ * 3 * 3];
-// 
+//
 //     float * h_outQ_R = new float[nQ_];
 //     float * h_outQ_I = new float[nQ_];
-// 
+//
 //     cpudiffuse   ( // q vectors
 //                     nQ_,
 //                     h_qx_,
 //                     h_qy_,
 //                     h_qz_,
-// 
+//
 //                     // atomic positions, ids
 //                     nAtoms_,
 //                     h_rx_,
@@ -693,18 +695,19 @@ int main() {
 //                     n_atom_types_,
 //                     atom_types_,
 //                     cromermann_,
-// 
+//
+//
 //                     // correlation matrix
 //                     V,
-// 
+//
 //                     // output
 //                     h_outQ_R,
 //                     h_outQ_I );
-// 
+//
 //     printf("CPP OUTPUT:\n");
 //     printf("%f\n", h_outQ_R[0]);
 //     printf("%f\n", h_outQ_I[0]);
-// 
+//
 //     return 0;
 // }
 // #endif
