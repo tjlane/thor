@@ -19,7 +19,7 @@ def skip(rason):
         @functools.wraps(test)
         def inner(*args, **kwargs):
             raise SkipTest
-            print "After f(*args)"
+            print("After f(*args)")
         return inner
     return wrap
     
@@ -40,7 +40,7 @@ def gputest(rason):
     def wrap(test):
         @functools.wraps(test)
         def inner(*args, **kwargs):
-            if 'GPU' not in globals().keys():
+            if 'GPU' not in list(globals().keys()):
                 try:
                     import gpuscatter
                     GPU = True
@@ -48,7 +48,7 @@ def gputest(rason):
                     GPU = False
             if not GPU: 
                 raise SkipTest
-            print "After f(*args)"
+            print("After f(*args)")
         return inner
     return wrap
     
@@ -86,9 +86,9 @@ def assert_dict_equal(t1, t2, decimal=6):
     """
 
     # make sure the keys are the same
-    eq_(t1.keys(), t2.keys())
+    eq_(list(t1.keys()), list(t2.keys()))
 
-    for key, val in t1.iteritems():        
+    for key, val in t1.items():        
         # compare numpy arrays using numpy.testing
         if isinstance(val, np.ndarray):
             if val.dtype.kind ==  'f':
@@ -167,7 +167,7 @@ def brute_force_masked_correlation(x, mask, normed=True):
 
     if normed:
         if ref_corr[0] == 0.0:
-            print 'ref_corr:', ref_corr
+            print('ref_corr:', ref_corr)
             raise RuntimeError('zero in first element of reference correlator')
         ref_corr /= ref_corr[0]
             

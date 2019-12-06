@@ -6,7 +6,7 @@ Functions that are useful in various places, but have no common theme.
 import functools
 import sys
 
-from cStringIO import StringIO
+from io import StringIO
 from pprint import pprint
 from argparse import ArgumentParser
 
@@ -43,7 +43,7 @@ class Parser(ArgumentParser):
     Simple extension of argparse, designed to automatically print stuff
     """
     def parse_args(self):
-        print graphic
+        print(graphic)
         args = super(Parser, self).parse_args()
         pprint(args.__dict__)
         return args
@@ -69,8 +69,8 @@ def all_pairs(n):
     """
     Generator that yields all unique pairs formed by the integers {0, ..., n-1}
     """
-    for i in xrange(n):
-        for j in xrange(i+1,n):
+    for i in range(n):
+        for j in range(i+1,n):
             yield (i,j)
     
     
@@ -161,7 +161,7 @@ def random_pairs(total_elements, num_pairs): #, extra=10):
     while len(inter_pairs) < num_pairs:
         rand_pairs   = np.random.randint( 0, total_elements, (num_pairs*factor,2) )
         unique_pairs = list( set( tuple(pair) for pair in rand_pairs ) )
-        inter_pairs  = filter( lambda x:x[0] != x[1], unique_pairs)
+        inter_pairs  = [x for x in unique_pairs if x[0] != x[1]]
         factor += 1
         
     return np.array(inter_pairs[0:num_pairs])
@@ -201,7 +201,7 @@ def hashable(a):
     """
     # stolen unashamedly from pymc3
     if isinstance(a, dict):
-        return hashable(a.iteritems())
+        return hashable(iter(a.items()))
     try:
         return tuple(map(hashable,a))
     except:

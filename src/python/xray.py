@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 import os
 import abc
-import cPickle
+import pickle
 import tables
 import multiprocessing
 
@@ -858,7 +858,7 @@ class Detector(Beam):
 
     def _to_serial(self):
         """ serialize the object to an array """
-        s = np.array( cPickle.dumps(self) )
+        s = np.array( pickle.dumps(self) )
         s.shape=(1,) # a bit nasty...
         return s
 
@@ -868,7 +868,7 @@ class Detector(Beam):
         """ recover a Detector object from a serialized array """
         if serialized.shape == (1,):
             serialized = serialized[0]
-        d = cPickle.loads( str(serialized) )
+        d = pickle.loads( str(serialized) )
         return d
 
 
@@ -3572,7 +3572,7 @@ class Rings(object):
                                    'increase the estimator stability, and try'
                                    ' again.')
         elif intra.shape[1] == 1:
-            print "here"
+            print("here")
             W = ( np.var(intra) * n_x + np.var(inter) * n_y ) / (n_x + n_y - 2.0)
             Winv = 1.0 / W
             logger.info('%f %f', mu_d, Winv)
@@ -3916,13 +3916,11 @@ class Rings(object):
         return
         
         
-class IntensitiesCollection(object):
+class IntensitiesCollection(object, metaclass=abc.ABCMeta):
     """
     An abstract base class specifying the necessary components of a custom
     container for intensity data.
     """
-    
-    __metaclass__ = abc.ABCMeta
     
     @abc.abstractproperty
     def num_shots(self):

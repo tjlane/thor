@@ -139,7 +139,7 @@ def write_better_cromer_mann_table():
     f = open('new-cromer-mann.txt', 'w')
     f.writelines(newlines)
     f.close()
-    print "Wrote: new-cromer-mann.txt"
+    print("Wrote: new-cromer-mann.txt")
     
     return
         
@@ -152,7 +152,7 @@ def print_cromer_mann_dict():
     
     cromer_mann_params = retrieve_cromer_mann()
     
-    print 'cromer_mann_params = {'
+    print('cromer_mann_params = {')
     
     for key in sorted(cromer_mann_params.keys()):
         values = cromer_mann_params[key]
@@ -163,9 +163,9 @@ def print_cromer_mann_dict():
             key = str(key)
         values = str(values)
         
-        print '                      %s : %s,' % (key, values)
+        print('                      %s : %s,' % (key, values))
     
-    print '                      }'
+    print('                      }')
     
     return
     

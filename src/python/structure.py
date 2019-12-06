@@ -334,7 +334,7 @@ def multiply_conformations(traj, num_replicas, density, traj_weights=None):
 
     # find the maximal radius of each snapshot in traj
     max_radius = np.zeros(traj.n_frames)
-    for i in xrange(traj.n_frames):
+    for i in range(traj.n_frames):
         max_radius[i] = np.max( np.sqrt( np.sum(np.power(traj.xyz[i,:,:]  , 2), axis=1) ) )
         
     if boxsize < np.max(max_radius)*2:
@@ -345,7 +345,7 @@ def multiply_conformations(traj, num_replicas, density, traj_weights=None):
     # place in space
     ind = []
     
-    for x in xrange( len(num_per_shapshot) ):
+    for x in range( len(num_per_shapshot) ):
         ind.extend( [x] * num_per_shapshot[x] )
     
     xyz = traj.xyz[ind,:,:]
@@ -355,10 +355,10 @@ def multiply_conformations(traj, num_replicas, density, traj_weights=None):
     # randomly orient the first molecule
     xyz[0,:,:]         = rand_rotate_molecule2(xyz[0,:,:])
     centers_of_mass[0] = np.random.uniform(low=0, high=boxsize, size=3)
-    for x in xrange(3):
+    for x in range(3):
         xyz[0,:,x] += centers_of_mass[0,x]
 
-    for i in xrange(1, xyz.shape[0] ):
+    for i in range(1, xyz.shape[0] ):
         molecule_overlapping = True # initial cond.
         
         attempt = 0
@@ -370,7 +370,7 @@ def multiply_conformations(traj, num_replicas, density, traj_weights=None):
             centers_of_mass[i,:] = np.random.uniform(low=0, high=boxsize, size=3)
             
             # check to see if we're overlapping another molecule already placed
-            for j in xrange(i):
+            for j in range(i):
                 molec_dist = np.linalg.norm(centers_of_mass[i,:] - centers_of_mass[j,:])
                 min_allowable_dist = max_radius[ind[i]] + max_radius[ind[j]]
                 
@@ -385,7 +385,7 @@ def multiply_conformations(traj, num_replicas, density, traj_weights=None):
                 raise RuntimeError('Number of attempts > 10000, density is too high.')
             
         xyz[i,:,:] = rand_rotate_molecule2(xyz[i,:,:])
-        for x in xrange(3):
+        for x in range(3):
             xyz[i,:,x] += centers_of_mass[i,x]
         
         logger.debug('Placed molecule, took %d attempts' % attempt)

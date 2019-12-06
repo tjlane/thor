@@ -196,7 +196,7 @@ def find_overlap(area_points, test_points):
     ordered = list(unordered.pop(0))
     
     while len(unordered) > 0:
-        next = (i for i, seg in enumerate(unordered) if ordered[-1] in seg).next()
+        next = next((i for i, seg in enumerate(unordered) if ordered[-1] in seg))
         ordered += [point for point in unordered.pop(next) if point != ordered[-1]]
     
     ordered_pts = area_points[ordered]

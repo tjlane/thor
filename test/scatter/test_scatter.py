@@ -238,11 +238,11 @@ def debye_reference(trajectory, weights=None, q_values=None):
 
     # iterate over each value of q and compute the Debye scattering equation
     for q_ind,q in enumerate(q_values):
-        print q_ind, len(q_values)
+        print(q_ind, len(q_values))
 
         # pre-compute the atomic form factors at this q
         qo = np.power( q / (4. * np.pi), 2)
-        for ai in xrange(num_atom_types):                
+        for ai in range(num_atom_types):                
             for i in range(4):
                 atomic_formfactors[ai]  = cromermann[ai*9+8]
                 atomic_formfactors[ai] += cromermann[ai*9+i] * np.exp( cromermann[ai*9+i+5] * qo)
@@ -291,11 +291,11 @@ class TestCppScatter(object):
                                                                               
     def test_cpu_scatter(self):
         
-        print "testing c cpu code..."
+        print("testing c cpu code...")
 
         cromermann_parameters, atom_types = get_cromermann_parameters(self.atomic_numbers)
 
-        print 'num_molecules:', self.num_molecules
+        print('num_molecules:', self.num_molecules)
         cpu_A = _cppscatter.cpp_scatter(self.num_molecules, 
                                         self.xyzlist, 
                                         self.q_grid, 
@@ -315,7 +315,7 @@ class TestCppScatter(object):
             
         cromermann_parameters, atom_types = get_cromermann_parameters(self.atomic_numbers)
         
-        print 'num_molecules:', self.num_molecules
+        print('num_molecules:', self.num_molecules)
         gpu_A = _cppscatter.cpp_scatter(self.num_molecules, 
                                         self.xyzlist, 
                                         self.q_grid, 
@@ -417,7 +417,7 @@ class TestSimulateAtomic(object):
         A = A.astype(np.float)
         ref_I = np.square( np.abs( self.cpp_A ) )
         
-        print np.sum( (A / A[0] - ref_I / ref_I[0]) > 0.05 )
+        print(np.sum( (A / A[0] - ref_I / ref_I[0]) > 0.05 ))
         
         assert_allclose(A / A[0], ref_I / ref_I[0], rtol=5e-2, 
                         err_msg='Finite photon statistics screwy in large photon limit')
@@ -435,7 +435,7 @@ class TestSimulateAtomic(object):
         # compute the differece -- we're not setting random numbers here so just
         # looking at radially averaged stuff...
         diff = np.sum(np.abs(I_noH - I_wH) / I_wH) / float(len(I_wH))
-        print diff
+        print(diff)
         assert diff < 1.0, 'ignoring hydrogens makes too big of a difference...'
         
         

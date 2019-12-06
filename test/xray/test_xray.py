@@ -219,7 +219,7 @@ class TestDetector(object):
 
         # compute the intersection from code
         pix, intersect = d._compute_intersections(q_vectors, 0) # 0 --> grid_index
-        print pix, intersect
+        print(pix, intersect)
 
         assert_array_almost_equal(intersect_ref, intersect)
         assert_array_almost_equal(pix_ref, pix)
@@ -284,7 +284,7 @@ class TestShotset(object):
         n = 0
         for i in self.shot.intensities_iter:
             n += 1
-        print "n/num_shots", n, self.num_shots
+        print("n/num_shots", n, self.num_shots)
         assert n == self.num_shots
             
     def test_len(self):
@@ -400,7 +400,7 @@ class TestShotset(object):
         # count the number of points that differ significantly between the two
         diff = ( np.abs((perf.polar_intensities[0,0,:] - real.polar_intensities[0,0,:]) \
                  / (real.polar_intensities[0,0,:] + 1e-300) ) > 1e-2)
-        print np.sum(diff)
+        print(np.sum(diff))
         assert np.sum(diff) < 300
 
     def test_i_profile(self):
@@ -475,7 +475,7 @@ class TestShotset(object):
         # for some reason assert_allclose not working, but this is
         x = np.sum( np.abs(rings_ip[5:,1] - shot_ip[5:,1]) )
         x /= float(len(rings_ip[5:,1]))
-        print x
+        print(x)
         assert x < 0.2 # intensity mismatch
         assert_allclose(rings_ip[:,0], shot_ip[:,0], err_msg='test impl error')
         
@@ -497,7 +497,7 @@ class TestShotset(object):
         ref_pm = np.ones((len(q_values), r.num_phi), dtype=np.bool)
         ref_pm[:q_cutoff_index+1,:] = np.bool(False)
         
-        print "num px masked", ref_pm.sum(), r.polar_mask.sum()
+        print("num px masked", ref_pm.sum(), r.polar_mask.sum())
         assert ref_pm.sum() == r.polar_mask.sum() # same num px masked
         assert_array_equal(ref_pm, r.polar_mask)
 
@@ -538,7 +538,7 @@ class TestShotset(object):
         if os.path.exists('test.shot'): os.remove('test.shot')
         self.shot.save('test.shot')
         s = xray.Shotset.load('test.shot', to_load=[0])
-        print s.num_shots
+        print(s.num_shots)
         assert s.num_shots == 1
         if os.path.exists('test.shot'): os.remove('test.shot')
         
@@ -596,7 +596,7 @@ class TestRings(object):
         n = 0
         for x in self.rings.polar_intensities_iter:
             n += 1
-        print "n / num_shots", n, self.num_shots
+        print("n / num_shots", n, self.num_shots)
         assert n == self.num_shots
         
     def test_polar_intensities_consistency(self):
@@ -663,7 +663,7 @@ class TestRings(object):
         ref_i = self.rings.polar_intensities.copy()
         phis = self.rings.phi_values
         
-        for i in xrange( len ( qs ) ):
+        for i in range( len ( qs ) ):
             q = qs[i]
             theta = np.arcsin( q*wave / 4./ np.pi)
             SinTheta = np.sin( 2 * theta )
@@ -823,14 +823,14 @@ class TestRings(object):
         ref = np.zeros(self.rings.num_phi)
         n = 0.0
         for i,j in utils.all_pairs(self.rings.num_shots):
-            print 'pair:', i,j
+            print('pair:', i,j)
             x = self.rings.polar_intensities[i,q_ind,:].flatten()
             y = self.rings.polar_intensities[j,q_ind,:].flatten()
             ref += self.rings._correlate_rows(x, y)
             n += 1.0
         ref /= float(n)
         
-        print 'tols:', rtol, atol
+        print('tols:', rtol, atol)
         assert_allclose(ref / ref[0], inter / inter[0], rtol=rtol, atol=atol, 
                         err_msg='doesnt match reference implementation')
         assert_allclose(ref, inter, rtol=rtol, atol=atol, 
@@ -939,14 +939,14 @@ class TestRings(object):
         fake_intra = np.random.randn(1000, 360)
         fake_inter = np.random.randn(1000, 360)
         p = self.rings.correlation_significance(1.0, 1.0, intra=fake_intra, inter=fake_inter, trim=0)
-        print 'accept p:', p
+        print('accept p:', p)
         assert p > 0.01 # null hypothesis should be accepted
         
         # reject null hypothesis
         fake_intra = np.random.randn(1000, 360)
         fake_inter = np.random.randn(1000, 360) + 0.10
         p = self.rings.correlation_significance(1.0, 1.0, intra=fake_intra, inter=fake_inter, trim=0)
-        print 'reject p:', p
+        print('reject p:', p)
         assert p < 0.01 # null hypothesis should be rejected
         
         # ensure univariate version gives same result as scipy

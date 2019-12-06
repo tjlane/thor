@@ -59,7 +59,7 @@ class InteractiveImshow(object):
         
         if event.key == 's':
             if not self.filename:
-                self.filename = raw_input('Saving. Enter filename: ')
+                self.filename = input('Saving. Enter filename: ')
             plt.savefig(self.filename)
             logger.info("Saved image: %s" % self.filename)
             

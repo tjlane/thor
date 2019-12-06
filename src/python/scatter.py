@@ -429,7 +429,7 @@ def sph_harm_coefficients(trajectory, q_values, weights=None,
     num_q_mags = len(q_values)
     
     # don't do odd values of ell
-    l_vals = range(0, 2*num_coefficients, 2)
+    l_vals = list(range(0, 2*num_coefficients, 2))
     
     # initialize spherical harmonic coefficient array
     # note that it's 4* num_coeff - 3 b/c we're skipping odd l's -- (2l+1)

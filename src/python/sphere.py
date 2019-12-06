@@ -213,10 +213,10 @@ def radial_sph_harm(n, l, m, u, theta, phi, Rtype='legendre', **kwargs):
         
     elif Rtype == 'legendre':
         
-        if not 'delta' in kwargs.keys():
+        if not 'delta' in list(kwargs.keys()):
             raise TypeError('with Rtype=legendre, you must provide a `delta` '
                             'kwarg parameter.')
-        if not 'radius' in kwargs.keys():
+        if not 'radius' in list(kwargs.keys()):
             raise TypeError('with Rtype=legendre, you must provide a `radius` '
                             'kwarg parameter.')
         

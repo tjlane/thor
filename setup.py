@@ -1,4 +1,4 @@
-u"""
+"""
 setup.py: Install THOR
 """
 
@@ -12,7 +12,7 @@ from glob import glob
 from distutils.extension import Extension
 from distutils.core import setup
 
-from Cython.Distutils import build_ext
+from Cython.Build import build_ext
 import numpy
 
 
@@ -60,7 +60,7 @@ class bcolors:
     
     
 def print_warning(string):
-    print bcolors.WARNING + string + bcolors.ENDC
+    print(bcolors.WARNING + string + bcolors.ENDC)
     
 
 def find_in_path(name, path):
@@ -134,10 +134,10 @@ def locate_cuda():
     # first check if the CUDA_HOME or CUDA_ROOT env variable is in use
     if 'CUDA_HOME' in os.environ:
         home = os.environ['CUDA_HOME'].split(':')
-        viable_nvcc_bins.extend( map( lambda x : pjoin(x, 'bin', 'nvcc'), home) )
+        viable_nvcc_bins.extend( [pjoin(x, 'bin', 'nvcc') for x in home] )
     elif 'CUDA_ROOT' in os.environ:
         home = os.environ['CUDA_ROOT'].split(':')
-        viable_nvcc_bins.extend( map( lambda x : pjoin(x, 'bin', 'nvcc'), home) )
+        viable_nvcc_bins.extend( [pjoin(x, 'bin', 'nvcc') for x in home] )
     else:
         nvcc_in_path = find_in_path('nvcc', os.environ['PATH'])
         if nvcc_in_path is not None:
@@ -145,7 +145,7 @@ def locate_cuda():
 
     cudaconfig_found = False
     for nvcc in viable_nvcc_bins:
-        print nvcc
+        print(nvcc)
         home = os.path.dirname(os.path.dirname(nvcc))
 
         cudaconfig = {
@@ -156,7 +156,7 @@ def locate_cuda():
                       }
         
         found_items = 0
-        for k, v in cudaconfig.iteritems():
+        for k, v in cudaconfig.items():
             if not os.path.exists(v):
                 print_warning('The CUDA %s path could not be located in %s' % (k, v))
             elif os.path.exists(v):
@@ -165,7 +165,7 @@ def locate_cuda():
         if found_items == len(cudaconfig):
             cudaconfig['enabled'] = True
             cudaconfig_found      = True
-            print "Found CUDA config:", cudaconfig
+            print("Found CUDA config:", cudaconfig)
             break
 
     if (cudaconfig_found is False) or DISABLE_CUDA:
@@ -208,11 +208,11 @@ def customize_compiler_for_nvcc(compiler):
         """
 
         if type(postargs) == dict:
-            if ('nvcc' in postargs.keys()) and CUDA['enabled']:
+            if ('nvcc' in list(postargs.keys())) and CUDA['enabled']:
                 compiler.set_executable('compiler_so', CUDA['nvcc'])
                 postargs_list = postargs['nvcc']
             else:
-                postargs_list = postargs[postargs.keys()[0]]
+                postargs_list = postargs[list(postargs.keys())[0]]
         else:
             postargs_list = postargs
             
@@ -300,10 +300,10 @@ corr = Extension('thor.corr',
 
 
 metadata['packages']     = ['thor']
-metadata['package_dir']  = {'thor' :         'src/python'}
+metadata['package_dir']  = {'thor' : 'src/python'}
 metadata['ext_modules']  = [cppscatter, misc, corr]
 metadata['scripts']      = [s for s in glob('scripts/*') if not s.endswith('__.py')]
-metadata['data_files']   = [('reference', glob('./reference/*'))]
+metadata['package_data'] = {'thor' : glob('./reference/*')}
 metadata['cmdclass']     = {'build_ext': custom_build_ext}
 
 # ------------------------------------------------------------------------------
@@ -314,35 +314,35 @@ metadata['cmdclass']     = {'build_ext': custom_build_ext}
 def print_warnings():
         
     if not CUDA['enabled']:
-        print 
-        print '*'*65
-        print '* WARNING : CUDA/GPU SUPPORT'
-        print '* --------------------------'
-        print '* Could not install one or more CUDA/GPU features. Look for'
-        print '* warnings in the setup.py output (above) for more details. THOR'
-        print '* will function without any GPU-acceleration. EVERYTHING WILL STILL'
-        print '* WORK -- just certain things will be a bit slower. Note that for  '
-        print '* successful installation of GPU support, you must have an nVidia'
-        print '* Fermi-class GPU (or better) and the CUDA toolkit installed. See'
-        print '* the nVidia website for more details.'
-        print '*'*65
+        print() 
+        print('*'*65)
+        print('* WARNING : CUDA/GPU SUPPORT')
+        print('* --------------------------')
+        print('* Could not install one or more CUDA/GPU features. Look for')
+        print('* warnings in the setup.py output (above) for more details. THOR')
+        print('* will function without any GPU-acceleration. EVERYTHING WILL STILL')
+        print('* WORK -- just certain things will be a bit slower. Note that for  ')
+        print('* successful installation of GPU support, you must have an nVidia')
+        print('* Fermi-class GPU (or better) and the CUDA toolkit installed. See')
+        print('* the nVidia website for more details.')
+        print('*'*65)
         
     try:
         import pyfftw
     except:
-        print 
-        print '*'*65
-        print '* WARNING : PYFFTW SUPPORT'
-        print '* --------------------------'
-        print '* Could not load the pyfftw package, EVERYTHING WILL STILL'
-        print '* WORK -- just certain things will be a bit slower. Install FFTW'
-        print '* and pyfftw if you wish to accelerate any calculation involving '
-        print '* FFTs, most notably correlation computations.'
-        print '* (https://pypi.python.org/pypi/pyFFTW)'
-        print '* (http://www.fftw.org/)'
-        print '*'*65
+        print() 
+        print('*'*65)
+        print('* WARNING : PYFFTW SUPPORT')
+        print('* --------------------------')
+        print('* Could not load the pyfftw package, EVERYTHING WILL STILL')
+        print('* WORK -- just certain things will be a bit slower. Install FFTW')
+        print('* and pyfftw if you wish to accelerate any calculation involving ')
+        print('* FFTs, most notably correlation computations.')
+        print('* (https://pypi.python.org/pypi/pyFFTW)')
+        print('* (http://www.fftw.org/)')
+        print('*'*65)
      
-    print "\n"
+    print("\n")
 
 if __name__ == '__main__':
     setup(**metadata) # ** will unpack dictionary 'metadata' providing the values as arguments

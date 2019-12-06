@@ -57,7 +57,7 @@ def get_cromermann_parameters(atomic_numbers, max_num_atom_types=None):
         try:
             cromermann[ind:ind+9] = np.array(cromer_mann_params[(a,0)], dtype=np.float32)
         except KeyError as e:
-            print 'Element number %d not in Cromer-Mann form factor parameter database' % a
+            print('Element number %d not in Cromer-Mann form factor parameter database' % a)
             raise RuntimeError('Could not get critical parameters for computation')
         aid[ atomic_numbers == a ] = np.int32(i)
 

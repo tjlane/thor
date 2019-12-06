@@ -6,7 +6,7 @@ import os
 import sys
 
 # dump a few things into the THOR namespace
-from xray import *
+from .xray import *
 
 # list all the files included in THOR
 __all__ = [os.path.basename(f)[:-3] for f in glob.glob(os.path.dirname(__file__) + "/*.py") if not f.endswith('__init__.py')]

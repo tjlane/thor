@@ -50,11 +50,10 @@ except ImportError as e:
 # ----- ABCs
 
 
-class SingleShotBase(object):
+class SingleShotBase(object, metaclass=abc.ABCMeta):
     """
     A base class for files containing only single shots.
     """
-    __metaclass__ = abc.ABCMeta
     
     @abc.abstractproperty
     def num_pixels(self):
@@ -128,11 +127,10 @@ class SingleShotBase(object):
     
     
     
-class MultiShotBase(object):
+class MultiShotBase(object, metaclass=abc.ABCMeta):
     """
     A base class for files containing multiple shots.
     """
-    __metaclass__ = abc.ABCMeta
 
     @abc.abstractproperty
     def num_pixels(self):
@@ -466,7 +464,7 @@ class CBF(SingleShotBase):
             The CBF file as an ODIN shotset.
         """
         
-        import xray # contained here to prevent circular imports
+        from . import xray # contained here to prevent circular imports
         
         p = np.array(list(self.corner) + [self.path_length])
         f = np.array([self.pixel_size[0], 0.0, 0.0]) # fast is x
