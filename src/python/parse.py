@@ -892,7 +892,7 @@ def find_center(image2d, mask=None, initial_guess=None, pix_res=0.1, window=15,
     x_size = image2d.shape[0]
     y_size = image2d.shape[1]
 
-    if mask != None:
+    if mask is not None:
         if not mask.shape == image2d.shape:
             raise ValueError('Mask and image must have same shape! Got %s, %s'
                              ' respectively.' % ( str(mask.shape), str(image2d.shape) ))

@@ -54,6 +54,8 @@ cdef extern from "cpp_scatter.hh":
                     int   * atom_types,
                     float * cromermann,
 
+		    float * U,
+
                     int   n_rotations,
                     float * randN1, 
                     float * randN2, 
@@ -76,6 +78,8 @@ cdef extern from "cpp_scatter.hh":
                     int   * atom_types,
                     float * cromermann,
 
+		    float * U,
+
                     int   n_rotations,
                     float * randN1, 
                     float * randN2, 
@@ -83,8 +87,46 @@ cdef extern from "cpp_scatter.hh":
 
                     float * q_out_real,
                     float * q_out_imag ) except +
-                    
 
+    void cpudiffuse(int   n_q,
+                    float * q_x, 
+                    float * q_y, 
+                    float * q_z, 
+
+                    int   n_atoms,
+                    float * r_x, 
+                    float * r_y, 
+                    float * r_z,
+
+                    int   n_atom_types,
+                    int   * atom_types,
+                    float * cromermann,
+
+                    float * V,
+
+                    float * q_out_bragg,
+                    float * q_out_diffuse ) except +                    
+
+    void gpudiffuse(int device_id,
+
+                    int   n_q,
+                    float * q_x,
+                    float * q_y,
+                    float * q_z,
+
+                    int   n_atoms,
+                    float * r_x,
+                    float * r_y,
+                    float * r_z,
+
+                    int   n_atom_types,
+                    int   * atom_types,
+                    float * cromermann,
+
+                    float * V,
+
+                    float * q_out_bragg,
+                    float * q_out_diffuse ) except +
 
 
 
@@ -134,6 +176,7 @@ def parallel_cpp_scatter(n_molecules,
                          nodes=[],
                          devices=[],
                          random_state=None,
+			 U=None,
                          ignore_gpu_check=False):
     """
     Multi-threaded interface to `cpp_scatter`. Specify the devices the
@@ -207,7 +250,7 @@ def parallel_cpp_scatter(n_molecules,
             continue
         print('CPU Thread %d :: %d shots' % (cpu_thread, num))
         cpu_args = (num, rxyz, qxyz, atom_types, cromermann_parameters, 
-                    'CPU', random_state)
+                    'CPU', random_state, U)
         t_cpu = Thread(target=t_fxn, args=cpu_args)
         t_cpu.start()
         threads.append(t_cpu)                
@@ -218,7 +261,7 @@ def parallel_cpp_scatter(n_molecules,
             continue
         print('GPU Device %d :: %d shots' % (gpu_device, num))
         gpu_args = (num, rxyz, qxyz, atom_types, cromermann_parameters, 
-                    gpu_device, random_state)
+                    gpu_device, random_state, U)
         t_gpu = Thread(target=t_fxn, args=gpu_args)
         t_gpu.start()
         threads.append(t_gpu)
@@ -236,7 +279,8 @@ def cpp_scatter(n_molecules,
                 np.ndarray atom_types,
                 np.ndarray cromermann_parameters,
                 device_id='CPU',
-                random_state=None):
+                random_state=None,
+		U=None):
     """
     A python interface to the C++ and CUDA scattering code. The idea here is to
     mirror that interface closely, but in a pythonic fashion.
@@ -269,7 +313,11 @@ def cpp_scatter(n_molecules,
         
     random_state : np.random.RandomState
         Seed the random state. For testing only.
-    
+
+    U : ndarray, float
+        An n x 3 x 3 array of the mean-square atomic displacement parameters of 
+	each atom.    
+
     Returns
     -------
     amplitudes : ndarray, complex128
@@ -301,7 +349,7 @@ def cpp_scatter(n_molecules,
     cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_qxyz
     cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_rxyz
     cdef np.ndarray[ndim=1, dtype=np.float32_t] c_cromermann
-    
+
     c_qxyz = np.ascontiguousarray(qxyz.T, dtype=np.float32)
     c_rxyz = np.ascontiguousarray(rxyz.T, dtype=np.float32)
     c_cromermann = np.ascontiguousarray(cromermann_parameters, dtype=np.float32)
@@ -320,6 +368,13 @@ def cpp_scatter(n_molecules,
     cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_rfloats
     c_rfloats = np.ascontiguousarray( random_state.rand(3, n_molecules), 
                                       dtype=np.float32 )
+				     
+    # generate U matrix of zeros if no ADPs input
+    num_atoms = rxyz.shape[0]
+    if U is None:
+        U = np.zeros((num_atoms, 3, 3))
+    cdef np.ndarray[ndim=1, dtype=np.float32_t, mode="c"] c_U
+    c_U = np.ascontiguousarray(U.flatten(), dtype=np.float32)
 
     # initialize output arrays
     cdef np.ndarray[ndim=1, dtype=np.float32_t] real_amplitudes
@@ -333,7 +388,7 @@ def cpp_scatter(n_molecules,
     if device_id == 'CPU':
         cpuscatter(qxyz.shape[0], &c_qxyz[0,0], &c_qxyz[1,0], &c_qxyz[2,0],
                    rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
-                   num_atom_types, &c_atom_types[0], &c_cromermann[0],
+                   num_atom_types, &c_atom_types[0], &c_cromermann[0], &c_U[0],
                    n_molecules, &c_rfloats[0,0], &c_rfloats[1,0], &c_rfloats[2,0],
                    &real_amplitudes[0], &imag_amplitudes[0])
     
@@ -345,7 +400,7 @@ def cpp_scatter(n_molecules,
         gpuscatter(device_id,
                    qxyz.shape[0], &c_qxyz[0,0], &c_qxyz[1,0], &c_qxyz[2,0],
                    rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
-                   num_atom_types, &c_atom_types[0], &c_cromermann[0],
+                   num_atom_types, &c_atom_types[0], &c_cromermann[0], &c_U[0],
                    n_molecules, &c_rfloats[0,0], &c_rfloats[1,0], &c_rfloats[2,0],
                    &real_amplitudes[0], &imag_amplitudes[0])
         
@@ -361,8 +416,114 @@ def cpp_scatter(n_molecules,
     amplitudes = real_amplitudes + 1j * imag_amplitudes
     
     return amplitudes
-    
 
+    
+def cpp_scatter_diffuse(np.ndarray rxyz,
+                        np.ndarray qxyz,
+                        np.ndarray atom_types,
+                        np.ndarray cromermann_parameters,
+                        np.ndarray V,
+                        device_id='CPU'):
+        """
+        A python interface to the C++ code implementing the MVN diffuse scatter
+        model.
+    
+        Parameters
+        ----------
+        qxyz : ndarray, float
+            An n x 3 array of the (x,y,z) positions of each q-vector describing
+            the detector.
+    
+        rxyz : ndarray, float
+            An m x 3 array of the (x,y,z) positions of each atom in the molecule.
+    
+        atom_types : ndarray, int
+            A length-m one dim array of the ID of each atom telling the code which
+            Cromer-Mann parameter to use. See below.
+        
+        cromermann_parameters : ndarray, float
+            A one-d array of length 9 * the number of unique `atom_types`,
+            specifying the 9 Cromer-Mann parameters for each atom type.
+            
+        V : ndarray, float
+            A 4-d array of shape (n_atoms, n_atoms, 3, 3) representing the
+            anisotropic Gaussian correlation between atoms. The value
+            V[i,j,a,b] is the correlation between atom i in the a direction with
+            j in the b direction, where a & b are one of {x/y/z}.
+    
+        Returns
+        -------
+        intensities : ndarray, float64
+            A flat array of the simulated intensities, each position corresponding
+            to a scattering vector from `qxyz`.
+        """
+    
+        # check input sanity
+        num_atom_types = len(np.unique(atom_types))
+        if not len(cromermann_parameters) == num_atom_types * 9:
+            raise ValueError('input array `cromermann_parameters` should be len '
+                             '9 * num of unique `atom_types`')
+                             
+        num_atoms = rxyz.shape[0]
+        if not (V.shape[0] == num_atoms) and (V.shape[1] == num_atoms):
+            raise ValueError('shape of V incorrect, first 2 dims should be '
+                             'number of atoms -- got shape:')
+        if not (V.shape[2] == 3) and (V.shape[3] == 3):
+            raise ValueError('shape of V incorrect, last 2 dims should be '
+                             'size 3 -- got shape:')
+    
+    
+        # A NOTE ABOUT ARRAY ORDERING
+        # In what follows, for multi-dimensional arrays I often take the transpose
+        # somewhat mysteriously. This is because the way C++ will loop over arrays
+        # in c-order, but Thor's arrays in python land are in "fortran" order
+    
+        # extract arrays from input  
+        cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_qxyz
+        cdef np.ndarray[ndim=2, dtype=np.float32_t, mode="c"] c_rxyz
+        cdef np.ndarray[ndim=1, dtype=np.float32_t] c_cromermann
+        cdef np.ndarray[ndim=1, dtype=np.float32_t, mode="c"] c_V
+    
+        c_qxyz = np.ascontiguousarray(qxyz.T, dtype=np.float32)
+        c_rxyz = np.ascontiguousarray(rxyz.T, dtype=np.float32)
+        c_cromermann = np.ascontiguousarray(cromermann_parameters, dtype=np.float32)
+        c_V = np.ascontiguousarray(V.flatten(), dtype=np.float32)
+    
+        # for some reason "memoryview" syntax necessary for int arrays...
+        cdef int[::1] c_atom_types = np.ascontiguousarray(atom_types, dtype=np.int32)
+
+        # initialize output arrays
+        cdef np.ndarray[ndim=1, dtype=np.float32_t] bragg_intensities
+        cdef np.ndarray[ndim=1, dtype=np.float32_t] diffuse_intensities
+        bragg_intensities = np.zeros(qxyz.shape[0], dtype=np.float32)
+        diffuse_intensities = np.zeros(qxyz.shape[0], dtype=np.float32)
+    
+    
+        # --- call the actual C++ code
+        if device_id == 'GPU':
+            device_id = 0 # default GPU
+
+        if device_id == 'CPU':
+            cpudiffuse(qxyz.shape[0], &c_qxyz[0,0], &c_qxyz[1,0], &c_qxyz[2,0],
+                       rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0], 
+                       num_atom_types, &c_atom_types[0], &c_cromermann[0], &c_V[0],
+                       &bragg_intensities[0], &diffuse_intensities[0])
+        elif type(device_id) is int:
+            gpudiffuse(device_id,
+                       qxyz.shape[0], &c_qxyz[0,0], &c_qxyz[1,0], &c_qxyz[2,0],
+                       rxyz.shape[0], &c_rxyz[0,0], &c_rxyz[1,0], &c_rxyz[2,0],
+                       num_atom_types, &c_atom_types[0], &c_cromermann[0], &c_V[0],
+                       &bragg_intensities[0], &diffuse_intensities[0])
+        else:
+            raise ValueError('uninterpretable device_id: %s' % str(device_id))
+                                   
+        # deal with the output
+        output_sanity_check(bragg_intensities)
+        output_sanity_check(diffuse_intensities)
+    
+        return bragg_intensities, diffuse_intensities
+        
+        
 
 # FIND OUT IF A GPU IS AVAILABLE
 global GPU_ENABLED

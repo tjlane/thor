@@ -69,7 +69,7 @@ class _NonRandomState(np.random.RandomState):
 def simulate_atomic(traj, num_molecules, detector, traj_weights=None,
                     finite_photon=False, ignore_hydrogens=False, 
                     dont_rotate=False, procs_per_node=1, 
-                    nodes=[], devices=[], random_state=None):
+                    nodes=[], devices=[], random_state=None, U=None):
     """
     Simulate a scattering 'shot', i.e. one exposure of x-rays to a sample.
     
@@ -117,6 +117,10 @@ def simulate_atomic(traj, num_molecules, detector, traj_weights=None,
     dont_rotate : bool
         Don't apply a random rotation to the molecule before computing the
         scattering. Good for debugging and the like.
+
+    U : ndarray, float
+        Atomic displacement parameters, either a 1d n_atoms array [isotropic case]
+        or 3d (n_atoms, 3, 3,) tensor.
         
     Returns
     -------
@@ -180,6 +184,21 @@ def simulate_atomic(traj, num_molecules, detector, traj_weights=None,
         atoms_to_keep = np.ones(n_atoms, dtype=np.bool)
         
     
+    # if a 1d U matrix is passed, expand to 3d; if no U matrix is input,
+    # set all elements to zero
+    n_atoms = len(atoms_to_keep)
+    if U is None:
+        U = np.zeros((n_atoms, 3, 3))
+    elif U.shape == (n_atoms,):
+        e = np.eye(3)
+        U = U[:,None,None] * e[None,None,:]
+    elif U.shape == (n_atoms, 3, 3):
+        # correctly sized for lower level interface
+        pass
+    else:
+        raise TypeError("U matrix has invalide shape.")
+
+
     qxyz = _qxyz_from_detector(detector)
     amplitudes = np.zeros(qxyz.shape[0], dtype=np.complex128)
     
@@ -196,7 +215,8 @@ def simulate_atomic(traj, num_molecules, detector, traj_weights=None,
                                                        procs_per_node=procs_per_node,
                                                        nodes=nodes,
                                                        devices=devices,
-                                                       random_state=random_state)
+                                                       random_state=random_state,
+                                                       U=U)
                                                        
     if finite_photon is not False:
         intensities = np.square(np.abs(amplitudes))
@@ -254,13 +274,104 @@ def simulate_density(grid, grid_spacing, num_molecules, detector,
                                                   procs_per_node=procs_per_node,
                                                   nodes=nodes,
                                                   devices=devices,
-                                                  random_state=random_state)
+                                                  random_state=random_state,
+                                                  U=None)
     
     # put the output back in sq grid form if requested
     if reshape_output:
         amplitudes = amplitudes.T.reshape(*gs)
     
     return amplitudes
+    
+    
+def simulate_diffuse(traj, detector, covariance_tensor,
+                     ignore_hydrogens=False, device_id='CPU'):
+    """
+    Simulate the multivariate normal diffuse scatter from `traj`.
+                     
+    Parameters
+    ----------
+    traj : mdtraj.trajectory
+        A trajectory object that contains a set of structures, representing
+        the Boltzmann ensemble of the sample. If len(traj) == 1, then we assume
+        the sample consists of a single homogenous structure, replecated 
+        `num_molecules` times.
+        
+    detector : thor.xray.Detector OR ndarray, float
+        A detector object the shot will be projected onto. Can alternatively be
+        just an n x 3 array of q-vectors to project onto.
+        
+    covariance_tensor : np.ndarray, float
+        Either a 2d n_atoms x n_atoms matrix [isotropic case] or 4d (n_atoms,
+        n_atoms, 3, 3) tensor. 
+
+        
+    Optional Parameters
+    -------------------
+    ignore_hydrogens : bool
+        Ignore hydrogens in calculation. Hydrogens are often costly to compute
+        and don't change the scattering appreciably.
+        
+    dont_rotate : bool
+        Don't apply a random rotation to the molecule before computing the
+        scattering. Good for debugging and the like.
+        
+    Returns
+    -------
+    intensities : ndarray, float
+        A flat array of the simulated intensities, each position corresponding
+        to a scattering vector from `qxyz`.
+    """
+
+    
+    # extract the atomic numbers & CM parameters
+    atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
+    cromermann_parameters, atom_types = get_cromermann_parameters(atomic_numbers)
+    
+    
+    # if we're getting a speedup by ignoring hydrogens, find em and slice em
+    n_atoms = len(atomic_numbers)
+    if ignore_hydrogens == True:
+        atoms_to_keep = (atomic_numbers != 1)
+        atomic_numbers = atomic_numbers[atoms_to_keep]
+        n_H = n_atoms - np.sum(atoms_to_keep)
+        logger.debug('Ignoring %d hydrogens (of %d atoms)' % (n_H, n_atoms))
+    else:
+        atoms_to_keep = np.ones(n_atoms, dtype=np.bool)
+        
+    
+    qxyz = _qxyz_from_detector(detector)
+    amplitudes = np.zeros(qxyz.shape[0], dtype=np.complex128)
+    
+
+    if traj.xyz.shape[0] > 1:
+        logger.info('using only 1st frame of trajectory to sim diffuse...')
+
+    rxyz = traj.xyz[0,atoms_to_keep,:] * 10.0 # convert nm --> Angstroms
+    
+    # if a 2d covariance_tensor is passed, expand it to 4d for the 
+    # lower level interface
+    n_atoms = len(atoms_to_keep)
+    if covariance_tensor.shape == (n_atoms, n_atoms):
+        # expand -- should have the same value on the 3x3 diagonals
+        e = np.diag((1,1,1))
+        covariance_tensor = covariance_tensor[:,:,None,None] * e[None,None,:,:]
+    elif covariance_tensor.shape == (n_atoms, n_atoms, 3, 3):
+        # correctly sized full tensor
+        pass
+    else:
+        raise TypeError('`covariance_tensor` has an invalid shape. Expected'
+                        '%s [,3,3], got %s' % (str((n_atoms, n_atoms)), 
+                                               str(covariance_tensor.shape)))
+        
+    # call through to c-code or cuda code
+    intensities = _cppscatter.cpp_scatter_diffuse(rxyz, qxyz,
+                                                  atom_types,
+                                                  cromermann_parameters,
+                                                  covariance_tensor,
+                                                  device_id=device_id)
+    
+    return intensities
     
         
 def atomic_formfactor(atomic_Z, q_mag):
