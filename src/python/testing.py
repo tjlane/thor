@@ -4,8 +4,6 @@ import os.path
 import functools
 from pkg_resources import resource_filename
 
-from nose import SkipTest
-
 import numpy as np
 from numpy.testing import assert_array_almost_equal, assert_array_equal
 
@@ -14,14 +12,14 @@ logging.basicConfig()
 logger = logging.getLogger(__name__)
 
 # decorator to skip tests
-def skip(rason):
-    def wrap(test):
-        @functools.wraps(test)
-        def inner(*args, **kwargs):
-            raise SkipTest
-            print("After f(*args)")
-        return inner
-    return wrap
+#def skip(rason):
+#    def wrap(test):
+#        @functools.wraps(test)
+#        def inner(*args, **kwargs):
+#            raise SkipTest
+#            print("After f(*args)")
+#        return inner
+#    return wrap
     
 # decorator to mark tests as expected failure
 def expected_failure(test):

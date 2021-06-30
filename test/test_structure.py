@@ -12,7 +12,7 @@ from scipy import ndimage
 
 from thor import structure
 from thor import math2
-from thor.testing import skip, ref_file
+from thor.testing import ref_file
 
 
 def test_pad_grid_to_square():

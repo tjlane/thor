@@ -7,7 +7,6 @@ import os
 import sys
 import warnings
 import tables
-from nose import SkipTest
 
 import numpy as np
 
@@ -20,9 +19,11 @@ from thor import xray
 from thor import parse
 from thor import structure
 from thor import scatter
-from thor.testing import (skip, ref_file, expected_failure, 
+from thor.testing import (ref_file, expected_failure, 
                           brute_force_masked_correlation)
 from thor.refdata import cromer_mann_params, get_cromermann_parameters
+
+import pytest
 
 import mdtraj
 from mdtraj import Trajectory, io
@@ -290,7 +291,7 @@ class TestShotset(object):
     def test_len(self):
         assert len(self.shot) == self.num_shots
 
-    @skip # not in yet
+    @pytest.mark.skip(reason="not in yet")
     def test_add(self):
         ss = self.shot + self.shot
         assert len(ss) == 2 * len(self.shot)
@@ -346,7 +347,7 @@ class TestShotset(object):
         assert ip[1] > ip[0]
         assert ip[1] > ip[2]
 
-    @skip
+    @pytest.mark.skip()
     def test_interpolation_consistency(self):
         q_values = np.array([2.0, 4.0])
         de = xray.Detector.generic(spacing=0.4, force_explicit=True)
@@ -897,7 +898,7 @@ class TestRings(object):
         d2 = r.correlate_difference(q, q, normed=True, intensity_normed=True)
         assert not np.any( np.isnan(d2) ), 'nans found when intensity_normed=True'
         
-    @skip # skip until convention is set
+    @pytest.mark.skip()
     def test_convert_to_kam(self):
         intra = self.rings.correlate_intra(1.0, 1.0, mean_only=True)
         kam_corr = self.rings._convert_to_kam(1.0, 1.0, intra)
@@ -1037,7 +1038,7 @@ class TestMisc(object):
 
     # this test is not working quite right, it fails a lot
     # maybe we can make it deterministic in the future
-    @skip
+    @pytest.mark.skip()
     def test_iprofile_consistency(self):
 
         t = structure.load_coor(ref_file('gold1k.coor'))

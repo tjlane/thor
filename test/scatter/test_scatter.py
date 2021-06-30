@@ -12,17 +12,14 @@ import numpy as np
 from numpy.linalg import norm
 from numpy.testing import assert_almost_equal, assert_allclose
 
-from nose import SkipTest
-
 import mdtraj
-import matplotlib.pyplot as plt
 
 from thor import _cppscatter
 from thor import xray
 from thor import scatter
 from thor import structure
 from thor.refdata import get_cromermann_parameters, cromer_mann_params
-from thor.testing import skip, ref_file, gputest
+from thor.testing import ref_file, gputest
 
 import time
 global RANDOM_SEED
@@ -267,7 +264,7 @@ def debye_reference(trajectory, weights=None, q_values=None):
 # ------------------------------------------------------------------------------
 #                           END REFERENCE IMPLEMENTATIONS
 # ------------------------------------------------------------------------------
-#                              BEGIN nosetest CLASSES
+#                              BEGIN test CLASSES
 # ------------------------------------------------------------------------------
 
     

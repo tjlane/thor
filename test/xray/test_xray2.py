@@ -7,7 +7,6 @@ import os
 import sys
 import warnings
 import tables
-from nose import SkipTest
 
 import numpy as np
 from scipy import stats
@@ -18,7 +17,7 @@ from thor import utils
 from thor import xray
 from thor import parse
 from thor import structure
-from thor.testing import (skip, ref_file, expected_failure, 
+from thor.testing import (ref_file, expected_failure, 
                           brute_force_masked_correlation)
 from thor.refdata import cromer_mann_params
 
