@@ -1,13 +1,9 @@
 # instructions for the Travis CI build system
-# this file modified from https://gist.github.com/dan-blanchard/7045057
 
 language: python
 python:
-  - 2.7
-  #- 3.3
+  - 3.7
 
-# Setup anaconda
-# updated 2/6/17 with instructions: https://conda.io/docs/travis.html
 before_install:
   - sudo apt-get update
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
@@ -23,10 +19,10 @@ before_install:
   - conda info -a
 
 install:
-  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION binstar atlas numexpr numpy scipy matplotlib nose pytables pyyaml cython
-  - conda install -n test-environment --channel https://conda.binstar.org/omnia mdtraj --yes
-  - conda install -n test-environment --channel https://conda.anaconda.org/conda-forge pyfftw --yes
-  - conda install -n test-environment --channel https://conda.anaconda.org/conda-forge fabio --yes
+  - conda create -q -n thor python=$TRAVIS_PYTHON_VERSION
+  - conda install -n thor numexpr numpy scipy matplotlib pytables pyyaml cython pytest --yes
+  - conda install -n thor --channel omnia mdtraj --yes
+  - conda install -n thor --channel conda-forge pyfftw fabio --yes
   - source activate test-environment
   - python setup.py install
 
@@ -38,5 +34,5 @@ env:
 
 # Run tests
 script:
-  - nosetests -v "$TESTFOLDER"
+  - pytest "$TESTFOLDER"
 
