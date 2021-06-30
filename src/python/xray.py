@@ -2470,13 +2470,13 @@ class Rings(object):
             logger.debug('Using pyfftw/FFTW backend for FFTs')
             
             finp = pyfftw.n_byte_align_empty((self._batch_size, self.num_phi), 8, 'float64')
-            fout = pyfftw.n_byte_align_empty((self._batch_size, self.num_phi/2 + 1), 16, 'complex128')
+            fout = pyfftw.n_byte_align_empty((self._batch_size, self.num_phi//2 + 1), 16, 'complex128')
             fft_fwd = pyfftw.FFTW(finp, fout, direction='FFTW_FORWARD', 
                                   flags=('FFTW_MEASURE',), 
                                   threads=self.num_procs)
                                   
             bout = pyfftw.n_byte_align_empty((self._batch_size, self.num_phi), 8, 'float64')
-            binp = pyfftw.n_byte_align_empty((self._batch_size, self.num_phi/2 + 1), 16, 'complex128')
+            binp = pyfftw.n_byte_align_empty((self._batch_size, self.num_phi//2 + 1), 16, 'complex128')
             fft_bck = pyfftw.FFTW(binp, bout, direction='FFTW_BACKWARD', 
                                   flags=('FFTW_MEASURE',),
                                   threads=self.num_procs)
@@ -2638,7 +2638,7 @@ class Rings(object):
             A shape (`batch_size` x `phi_values`) array of polar intensities.
         """
         
-        num_batches = (self.num_shots / self._batch_size)
+        num_batches = (self.num_shots // self._batch_size)
         if (self.num_shots % self._batch_size) > 0: # catch remaining shots
             num_batches += 1
 

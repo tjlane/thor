@@ -21,6 +21,8 @@ from thor import structure
 from thor.refdata import get_cromermann_parameters, cromer_mann_params
 from thor.testing import ref_file, gputest
 
+import pytest
+
 import time
 global RANDOM_SEED
 RANDOM_SEED = int(time.time() * 1e6) % 4294967294
@@ -308,7 +310,8 @@ class TestCppScatter(object):
     
     def test_gpu_scatter(self):
 
-        if not GPU: raise SkipTest
+        if not GPU:
+            pytest.skip("unsupported configuration")
             
         cromermann_parameters, atom_types = get_cromermann_parameters(self.atomic_numbers)
         
@@ -485,9 +488,9 @@ class TestSimulateDensity(object):
         # make a 3d square pulse
         dens = np.zeros(self.gs)
         sq = 2 # size of box
-        dens[self.GRIDSIZE/2:self.GRIDSIZE/2+sq,
-             self.GRIDSIZE/2:self.GRIDSIZE/2+sq,
-             self.GRIDSIZE/2:self.GRIDSIZE/2+sq] = 1.0
+        dens[self.GRIDSIZE//2:self.GRIDSIZE//2+sq,
+             self.GRIDSIZE//2:self.GRIDSIZE//2+sq,
+             self.GRIDSIZE//2:self.GRIDSIZE//2+sq] = 1.0
              
         tst, ref = self.fft_and_simulate_density(dens)
         
@@ -560,7 +563,7 @@ def test_sph_harm():
     # compute the Kam-theoretic values of the Legendre coefficients C_ell, which
     # we will call "coeffsh"
     coeffsh_even = scatter.sph_harm_coefficients(traj, q_magnitudes,
-                                                 num_coefficients=num_coefficients/2)
+                                                 num_coefficients=num_coefficients//2)
     coeffsh_even = np.nan_to_num(coeffsh_even)
     coeffsh_even /= coeffsh_even[1]
 
