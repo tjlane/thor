@@ -34,12 +34,7 @@ metadata = {
     'license': 'GPL v3.0',
     'url': 'https://github.com/tjlane/thor',
     'download_url': 'https://github.com/tjlane/thor',
-    'install_requires': ['numpy', 'scipy', 'matplotlib', 'pyyaml', 'mdtraj', 
-                         'nose', 'cython>=0.16', 'tables'],
-    'dependency_links' : ['https://github.com/kif/fabio/tarball/master#egg=fabio-0.1.3'],
     'platforms': ['Linux', 'OSX'],
-    'zip_safe': False,
-    'test_suite': "nose.collector",
     'description': "Code for Structure Determination",
     'long_description': """THOR is a simulation toolpackage for producing
 models of biomolecular structures consistent with a large set of experimental
@@ -282,13 +277,13 @@ else:
                            include_dirs = [get_numpy_include(), 'src/scatter'],
                            language='c++')
 
-misc = Extension('thor.misc_ext',
-                 sources=['src/misc/misc_wrap.pyx', 'src/misc/solidangle.cpp'],
-                 extra_compile_args = ['-O3', '-fPIC', '-Wall'],
-                 runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
-                 extra_link_args = ['-lstdc++', '-lm'],
-                 include_dirs = [get_numpy_include(), 'src/misc'],
-                 language='c++')
+#misc = Extension('thor.misc_ext',
+#                 sources=['src/misc/misc_wrap.pyx', 'src/misc/solidangle.cpp'],
+#                 extra_compile_args = ['-O3', '-fPIC', '-Wall'],
+#                 runtime_library_dirs=['/usr/lib', '/usr/local/lib'],
+#                 extra_link_args = ['-lstdc++', '-lm'],
+#                 include_dirs = [get_numpy_include(), 'src/misc'],
+#                 language='c++')
 
 corr = Extension('thor.corr',
                  sources=['src/corr/correlate.pyx', 'src/corr/corr.cpp'],
@@ -301,7 +296,8 @@ corr = Extension('thor.corr',
 
 metadata['packages']     = ['thor']
 metadata['package_dir']  = {'thor' : 'src/python'}
-metadata['ext_modules']  = [cppscatter, misc, corr]
+#metadata['ext_modules']  = [cppscatter, misc, corr]
+metadata['ext_modules']  = [cppscatter, corr]
 metadata['scripts']      = [s for s in glob('scripts/*') if not s.endswith('__.py')]
 metadata['package_data'] = {'thor' : glob('./reference/*')}
 metadata['cmdclass']     = {'build_ext': custom_build_ext}

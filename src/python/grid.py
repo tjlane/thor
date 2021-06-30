@@ -58,7 +58,7 @@ def _grid_indices(slice_xyz):
     an N x 3 array of integers: idx
     such that: grid[idx] = lower left corner
     """
-    return (slice_xyz // 1).reshape(-1, 3).astype(np.int)
+    return (slice_xyz // 1).reshape(-1, 3).astype(int)
 
 
 def slice_grid(grid, rot_matrix, slice_res=1.0, slice_extent=None):

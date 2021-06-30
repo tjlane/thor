@@ -19,7 +19,6 @@ from scipy import optimize
 from scipy import spatial
 from scipy import special
 
-from scipy.misc import factorial
 from scipy.ndimage import filters, interpolation, morphology
 from scipy.signal import fftconvolve
 from scipy.interpolate import interpn
