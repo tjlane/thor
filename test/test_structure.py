@@ -45,8 +45,8 @@ class TestAtomicToDensity(object):
             grid = structure.atomic_to_density(traj, (51,)*3, spcg)
             
             maxima = math2.find_local_maxima(grid)
-            grid_maxima  = np.array(maxima).astype(np.float).T
-            grid_maxima -= (np.array(grid.shape) / 2 + 1.0)[None,:] # center around origin
+            grid_maxima  = np.array(maxima).astype(float).T
+            grid_maxima -= (np.array(grid.shape) // 2 + 1.0)[None,:] # center around origin
             grid_maxima *= spcg                                     # apply correct scale
             
             grid_maxima = grid_maxima[pi]

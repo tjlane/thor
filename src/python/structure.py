@@ -211,8 +211,8 @@ def pad_grid_to_square(grid, min_pad_size=0):
     too_add = [ max( ms-s+2*min_pad_size, 2*min_pad_size) for s in grid.shape ]
     too_add = np.array(too_add)
     
-    bottom = too_add / 2
-    top    = too_add / 2 + too_add % 2
+    bottom = too_add // 2
+    top    = too_add // 2 + too_add % 2
     assert np.all(top + bottom == too_add)
     pt = [ (bottom[i], top[i]) for i in range(len(grid.shape)) ]
     
@@ -466,7 +466,7 @@ def atomic_to_density(traj, grid_dimensions, grid_spacing, radial_cutoff=3.0):
     center = np.array(grid_dimensions) / 2.0 + np.array([0.5, 0.5, 0.5])
     nxyz = np.mgrid[:grid_dimensions[0],
                     :grid_dimensions[1],
-                    :grid_dimensions[2]].astype(np.float) - center[:,None,None,None]
+                    :grid_dimensions[2]].astype(float) - center[:,None,None,None]
     nxyz *= grid_spacing
 
     atomic_numbers = np.array([ a.element.atomic_number for a in traj.topology.atoms ])
