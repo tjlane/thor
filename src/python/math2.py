@@ -60,7 +60,7 @@ def smooth(x, beta=10.0, window_size=11):
     y = np.convolve( w/w.sum(), s, mode='valid' )
     
     # remove the extra array length convolve adds
-    b = (window_size-1) / 2
+    b = (window_size-1) // 2
     smoothed = y[b:len(y)-b]
     
     return smoothed

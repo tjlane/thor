@@ -90,7 +90,8 @@ cdef extern from "cpp_scatter.hh":
 
 def _detect_gpus():
     try:
-        gpu_list = subprocess.check_output(['nvidia-smi', '-L']).strip().split('\n')
+        nsmi_ret = subprocess.check_output(['nvidia-smi', '-L']).decode()
+        gpu_list = nsmi_ret.strip().split('\n')
     except OSError as e:
         gpu_list = []
 

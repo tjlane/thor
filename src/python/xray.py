@@ -868,7 +868,24 @@ class Detector(Beam):
         """ recover a Detector object from a serialized array """
         if serialized.shape == (1,):
             serialized = serialized[0]
-        d = pickle.loads( str(serialized) )
+        try:
+            d = pickle.loads(serialized)
+        
+        except UnicodeDecodeError as e:
+
+            bd = pickle.loads(serialized, encoding='bytes')
+
+            print(bd.__dict__[b'_xyz_type'])
+            if bd.__dict__[b'_xyz_type'] == b'implicit':
+                raise NotImplementedError('make a new one')
+                xyz = bd.__dict__[b'_basis_grid']
+            elif bd.__dict__[b'_xyz_type'] == b'explicit':
+                xyz = bd.__dict__[b'xyz']
+
+            d = Detector(xyz, 
+                         bd.__dict__[b'k'], 
+                         bd.__dict__[b'beam_vector'])
+            print(type(d), dir(d))
         return d
 
 
@@ -2994,7 +3011,7 @@ class Rings(object):
         q_ind1 = self.q_index(q1)
         q_ind2 = self.q_index(q2)
 
-        max_pairs = self.num_shots * (self.num_shots - 1) / 2
+        max_pairs = self.num_shots * (self.num_shots - 1) // 2
         
         # Check if mask exists
         if self.polar_mask is not None:
